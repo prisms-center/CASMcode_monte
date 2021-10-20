@@ -11,6 +11,29 @@
 namespace CASM {
 namespace monte {
 
+/// \brief A `ConfigGenerator` for state generation -- always returns the same
+/// configuration
+///
+/// - For use with `IncrementalConditionsStateGenerator`.
+/// - Returns the same `_ConfigType` no matter what the current
+///   conditions and finished states are.
+template <typename _ConfigType>
+class FixedConfigGenerator {
+ public:
+  using _ConfigType ConfigType;
+  FixedConfigGenerator(ConfigType const &configuration)
+      : m_configuration(configuration) {}
+
+  clexulator::ConfigDoFValues operator()(
+      VectorValueMap conditions,
+      std::vector<State<ConfigType>> const &finished_states) const {
+    return m_configuration;
+  }
+
+ private:
+  ConfigType m_configuration;
+};
+
 /// \brief Generates a series of states by constant conditions increments
 ///
 /// The run information needed to check completion and generate subsequent
@@ -21,6 +44,9 @@ class IncrementalConditionsStateGenerator
  public:
   using _ConfigType ConfigType;
   using State<_ConfigType> RunInfoType;
+  using std::function<ConfigType(VectorValueMap,
+                                 std::vector<State<ConfigType>> const &)>
+      ConfigGenerator;
 
   /// \brief Constructor
   ///
@@ -34,10 +60,11 @@ class IncrementalConditionsStateGenerator
   ///     point for the next state. If false, always use the configuration of
   ///     the initial state.
   IncrementalConditionsStateGenerator(
-      State<ConfigType> const &_initial_state,
+      ConfigGenerator const &_config_generator,
       VectorValueMap const &_conditions_increment, Index _n_states,
       bool _dependent_runs)
-      : m_initial_state(_initial_state),
+      : m_config_generator(_config_generator),
+        m_initial_conditions(_initial_conditions),
         m_conditions_increment(_conditions_increment),
         m_n_states(_n_states),
         m_dependent_runs(_dependent_runs) {}
@@ -51,21 +78,22 @@ class IncrementalConditionsStateGenerator
   /// \brief Return the next state
   State<ConfigType> next_state(
       std::vector<State<ConfigType>> const &final_states) override {
-    State<ConfigType> state((m_dependent_runs && final_states.size())
-                                ? final_states.back()
-                                : m_initial_state);
+    VectorValueMap next_conditions;
     if (final_states.size() == 0) {
-      return state;
+      next_conditions = m_initial_conditions;
     } else {
+      next_conditions = final_states.back();
       for (auto const &pair : m_conditions_increment) {
-        state.conditions[pair.first] += pair.second;
+        next_conditions[pair.first] += pair.second;
       }
     }
-    return state;
+
+    return State<ConfigType>(m_config_generator(next_conditions, final_states),
+                             next_conditions);
   }
 
  private:
-  ConfigType m_initial_configuration;
+  ConfigGenerator m_config_generator;
   VectorValueMap m_initial_conditions;
   VectorValueMap m_conditions_increment;
   Index m_n_states;
