@@ -115,18 +115,7 @@ class OccCandidateList {
 
   Index size() const { return m_end; }
 
-  const std::vector<OccSwap> &canonical_swap() const {
-    return m_canonical_swap;
-  }
-
-  const std::vector<OccSwap> &grand_canonical_swap() const {
-    return m_grand_canonical_swap;
-  }
-
  private:
-  /// \brief Construct m_canonical_swaps, m_grand_canonical_swaps
-  void _make_possible_swaps(const Conversions &convert);
-
   /// m_converter[asym][species_index] -> candidate_index
   std::vector<std::vector<Index>> m_species_to_cand_index;
 
@@ -135,13 +124,15 @@ class OccCandidateList {
   /// Number of allowed candidates, what is returned if a candidate is not
   /// allowed
   Index m_end;
-
-  /// vector of allowed canonical swaps
-  std::vector<OccSwap> m_canonical_swap;
-
-  /// vector of allowed grand canonical swaps
-  std::vector<OccSwap> m_grand_canonical_swap;
 };
+
+/// \brief Construct OccSwap allowed for canonical Monte Carlo
+std::vector<OccSwap> make_canonical_swaps(
+    Conversions const &convert, OccCandidateList const &occ_candidate_list);
+
+/// \brief Construct OccSwap allowed for grand canonical Monte Carlo
+std::vector<OccSwap> make_grand_canonical_swaps(
+    const Conversions &convert, OccCandidateList const &occ_candidate_list);
 
 }  // namespace monte
 }  // namespace CASM

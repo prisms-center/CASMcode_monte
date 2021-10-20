@@ -38,6 +38,8 @@ jsonParser &to_json(monte::OccSwap const &swap,
   return json;
 }
 
+/// \brief Write OccCandidateList to json, including all possible canonical and
+///     grand canonical swaps
 jsonParser &to_json(monte::OccCandidateList const &list,
                     monte::Conversions const &convert, jsonParser &json) {
   jsonParser tmp;
@@ -49,16 +51,17 @@ jsonParser &to_json(monte::OccCandidateList const &list,
     json["candidate"].push_back(to_json(*it, convert, tmp));
   }
 
-  json["canonical_swap"].put_array();
-  for (auto it = list.canonical_swap().begin();
-       it != list.canonical_swap().end(); ++it) {
-    json["candidate_swap"].push_back(to_json(*it, convert, tmp));
+  json["canonical_swaps"].put_array();
+  auto canonical_swaps = make_canonical_swaps(convert, list);
+  for (auto it = canonical_swaps.begin(); it != canonical_swaps.end(); ++it) {
+    json["candidate_swaps"].push_back(to_json(*it, convert, tmp));
   }
 
-  json["grand_canonical_swap"].put_array();
-  for (auto it = list.grand_canonical_swap().begin();
-       it != list.grand_canonical_swap().end(); ++it) {
-    json["grand_candidate_swap"].push_back(to_json(*it, convert, tmp));
+  json["grand_canonical_swaps"].put_array();
+  auto grand_canonical_swaps = make_grand_canonical_swaps(convert, list);
+  for (auto it = grand_canonical_swaps.begin();
+       it != grand_canonical_swaps.end(); ++it) {
+    json["grand_candidate_swaps"].push_back(to_json(*it, convert, tmp));
   }
 
   return json;

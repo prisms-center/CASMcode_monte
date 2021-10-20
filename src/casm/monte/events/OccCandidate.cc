@@ -35,18 +35,13 @@ OccCandidateList::OccCandidateList(const Conversions &convert) {
     m_species_to_cand_index[cand.asym][cand.species_index] = index;
     ++index;
   }
-
-  // make canonical and grand canonical swaps
-  _make_possible_swaps(convert);
 }
 
-/// \brief Construct m_canonical_swaps, m_grand_canonical_swaps
-///
-/// - Currently settings is not used, but we could add restrictions
-void OccCandidateList::_make_possible_swaps(const Conversions &convert) {
-  // construct canonical and grand canonical swaps
-  m_canonical_swap.clear();
-  m_grand_canonical_swap.clear();
+/// \brief Construct OccSwap allowed for canonical Monte Carlo
+std::vector<OccSwap> make_canonical_swaps(
+    Conversions const &convert, OccCandidateList const &occ_candidate_list) {
+  // construct canonical swaps
+  std::vector<OccSwap> canonical_swaps;
 
   // check that species are different and allowed on both sites
   auto allowed_canonical_swap = [&](OccCandidate cand_a, OccCandidate cand_b) {
@@ -54,6 +49,27 @@ void OccCandidateList::_make_possible_swaps(const Conversions &convert) {
            convert.species_allowed(cand_a.asym, cand_b.species_index) &&
            convert.species_allowed(cand_b.asym, cand_a.species_index);
   };
+
+  // for each pair of candidates, check if they are allowed to swap
+  for (const auto &cand_a : occ_candidate_list) {
+    for (const auto &cand_b : occ_candidate_list) {
+      // don't repeat a->b, b->a
+      // and check that cand_b's species is allowed on cand_a's sublat && vice
+      // versa
+      if (cand_a < cand_b && allowed_canonical_swap(cand_a, cand_b)) {
+        canonical_swaps.push_back(OccSwap(cand_a, cand_b));
+      }
+    }
+  }
+
+  return canonical_swaps;
+}
+
+/// \brief Construct OccSwap allowed for grand canonical Monte Carlo
+std::vector<OccSwap> make_grand_canonical_swaps(
+    const Conversions &convert, OccCandidateList const &occ_candidate_list) {
+  // construct grand canonical swaps
+  std::vector<OccSwap> grand_canonical_swaps;
 
   // check that asym is the same and species_index is different
   auto allowed_grand_canonical_swap = [&](OccCandidate cand_a,
@@ -63,22 +79,16 @@ void OccCandidateList::_make_possible_swaps(const Conversions &convert) {
   };
 
   // for each pair of candidates, check if they are allowed to swap
-  for (const auto &cand_a : m_candidate) {
-    for (const auto &cand_b : m_candidate) {
-      // don't repeat a->b, b->a
-      // and check that cand_b's species is allowed on cand_a's sublat && vice
-      // versa
-      if (cand_a < cand_b && allowed_canonical_swap(cand_a, cand_b)) {
-        m_canonical_swap.push_back(OccSwap(cand_a, cand_b));
-      }
-
+  for (const auto &cand_a : occ_candidate_list) {
+    for (const auto &cand_b : occ_candidate_list) {
       // allow a->b, b->a
       // check that asym is the same and species_index is different
       if (allowed_grand_canonical_swap(cand_a, cand_b)) {
-        m_grand_canonical_swap.push_back(OccSwap(cand_a, cand_b));
+        grand_canonical_swaps.push_back(OccSwap(cand_a, cand_b));
       }
     }
   }
+  return grand_canonical_swaps;
 }
 
 }  // namespace monte

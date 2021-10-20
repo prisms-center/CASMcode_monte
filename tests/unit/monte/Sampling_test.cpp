@@ -32,6 +32,7 @@ void run_case(std::shared_ptr<xtal::BasicStructure const> shared_prim,
 
   // construct OccCandidateList
   monte::OccCandidateList cand_list(convert);
+  auto canonical_swaps = make_canonical_swaps(convert, cand_list);
 
   // construct OccLocation
   monte::OccLocation occ_loc(convert, cand_list);
@@ -43,7 +44,7 @@ void run_case(std::shared_ptr<xtal::BasicStructure const> shared_prim,
     if (count % 1000 == 0) {
       sampler.sample(state);
     }
-    propose_canonical_event(e, occ_loc, cand_list.canonical_swap(), mtrand);
+    propose_canonical_event(e, occ_loc, canonical_swaps, mtrand);
     occ_loc.apply(e, occupation);
     ++count;
   }

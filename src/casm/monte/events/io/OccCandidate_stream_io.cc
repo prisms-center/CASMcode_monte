@@ -26,6 +26,8 @@ std::ostream &operator<<(
   return sout;
 }
 
+/// \brief Write OccCandidateList to stream, including all possible canonical
+///     and grand canonical swaps
 std::ostream &operator<<(
     std::ostream &sout,
     std::pair<monte::OccCandidateList const &, monte::Conversions const &>
@@ -61,15 +63,16 @@ std::ostream &operator<<(
   sout << "\n";
 
   sout << "Canonical swaps: " << std::endl;
-  for (auto it = list.canonical_swap().begin();
-       it != list.canonical_swap().end(); ++it) {
+  auto canonical_swaps = make_canonical_swaps(convert, list);
+  for (auto it = canonical_swaps.begin(); it != canonical_swaps.end(); ++it) {
     sout << "  " << swap_pair(*it, convert) << "\n";
   }
   sout << "\n";
 
   sout << "Grand canonical swaps: " << std::endl;
-  for (auto it = list.grand_canonical_swap().begin();
-       it != list.grand_canonical_swap().end(); ++it) {
+  auto grand_canonical_swaps = make_grand_canonical_swaps(convert, list);
+  for (auto it = grand_canonical_swaps.begin();
+       it != grand_canonical_swaps.end(); ++it) {
     sout << "  " << cand_pair(it->cand_a, convert) << " -> "
          << cand_pair(it->cand_b, convert) << "\n";
   }
