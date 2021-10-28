@@ -11,6 +11,8 @@ namespace monte {
 
 // Sampled data from a single run (constant conditions)
 struct SampledData {
+  // TODO: use Eigen::MatrixXd here?
+
   /// Map of <sampler name>:<sampler>
   std::map<std::string, std::shared_ptr<Sampler>> samplers;
 

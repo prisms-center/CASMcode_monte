@@ -19,12 +19,14 @@ namespace monte {
 ///   information is provided to a particular state generation method. In the
 ///   basic case, it will be the final state for each run. Templating allows
 ///   support for more complex cases where the next state could be generated
-///   based on the sampled data generated during previous runs.
+///   based on the sampled data collected during previous runs.
 template <typename _ConfigType, typename _RunInfoType>
 class StateGenerator {
  public:
   typedef _ConfigType ConfigType;
   typedef _RunInfoType RunInfoType;
+
+  virtual ~StateGenerator() {}
 
   /// \brief Check if calculations are complete, using info from all finished
   ///     runs

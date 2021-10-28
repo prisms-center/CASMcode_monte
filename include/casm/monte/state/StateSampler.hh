@@ -143,7 +143,7 @@ std::unique_ptr<StateSampler<ConfigType>> make_conditions_sampler(
     return state.conditions.at(condition_name);
   };
   StateSamplingFunction<ConfigType> f(name, description, lambda);
-  return notstd::make_unique<StateSampler<ConfigType>>(f);
+  return std::make_unique<StateSampler<ConfigType>>(f);
 }
 
 template <typename ConfigType>
@@ -153,7 +153,7 @@ std::unique_ptr<StateSampler<ConfigType>> make_properties_sampler(
     return state.properties.at(property_name);
   };
   StateSamplingFunction<ConfigType> f(name, description, lambda);
-  return notstd::make_unique<StateSampler<ConfigType>>(f);
+  return std::make_unique<StateSampler<ConfigType>>(f);
 }
 
 template <typename ConfigType>
@@ -164,7 +164,7 @@ std::unique_ptr<StateSampler<ConfigType>> make_configuration_sampler(
     return function(state.configuration);
   };
   StateSamplingFunction<ConfigType> f(name, description, lambda);
-  return notstd::make_unique<StateSampler<ConfigType>>(f);
+  return std::make_unique<StateSampler<ConfigType>>(f);
 }
 
 }  // namespace monte
