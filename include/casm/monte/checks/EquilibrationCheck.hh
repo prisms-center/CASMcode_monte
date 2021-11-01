@@ -48,7 +48,7 @@ struct EquilibrationCheckResults {
 };
 
 EquilibrationCheckResults equilibration_check(
-    std::map<SamplerComponent, ConvergenceCheckParams> const
+    std::map<SamplerComponent, SamplerConvergenceParams> const
         &convergence_check_params,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
     bool check_all);

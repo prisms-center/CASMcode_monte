@@ -124,7 +124,7 @@ IndividualEquilibrationCheckResult equilibration_check(
 ///     `convergence_check_params.size() == 0`), otherwise it will be equal to
 ///     `get_n_samples(samplers) - N_samples_for_equilibration`.
 EquilibrationCheckResults equilibration_check(
-    std::map<SamplerComponent, ConvergenceCheckParams> const
+    std::map<SamplerComponent, SamplerConvergenceParams> const
         &convergence_check_params,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
     bool check_all) {
@@ -140,7 +140,7 @@ EquilibrationCheckResults equilibration_check(
   // check requested sampler components for equilibration
   for (auto const &p : convergence_check_params) {
     SamplerComponent const &key = p.first;
-    ConvergenceCheckParams const &value = p.second;
+    SamplerConvergenceParams const &value = p.second;
 
     // find and validate sampler name && component index
     auto sampler_it = find_or_throw(samplers, key);

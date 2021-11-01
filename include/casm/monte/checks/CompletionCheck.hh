@@ -21,16 +21,16 @@ struct CompletionCheckParams {
   CutoffCheckParams cutoff_params;
 
   /// \brief Sampler components that must be checked for convergence
-  std::map<SamplerComponent, ConvergenceCheckParams> convergence_check_params;
+  std::map<SamplerComponent, SamplerConvergenceParams> convergence_check_params;
 
   /// \brief Minimum number of samples before checking for completion
-  CountType check_begin = 0;
+  CountType check_begin = 10;
 
   /// \brief How often to check for completion
   ///
   /// Check for completion performed if:
   /// - n_samples % check_frequency == 0 && n_samples >= check_begin
-  CountType check_frequency = 0;
+  CountType check_frequency = 1;
 };
 
 /// \brief Stores completion check results

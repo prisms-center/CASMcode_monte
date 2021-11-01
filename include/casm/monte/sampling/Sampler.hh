@@ -36,7 +36,7 @@ class Sampler {
   void set_capacity_increment(CountType _capacity_increment);
 
   /// Return sampled vector component names
-  std::vector<std::string> const &component_names();
+  std::vector<std::string> const &component_names() const;
 
   /// Number of components (vector size) of samples
   Index n_components() const;
@@ -179,7 +179,7 @@ inline void Sampler::set_capacity_increment(CountType _capacity_increment) {
 }
 
 /// Return sampled vector component names
-inline std::vector<std::string> const &Sampler::component_names() {
+inline std::vector<std::string> const &Sampler::component_names() const {
   return m_component_names;
 }
 
