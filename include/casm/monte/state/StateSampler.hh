@@ -74,6 +74,12 @@ std::unique_ptr<StateSampler<ConfigType>> make_configuration_sampler(
     std::string name, std::string description,
     std::function<Eigen::VectorXd(ConfigType const &)> function);
 
+/// \brief Get component names for a particular function, else use defaults
+template <typename ConfigType>
+std::vector<std::string> get_component_names(
+    std::string const &function_name, Eigen::VectorXd const &value,
+    StateSamplingFunctionMap<ConfigType> const &sampling_functions);
+
 }  // namespace monte
 }  // namespace CASM
 
@@ -165,6 +171,35 @@ std::unique_ptr<StateSampler<ConfigType>> make_configuration_sampler(
   };
   StateSamplingFunction<ConfigType> f(name, description, lambda);
   return std::make_unique<StateSampler<ConfigType>>(f);
+}
+
+/// \brief Get component names for a particular function, else use defaults
+///
+/// Notes:
+/// - Used for naming conditions vector components using a sampling function
+///   of the same name.
+/// - If function not found, returns default component names ("0", "1", "2",
+///   ...)
+/// - Throws if function found, but component_names dimension does not match
+///   `dimension`.
+template <typename ConfigType>
+std::vector<std::string> get_component_names(
+    std::string const &function_name, Index dimension,
+    StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+  auto function_it = sampling_functions.find(function_name);
+  if (function_it == sampling_functions.end()) {
+    return default_component_names(dimension);
+  } else {
+    if (function_it->second.component_names.size() != dimension) {
+      std::stringstream msg;
+      CASM::err_log()
+          << "Error in get_component_names: Dimension of \"" << function_name
+          << "\" (" << dimension
+          << ") does not match the corresponding sampling function.";
+      throw std::runtime_error(msg.str());
+    }
+    return function_it->second.component_names;
+  }
 }
 
 }  // namespace monte

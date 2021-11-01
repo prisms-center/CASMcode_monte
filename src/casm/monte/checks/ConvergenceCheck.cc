@@ -125,6 +125,8 @@ IndividualConvergenceCheckResult convergence_check(
 ///
 /// \param convergence_check_params Sampler components to check, with requested
 ///     precision and confidence
+/// \param confidence Confidence level for calculated precision of mean.
+///     Typical value is 0.95.
 /// \param N_samples_for_equilibration Number of samples to exclude from
 ///     statistics because the system is out of equilibrium
 /// \param samplers All samplers
@@ -135,9 +137,9 @@ IndividualConvergenceCheckResult convergence_check(
 ///     `convergence_check_params.size() == 0`), otherwise it will be equal to
 ///     `get_n_samples(samplers) - N_samples_for_equilibration`.
 ConvergenceCheckResults convergence_check(
-    std::map<SamplerComponent, ConvergenceCheckParams> const
+    std::map<SamplerComponent, SamplerConvergenceParams> const
         &convergence_check_params,
-    CountType N_samples_for_equilibration,
+    double confidence, CountType N_samples_for_equilibration,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers) {
   ConvergenceCheckResults results;
   CountType N_samples = get_n_samples(samplers);
@@ -162,15 +164,16 @@ ConvergenceCheckResults convergence_check(
   // check requested sampler components for equilibration
   for (auto const &p : convergence_check_params) {
     SamplerComponent const &key = p.first;
-    ConvergenceCheckParams const &value = p.second;
+    SamplerConvergenceParams const &value = p.second;
 
     // find and validate sampler name && component index
-    auto sampler_it = find_or_throw(samplers, key);
+    Sampler const &sampler = *find_or_throw(samplers, key)->second;
 
     // do convergence check
-    IndividualConvergenceCheckResult current = convergence_check(
-        sampler_it->second->component(key.component_index),  // observations
-        value.precision, value.confidence);
+    IndividualConvergenceCheckResult current =
+        convergence_check(sampler.component(key.component_index)
+                              .tail(results.N_samples_for_statistics),
+                          value.precision, confidence);
 
     // combine results
     results.all_converged &= current.is_converged;

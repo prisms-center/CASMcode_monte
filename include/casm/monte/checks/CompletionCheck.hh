@@ -21,16 +21,19 @@ struct CompletionCheckParams {
   CutoffCheckParams cutoff_params;
 
   /// \brief Sampler components that must be checked for convergence
-  std::map<SamplerComponent, ConvergenceCheckParams> convergence_check_params;
+  std::map<SamplerComponent, SamplerConvergenceParams> convergence_check_params;
+
+  /// \brief Confidence level for calculated precision of mean
+  double confidence = 0.95;
 
   /// \brief Minimum number of samples before checking for completion
-  CountType check_begin = 0;
+  CountType check_begin = 10;
 
   /// \brief How often to check for completion
   ///
   /// Check for completion performed if:
   /// - n_samples % check_frequency == 0 && n_samples >= check_begin
-  CountType check_frequency = 0;
+  CountType check_frequency = 1;
 };
 
 /// \brief Stores completion check results
@@ -39,6 +42,9 @@ struct CompletionCheckResults {
   bool is_complete = false;
 
   EquilibrationCheckResults equilibration_check_results;
+
+  /// \brief Confidence level used for calculated precision of mean
+  double confidence = 0.95;
 
   ConvergenceCheckResults convergence_check_results;
 };

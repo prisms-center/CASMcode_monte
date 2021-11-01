@@ -13,6 +13,11 @@ namespace monte {
 /// \brief Sampler stores vector valued samples in a matrix
 class Sampler {
  public:
+  /// \brief Return type for a column vector block
+  typedef const Eigen::VectorBlock<
+      const Eigen::Block<const Eigen::MatrixXd, -1, 1, true>, -1>
+      const_vector_block_type;
+
   /// \brief Sampler constructor - default component names
   Sampler(Index n_components, CountType _capacity_increment = 1000);
 
@@ -36,7 +41,7 @@ class Sampler {
   void set_capacity_increment(CountType _capacity_increment);
 
   /// Return sampled vector component names
-  std::vector<std::string> const &component_names();
+  std::vector<std::string> const &component_names() const;
 
   /// Number of components (vector size) of samples
   Index n_components() const;
@@ -54,10 +59,10 @@ class Sampler {
   Eigen::Block<const Eigen::MatrixXd> values() const;
 
   /// \brief Get all samples of a particular component (a column of `values()`)
-  Eigen::Block<const Eigen::MatrixXd> component(Index component_index) const;
+  const_vector_block_type component(Index component_index) const;
 
   /// \brief Get a sample (a row of `values()`)
-  Eigen::Block<const Eigen::MatrixXd> sample(CountType sample_index) const;
+  Eigen::MatrixXd::ConstRowXpr sample(CountType sample_index) const;
 
  private:
   /// Size of vectors to be sampled
@@ -88,14 +93,20 @@ struct SamplerComponent {
   ///
   /// \param _sampler_name Name of Sampler
   /// \param _component_index Index into sampler output vector
-  SamplerComponent(std::string _sampler_name, Index _component_index)
-      : sampler_name(_sampler_name), component_index(_component_index) {}
+  SamplerComponent(std::string _sampler_name, Index _component_index,
+                   std::string _component_name)
+      : sampler_name(_sampler_name),
+        component_index(_component_index),
+        component_name(_component_name) {}
 
   /// Sampler name (i.e. "comp_n", "corr", etc.)
   std::string sampler_name = "";
 
   /// Sampler component index (i.e. 0, 1, etc.)
   Index component_index = 0;
+
+  /// Sampler component name (i.e. "0", "1", "Mg", "O", etc.)
+  std::string component_name = 0;
 
   bool operator<(SamplerComponent const &other) const;
 };
@@ -179,7 +190,7 @@ inline void Sampler::set_capacity_increment(CountType _capacity_increment) {
 }
 
 /// Return sampled vector component names
-inline std::vector<std::string> const &Sampler::component_names() {
+inline std::vector<std::string> const &Sampler::component_names() const {
   return m_component_names;
 }
 
@@ -201,15 +212,15 @@ inline Eigen::Block<const Eigen::MatrixXd> Sampler::values() const {
 }
 
 /// \brief Get all samples of a particular component (a column of `values()`)
-inline Eigen::Block<const Eigen::MatrixXd> Sampler::component(
+inline Sampler::const_vector_block_type Sampler::component(
     Index component_index) const {
-  return m_values.block(0, component_index, m_n_samples, 1);
+  return m_values.col(component_index).head(m_n_samples);
 }
 
 /// \brief Get a sample (a row of `values()`)
-inline Eigen::Block<const Eigen::MatrixXd> Sampler::sample(
+inline Eigen::MatrixXd::ConstRowXpr Sampler::sample(
     CountType sample_index) const {
-  return m_values.block(sample_index, 0, 1, m_values.cols());
+  return m_values.row(sample_index);
 }
 
 /// \brief Construct vector of ["0", "1", ..., std::string(n_components-1)]

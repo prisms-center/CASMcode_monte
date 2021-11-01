@@ -12,6 +12,7 @@ void CompletionCheck::_check(
     std::optional<CountType> count, std::optional<TimeType> time,
     CountType n_samples) {
   m_results = CompletionCheckResults();
+  m_results.confidence = m_params.confidence;
 
   // if minimums not met -> continue
   if (!all_minimums_met(m_params.cutoff_params, count, time, n_samples)) {
@@ -28,11 +29,11 @@ void CompletionCheck::_check(
 
     // if all requested to converge are equilibrated, then check convergence
     if (m_results.equilibration_check_results.all_equilibrated) {
-      m_results.convergence_check_results =
-          convergence_check(m_params.convergence_check_params,
-                            m_results.equilibration_check_results
-                                .N_samples_for_all_to_equilibrate,
-                            samplers);
+      m_results.convergence_check_results = convergence_check(
+          m_params.convergence_check_params, m_params.confidence,
+          m_results.equilibration_check_results
+              .N_samples_for_all_to_equilibrate,
+          samplers);
     }
 
     // if all requested to converge are converged, then complete

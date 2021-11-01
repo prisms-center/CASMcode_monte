@@ -3,18 +3,10 @@
 
 #include "casm/monte/definitions.hh"
 #include "casm/monte/sampling/Sampler.hh"
+#include "casm/monte/sampling/SamplerConvergenceParams.hh"
 
 namespace CASM {
 namespace monte {
-
-/// \brief Check sampler of given name for equilibration and convergence
-struct ConvergenceCheckParams {
-  /// \brief Requested precision
-  double precision = 0.0;
-
-  /// \brief Requested confidence
-  double confidence = 0.0;
-};
 
 /// \brief Convergence check results data structure (individual component)
 struct IndividualConvergenceCheckResult {
@@ -62,9 +54,9 @@ struct ConvergenceCheckResults {
 
 /// \brief Check convergence of all requested properties
 ConvergenceCheckResults convergence_check(
-    std::map<SamplerComponent, ConvergenceCheckParams> const
+    std::map<SamplerComponent, SamplerConvergenceParams> const
         &convergence_check_params,
-    CountType N_samples_for_equilibration,
+    double confidence, CountType N_samples_for_equilibration,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers);
 
 }  // namespace monte

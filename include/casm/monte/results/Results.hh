@@ -14,10 +14,12 @@ namespace monte {
 template <typename ConfigType>
 struct Results {
   Results(State<ConfigType> const &_initial_state)
-      : trajectory(1, _initial_state) {}
+      : conditions(_initial_state.conditions),
+        trajectory(1, _initial_state.configuration) {}
 
+  VectorValueMap conditions;
   SampledData sampled_data;
-  std::vector<State<ConfigType>> trajectory;
+  std::vector<ConfigType> trajectory;
   CompletionCheckResults completion_check_results;
 };
 

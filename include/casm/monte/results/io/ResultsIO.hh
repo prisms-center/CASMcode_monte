@@ -24,20 +24,8 @@ class ResultsIO {
   virtual ~ResultsIO() {}
 
   virtual std::vector<state_type> read_final_states() = 0;
-  virtual void write_trajectory(std::vector<state_type> const &trajectory,
-                                Index run_index) = 0;
-  virtual void write_observations(monte::SampledData const &sampled_data,
-                                  Index run_index) = 0;
-  virtual void write_initial_state(state_type const &initial_state,
-                                   Index run_index) = 0;
-  virtual void write_final_state(state_type const &final_state,
-                                 Index run_index) = 0;
-  virtual void write_completion_check_results(
-      monte::CompletionCheckResults const &completion_check_results,
-      Index run_index) = 0;
-  virtual void write_summary(
-      monte::CompletionCheckResults const &completion_check_results,
-      Index run_index) = 0;
+
+  virtual void write(results_type const &results, Index run_index) = 0;
 };
 
 }  // namespace monte

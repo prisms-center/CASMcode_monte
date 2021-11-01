@@ -27,29 +27,28 @@ struct SamplingParams {
   /// \brief Sample linearly or logarithmically
   ///
   /// Default=SAMPLE_METHOD::LINEAR
+  ///
+  /// Parameters for determining when samples are taken by count
+  ///
+  /// For SAMPLE_METHOD::LINEAR, take the n-th sample when:
+  ///
+  ///    sample/pass = ceil( begin + (period / samples_per_period) * n )
+  ///           time = begin + (period / samples_per_period) * n
+  ///
+  /// For SAMPLE_METHOD::LOG, take the n-th sample when:
+  ///
+  ///    sample/pass = ceil( begin + period ^ ( (n + shift) /
+  ///                      samples_per_period ) )
+  ///           time = begin + period ^ ( (n + shift) / samples_per_period )
+  ///
   SAMPLE_METHOD sample_method;
 
-  // --- Used for sampling BY_STEP or BY_PASS ---
+  // --- Parameters for determining when samples are taken by count ---
 
-  /// \brief Parameters for determining when samples are taken by count
-  ///
-  /// Linear sampling: count = a + b*n
-  /// Log sampling: count = a + b^(n-c)
-  ///   where n=sample index
-  ///
-  /// Default={0, 1} (sample period = 1)
-  std::vector<CountType> count_sampling_params;
-
-  // --- Used for sampling BY_TIME ---
-
-  /// \brief Parameters for determining when samples are taken by time
-  ///
-  /// Linear sampling: time = a + b*n
-  /// Log sampling: time = a + b^(n-c)
-  ///   where n=sample index, starting from 0
-  ///
-  /// Default={0., 1.} (sample period = 1.)
-  std::vector<TimeType> time_sampling_params;
+  double begin;
+  double period;
+  double samples_per_period;
+  double shift;
 
   /// \brief What to sample
   ///
@@ -62,15 +61,9 @@ struct SamplingParams {
   bool sample_trajectory;
 };
 
-/// The count when a particular sample is due
-CountType sample_count(SAMPLE_METHOD sample_method,
-                       std::vector<CountType> const &count_sampling_params,
-                       CountType sample_index);
-
-/// The time when a particular sample is due
-TimeType sample_time(SAMPLE_METHOD sample_method,
-                     std::vector<TimeType> const &time_sampling_params,
-                     CountType sample_index);
+/// The pass/step/time when a particular sample is due
+double sample_due(SamplingParams const &sampling_params,
+                  CountType sample_index);
 
 }  // namespace monte
 }  // namespace CASM
@@ -81,47 +74,38 @@ namespace CASM {
 namespace monte {
 
 /// Default constructor
+///
+/// Default values are:
+/// - sample_mode=SAMPLE_MODE::BY_PASS
+/// - sample_method=SAMPLE_METHOD::LINEAR
+/// - begin=0.0
+/// - period=1.0
+/// - samples_per_period=1.0
+/// - shift=0.0
+/// - sampler_names={}
+/// - sample_trajectory=false
 inline SamplingParams::SamplingParams()
     : sample_mode(SAMPLE_MODE::BY_PASS),
       sample_method(SAMPLE_METHOD::LINEAR),
-      count_sampling_params({0, 1}),
-      time_sampling_params({0., 1.}),
+      begin(0.0),
+      period(1.0),
+      samples_per_period(1.0),
+      shift(0.0),
       sampler_names({}),
       sample_trajectory(false) {}
 
-inline CountType sample_count(
-    SAMPLE_METHOD sample_method,
-    std::vector<CountType> const &count_sampling_params,
-    CountType sample_index) {
-  if (sample_method == SAMPLE_METHOD::LINEAR) {
-    auto &a = count_sampling_params[0];
-    auto &b = count_sampling_params[1];
-    auto &n = sample_index;
-    return a + b * n;
+/// The pass/step/time when a particular sample is due
+inline double sample_due(SamplingParams const &sampling_params,
+                         CountType sample_index) {
+  SamplingParams const &s = sampling_params;
+  double n = static_cast<double>(sample_index);
+  double value;
+  if (s.sample_method == SAMPLE_METHOD::LINEAR) {
+    value = s.begin + (s.period / s.samples_per_period) * n;
   } else /* sample_method == SAMPLE_METHOD::LOG */ {
-    auto &a = count_sampling_params[0];
-    auto &b = count_sampling_params[1];
-    auto &c = count_sampling_params[2];
-    auto &n = sample_index;
-    return a + pow(b, n - c);
+    value = s.begin + std::pow(s.period, (n + s.shift) / s.samples_per_period);
   }
-}
-
-inline TimeType sample_time(SAMPLE_METHOD sample_method,
-                            std::vector<TimeType> const &time_sampling_params,
-                            CountType sample_index) {
-  if (sample_method == SAMPLE_METHOD::LINEAR) {
-    auto &a = time_sampling_params[0];
-    auto &b = time_sampling_params[1];
-    auto &n = sample_index;
-    return a + b * n;
-  } else /* sample_method == SAMPLE_METHOD::LOG */ {
-    auto &a = time_sampling_params[0];
-    auto &b = time_sampling_params[1];
-    auto &c = time_sampling_params[2];
-    auto &n = sample_index;
-    return a + pow(b, n - c);
-  }
+  return value;
 }
 
 }  // namespace monte
