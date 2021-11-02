@@ -33,7 +33,7 @@ class jsonResultsIO : public ResultsIO<_ConfigType> {
       StateSamplingFunctionMap<config_type> const &sampling_functions);
 
   /// \brief Write run.<index>/trajectory.json
-  void write_trajectory(std::vector<state_type> const &trajectory,
+  void write_trajectory(std::vector<config_type> const &trajectory,
                         Index run_index);
 
   /// \brief Write run.<index>/observations.json

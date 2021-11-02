@@ -5,6 +5,7 @@
 #include "casm/casm_io/container/json_io.hh"
 #include "casm/casm_io/json/jsonParser.hh"
 #include "casm/monte/results/Results.hh"
+#include "casm/monte/results/io/json/jsonResultsIO.hh"
 
 namespace CASM {
 namespace monte {
@@ -19,9 +20,8 @@ inline jsonParser &ensure_initialized_objects(jsonParser &json,
       json[key].put_obj();
     } else if (!json[key].is_obj()) {
       std::stringstream msg;
-      msg << "JSON Error: \"" << key
-          << "\" is expected to be an object." throw std::runtime_error(
-                 msg.str());
+      msg << "JSON Error: \"" << key << "\" is expected to be an object.";
+      throw std::runtime_error(msg.str());
     }
   }
   return json;
@@ -35,9 +35,8 @@ inline jsonParser &ensure_initialized_arrays(jsonParser &json,
       json[key].put_array();
     } else if (!json[key].is_array()) {
       std::stringstream msg;
-      msg << "JSON Error: \"" << key
-          << "\" is expected to be an array." throw std::runtime_error(
-                 msg.str());
+      msg << "JSON Error: \"" << key << "\" is expected to be an array.";
+      throw std::runtime_error(msg.str());
     }
   }
   return json;
@@ -150,6 +149,7 @@ jsonParser &append_sampled_data_to_json(
     }
     ++i;
   }
+  return json;
 }
 
 /// \brief Append completion check results to summary JSON
@@ -167,10 +167,7 @@ jsonParser &append_completion_check_results_to_json(
     monte::Results<ConfigType> const &results, jsonParser &json) {
   auto const &completion_r = results.completion_check_results;
   auto const &equilibration_r = completion_r.equilibration_check_results;
-  Index N_samples_for_all_to_equilibrate =
-      equilibration_r.N_samples_for_all_to_equilibrate;
   auto const &convergence_r = completion_r.convergence_check_results;
-  Index N_samples_for_statistics = convergence_r.N_samples_for_statistics;
 
   ensure_initialized_arrays(
       json, {"all_equilibrated", "N_samples_for_all_to_equilibrate",
@@ -181,9 +178,9 @@ jsonParser &append_completion_check_results_to_json(
   json["N_samples_for_all_to_equilibrate"].push_back(
       equilibration_r.N_samples_for_all_to_equilibrate);
 
-  json["all_converged"].put_array(convergence_r.all_converged);
+  json["all_converged"].push_back(convergence_r.all_converged);
 
-  json["N_samples_for_statistics"].put_array(
+  json["N_samples_for_statistics"].push_back(
       convergence_r.N_samples_for_statistics);
 
   return json;
@@ -228,8 +225,8 @@ jsonResultsIO<_ConfigType>::jsonResultsIO(
 
 /// \brief Read a vector of final states of completed runs
 template <typename _ConfigType>
-std::vector<state_type> jsonResultsIO<_ConfigType>::read_final_states()
-    override {
+std::vector<typename jsonResultsIO<_ConfigType>::state_type>
+jsonResultsIO<_ConfigType>::read_final_states() {
   jsonParser json = read_summary();
   return json["final_states"].get<std::vector<state_type>>();
 }
@@ -243,7 +240,9 @@ std::vector<state_type> jsonResultsIO<_ConfigType>::read_final_states()
 ///   - Only written if constructed with `write_trajectory == true`
 /// - See `write_observations` for run.<index>/observations.json output format
 ///   - Only written if constructed with `write_observations == true`
-void write(results_type const &results, Index run_index) override {
+template <typename _ConfigType>
+void jsonResultsIO<_ConfigType>::write(results_type const &results,
+                                       Index run_index) {
   write_summary(results, m_sampling_functions);
   if (m_write_trajectory) {
     write_trajectory(results.trajectory, run_index);
@@ -297,7 +296,7 @@ void write(results_type const &results, Index run_index) override {
 template <typename _ConfigType>
 void jsonResultsIO<_ConfigType>::write_summary(
     results_type const &results,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions) override {
+    StateSamplingFunctionMap<_ConfigType> const &sampling_functions) {
   using namespace jsonResultsIO_impl;
 
   // read existing summary file (create if not existing)
@@ -327,16 +326,17 @@ void jsonResultsIO<_ConfigType>::write_summary(
   fs::path summary_path = m_output_dir / "summary.json";
   SafeOfstream file;
   file.open(summary_path);
-  json.write(file.ofstream());
+  json.print(file.ofstream());
   file.close();
 }
 
 /// \brief Write run.<index>/trajectory.json
 ///
-/// Output file is a JSON array of each state at the time a sample was taken.
+/// Output file is a JSON array of the configuration at the time a sample was
+/// taken.
 template <typename _ConfigType>
 void jsonResultsIO<_ConfigType>::write_trajectory(
-    std::vector<state_type> const &trajectory, Index run_index) override {
+    std::vector<config_type> const &trajectory, Index run_index) {
   jsonParser json(trajectory);
   json.write(run_dir(run_index) / "trajectory.json");
 }
@@ -357,7 +357,7 @@ void jsonResultsIO<_ConfigType>::write_trajectory(
 /// \endcode
 template <typename _ConfigType>
 void jsonResultsIO<_ConfigType>::write_observations(
-    monte::SampledData const &sampled_data, Index run_index) override {
+    monte::SampledData const &sampled_data, Index run_index) {
   jsonParser json = jsonParser::object();
   if (sampled_data.count.size()) {
     json["count"] = sampled_data.count;

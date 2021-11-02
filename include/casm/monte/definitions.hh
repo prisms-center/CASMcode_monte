@@ -29,6 +29,8 @@ struct Results;
 
 template <typename _ConfigType>
 class ResultsIO;
+template <typename _ConfigType>
+class jsonResultsIO;
 
 template <typename _ConfigType>
 struct State;

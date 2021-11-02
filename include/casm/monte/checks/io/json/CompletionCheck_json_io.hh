@@ -1,8 +1,10 @@
 #ifndef CASM_monte_checks_CompletionCheck_json_io
 #define CASM_monte_checks_CompletionCheck_json_io
 
+#include "casm/casm_io/container/json_io.hh"
 #include "casm/casm_io/json/InputParser_impl.hh"
 #include "casm/monte/checks/CompletionCheck.hh"
+#include "casm/monte/checks/io/json/CutoffCheck_json_io.hh"
 #include "casm/monte/state/StateSampler.hh"
 
 namespace CASM {
@@ -21,7 +23,9 @@ namespace CompletionCheck_json_io_impl {
 /// \brief If successfully parsed, result is not empty
 template <typename ConfigType>
 std::unique_ptr<StateSamplingFunction<ConfigType>> _parse_quantity(
-    InputParser<CompletionCheckParams> &parser, fs::path const &option) {
+    InputParser<CompletionCheckParams> &parser,
+    StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+    fs::path const &option) {
   std::unique_ptr<std::string> quantity =
       parser.require<std::string>(option / "quantity");
   if (quantity == nullptr) {
@@ -34,7 +38,8 @@ std::unique_ptr<StateSamplingFunction<ConfigType>> _parse_quantity(
     parser.insert_error(option / *quantity, msg.str());
     return std::unique_ptr<StateSamplingFunction<ConfigType>>();
   }
-  return std::make_unique<StateSamplingFunction<ConfigType>>(*function_it);
+  return std::make_unique<StateSamplingFunction<ConfigType>>(
+      function_it->second);
 }
 
 /// \brief If successfully parsed, adds elements to convergence_check_params
@@ -53,7 +58,7 @@ void _parse_component_index(
     auto size = function.component_names.size();
     if (index < 0 || index >= size) {
       std::stringstream msg;
-      msg << "Error: For \"" << *quantity << "\", component index " << index
+      msg << "Error: For \"" << function.name << "\", component index " << index
           << " is out of range. Valid range is [0," << size << ").";
       parser.insert_error(option / "component_index", msg.str());
       continue;
@@ -76,7 +81,7 @@ void _parse_component_name(
   std::vector<std::string> component_name;
   parser.optional(component_name, option / "component_name");
 
-  for (Index name : component_name) {
+  for (std::string const &name : component_name) {
     auto begin = function.component_names.begin();
     auto end = function.component_names.end();
     auto it = std::find(begin, end, name);
@@ -88,9 +93,9 @@ void _parse_component_name(
       continue;
     }
     Index index = std::distance(begin, it);
-    SamplerComponent first(*quantity, index, name);
-    SamplerConvergenceParams second(precision);
-    convergence_check_params.emplace(first, second);
+    convergence_check_params.emplace(
+        SamplerComponent(function.name, index, name),
+        sampler_convergence_params);
   }
 }
 
@@ -149,7 +154,7 @@ void _parse_convergence_criteria(
 
     // parse "quantity"
     std::unique_ptr<StateSamplingFunction<ConfigType>> function =
-        _parse_quantity(parser, option);
+        _parse_quantity(parser, sampling_functions, option);
     if (function == nullptr) {
       continue;
     }
@@ -217,9 +222,6 @@ void _parse_convergence_criteria(
 ///       quantity: string (required)
 ///         Name of sampled quantity
 ///
-///       confidence: number (optional, default=0.95)
-///         Confidence level, in range (0, 1.0), to check convergence.
-///
 ///       precision: number (required)
 ///         The required (absolute) precision in the average of the quantity
 ///         for the calculation to be considered converged.
@@ -247,9 +249,11 @@ void parse(InputParser<CompletionCheckParams> &parser,
   CompletionCheckParams completion_check_params;
 
   // parse "cutoff"
-  auto cutoff_params_subparser = parser.optional<CutoffCheckParams>("cutoff");
-  if (cutoff_params_subparser->value != nullptr) {
-    completion_check_params.cutoff_params = *cutoff_params_subparser->value;
+  auto cutoff_params_subparser =
+      parser.subparse_else<CutoffCheckParams>("cutoff", CutoffCheckParams());
+  if (cutoff_params_subparser->valid()) {
+    completion_check_params.cutoff_params =
+        std::move(*cutoff_params_subparser->value);
   }
 
   // parse "convergence"
@@ -257,11 +261,14 @@ void parse(InputParser<CompletionCheckParams> &parser,
                               completion_check_params.convergence_check_params);
 
   parser.optional_else(completion_check_params.confidence, "confidence", 0.95);
-  parser.optional_else(completion_check_params.check_begin, "begin", 10);
-  parser.optional_else(completion_check_params.check_frequency, "frequency", 1);
+  parser.optional_else<monte::CountType>(completion_check_params.check_begin,
+                                         "begin", 10);
+  parser.optional_else<monte::CountType>(
+      completion_check_params.check_frequency, "frequency", 1);
 
   if (parser.valid()) {
-    parser.value = std::make_unique(completion_check_params);
+    parser.value =
+        std::make_unique<CompletionCheckParams>(completion_check_params);
   }
 }
 

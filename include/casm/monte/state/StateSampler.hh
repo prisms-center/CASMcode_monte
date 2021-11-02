@@ -192,8 +192,7 @@ std::vector<std::string> get_component_names(
   } else {
     if (function_it->second.component_names.size() != dimension) {
       std::stringstream msg;
-      CASM::err_log()
-          << "Error in get_component_names: Dimension of \"" << function_name
+      msg << "Error in get_component_names: Dimension of \"" << function_name
           << "\" (" << dimension
           << ") does not match the corresponding sampling function.";
       throw std::runtime_error(msg.str());
