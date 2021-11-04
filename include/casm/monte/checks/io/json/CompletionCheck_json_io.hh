@@ -42,14 +42,12 @@ std::unique_ptr<StateSamplingFunction<ConfigType>> _parse_quantity(
       function_it->second);
 }
 
-/// \brief If successfully parsed, adds elements to convergence_check_params
+/// \brief If successfully parsed, adds elements to requested_precision
 template <typename ConfigType>
 void _parse_component_index(
     InputParser<CompletionCheckParams> &parser, fs::path const &option,
-    StateSamplingFunction<ConfigType> const &function,
-    SamplerConvergenceParams const &sampler_convergence_params,
-    std::map<SamplerComponent, SamplerConvergenceParams>
-        &convergence_check_params) {
+    StateSamplingFunction<ConfigType> const &function, double precision,
+    std::map<SamplerComponent, double> &requested_precision) {
   // converge components specified by index
   std::vector<Index> component_index;
   parser.optional(component_index, option / "component_index");
@@ -63,20 +61,18 @@ void _parse_component_index(
       parser.insert_error(option / "component_index", msg.str());
       continue;
     }
-    convergence_check_params.emplace(
+    requested_precision.emplace(
         SamplerComponent(function.name, index, function.component_names[index]),
-        sampler_convergence_params);
+        precision);
   }
 }
 
-/// \brief If successfully parsed, adds elements to convergence_check_params
+/// \brief If successfully parsed, adds elements to requested_precision
 template <typename ConfigType>
 void _parse_component_name(
     InputParser<CompletionCheckParams> &parser, fs::path const &option,
-    StateSamplingFunction<ConfigType> const &function,
-    SamplerConvergenceParams const &sampler_convergence_params,
-    std::map<SamplerComponent, SamplerConvergenceParams>
-        &convergence_check_params) {
+    StateSamplingFunction<ConfigType> const &function, double precision,
+    std::map<SamplerComponent, double> &requested_precision) {
   // converge components specified by name
   std::vector<std::string> component_name;
   parser.optional(component_name, option / "component_name");
@@ -93,20 +89,17 @@ void _parse_component_name(
       continue;
     }
     Index index = std::distance(begin, it);
-    convergence_check_params.emplace(
-        SamplerComponent(function.name, index, name),
-        sampler_convergence_params);
+    requested_precision.emplace(SamplerComponent(function.name, index, name),
+                                precision);
   }
 }
 
-/// \brief If successfully parsed, adds elements to convergence_check_params
+/// \brief If successfully parsed, adds elements to requested_precision
 template <typename ConfigType>
 void _parse_components(
     InputParser<CompletionCheckParams> &parser, fs::path const &option,
-    StateSamplingFunction<ConfigType> const &function,
-    SamplerConvergenceParams const &sampler_convergence_params,
-    std::map<SamplerComponent, SamplerConvergenceParams>
-        &convergence_check_params) {
+    StateSamplingFunction<ConfigType> const &function, double precision,
+    std::map<SamplerComponent, double> &requested_precision) {
   bool has_index =
       (parser.self.find_at(option / "component_index") != parser.self.end());
   bool has_name =
@@ -116,29 +109,28 @@ void _parse_components(
                         "Error: cannot specify both \"component_index\" and "
                         "\"component_name\"");
   } else if (has_index) {
-    _parse_component_index(parser, option, function, sampler_convergence_params,
-                           convergence_check_params);
+    _parse_component_index(parser, option, function, precision,
+                           requested_precision);
   } else if (has_name) {
-    _parse_component_name(parser, option, function, sampler_convergence_params,
-                          convergence_check_params);
+    _parse_component_name(parser, option, function, precision,
+                          requested_precision);
   } else {
     // else, converge all components
     for (Index index = 0; index < function.component_names.size(); ++index) {
-      convergence_check_params.emplace(
+      requested_precision.emplace(
           SamplerComponent(function.name, index,
                            function.component_names[index]),
-          sampler_convergence_params);
+          precision);
     }
   }
 }
 
-/// \brief If successfully parsed, adds elements to convergence_check_params
+/// \brief If successfully parsed, adds elements to requested_precision
 template <typename ConfigType>
 void _parse_convergence_criteria(
     InputParser<CompletionCheckParams> &parser,
     StateSamplingFunctionMap<ConfigType> const &sampling_functions,
-    std::map<SamplerComponent, SamplerConvergenceParams>
-        &convergence_check_params) {
+    std::map<SamplerComponent, double> &requested_precision) {
   auto it = parser.self.find("convergence");
   if (it == parser.self.end()) {
     return;
@@ -162,12 +154,11 @@ void _parse_convergence_criteria(
     // parse "precision"
     double precision;
     parser.require(precision, option / "precision");
-    SamplerConvergenceParams sampler_convergence_params(precision);
 
     // parse "component_index", "component_name",
     //   or default (neither given, converges all components)
-    _parse_components(parser, option, *function, sampler_convergence_params,
-                      convergence_check_params);
+    _parse_components(parser, option, *function, precision,
+                      requested_precision);
   }
 }
 
@@ -231,7 +222,9 @@ void _parse_convergence_criteria(
 ///         the specified precision. Example:
 ///
 ///           {
-///             "quantity": "comp_n", "component_index": [1, 2]
+///             "quantity": "comp_n",
+///             "precision": 0.001,
+///             "component_index": [1, 2]
 ///           }
 ///
 ///       component_name: array of string (optional)
@@ -239,7 +232,9 @@ void _parse_convergence_criteria(
 ///         to converge to the specified precision. Example:
 ///
 ///           {
-///             "quantity": "comp_n", "component_name": ["Va", "O"]
+///             "quantity": "comp_n",
+///             "precision": 0.001,
+///             "component_name": ["Va", "O"]
 ///           }
 ///
 template <typename ConfigType>
@@ -258,7 +253,7 @@ void parse(InputParser<CompletionCheckParams> &parser,
 
   // parse "convergence"
   _parse_convergence_criteria(parser, sampling_functions,
-                              completion_check_params.convergence_check_params);
+                              completion_check_params.requested_precision);
 
   parser.optional_else(completion_check_params.confidence, "confidence", 0.95);
   parser.optional_else<monte::CountType>(completion_check_params.check_begin,

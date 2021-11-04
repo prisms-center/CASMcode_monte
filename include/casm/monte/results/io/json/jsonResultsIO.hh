@@ -14,8 +14,8 @@ template <typename _ConfigType>
 class jsonResultsIO : public ResultsIO<_ConfigType> {
  public:
   typedef _ConfigType config_type;
-  typedef monte::State<config_type> state_type;
-  typedef monte::Results<config_type> results_type;
+  typedef State<config_type> state_type;
+  typedef Results<config_type> results_type;
 
   jsonResultsIO(fs::path _output_dir,
                 StateSamplingFunctionMap<config_type> _sampling_functions,
@@ -37,8 +37,7 @@ class jsonResultsIO : public ResultsIO<_ConfigType> {
                         Index run_index);
 
   /// \brief Write run.<index>/observations.json
-  void write_observations(monte::SampledData const &sampled_data,
-                          Index run_index);
+  void write_observations(results_type const &results, Index run_index);
 
   jsonParser read_summary();
 

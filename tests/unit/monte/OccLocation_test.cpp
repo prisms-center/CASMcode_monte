@@ -5,6 +5,7 @@
 #include "casm/monte/Conversions.hh"
 #include "casm/monte/events/OccCandidate.hh"
 #include "casm/monte/events/OccEventProposal.hh"
+#include "casm/monte/events/io/OccCandidate_stream_io.hh"
 #include "gtest/gtest.h"
 #include "testConfiguration.hh"
 #include "teststructures.hh"

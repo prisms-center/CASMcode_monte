@@ -54,11 +54,11 @@ inline jsonParser &ensure_initialized_arrays(jsonParser &json,
 template <typename ConfigType>
 jsonParser &append_condition_to_json(
     std::pair<std::string, Eigen::VectorXd> condition, jsonParser &json,
-    monte::Results<ConfigType> const &results,
     StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
   std::string const &name = condition.first;
   Eigen::VectorXd const &value = condition.second;
-  auto &j = ensure_initialized_objects(json, {name});
+  ensure_initialized_objects(json, {name});
+  auto &j = json[name];
 
   std::vector<std::string> component_names =
       get_component_names(name, value.size(), sampling_functions);
@@ -93,10 +93,10 @@ jsonParser &append_condition_to_json(
 template <typename ConfigType>
 jsonParser &append_sampled_data_to_json(
     std::pair<std::string, std::shared_ptr<Sampler>> quantity, jsonParser &json,
-    monte::Results<ConfigType> const &results,
+    Results<ConfigType> const &results,
     StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
   std::string const &quantity_name = quantity.first;
-  monte::Sampler const &sampler = *quantity.second;
+  Sampler const &sampler = *quantity.second;
   ensure_initialized_objects(json, {quantity_name});
   auto &quantity_json = json[quantity_name];
 
@@ -117,21 +117,20 @@ jsonParser &append_sampled_data_to_json(
 
     auto result_it = convergence_r.individual_results.find(key);
     bool is_requested_to_converge =
-        result_it != convergence_r.individual_results.end();
+        (result_it != convergence_r.individual_results.end());
     IndividualConvergenceCheckResult result;
 
     if (is_requested_to_converge) {
+      // if is a quantity specifically asked to be converged,
+      //     use existing results
+      result = result_it->second;
+    } else {
       // if not a quantity specifically asked to be converged,
       //     do convergence check
       double required_precision = 0.0;
       result = convergence_check(
           sampler.component(i).tail(convergence_r.N_samples_for_statistics),
           required_precision, completion_r.confidence);
-
-    } else {
-      // if is a quantity specifically asked to be converged,
-      //     use existing results
-      result = result_it->second;
     }
 
     ensure_initialized_objects(quantity_json, {component_name});
@@ -164,7 +163,7 @@ jsonParser &append_sampled_data_to_json(
 /// \endcode
 template <typename ConfigType>
 jsonParser &append_completion_check_results_to_json(
-    monte::Results<ConfigType> const &results, jsonParser &json) {
+    Results<ConfigType> const &results, jsonParser &json) {
   auto const &completion_r = results.completion_check_results;
   auto const &equilibration_r = completion_r.equilibration_check_results;
   auto const &convergence_r = completion_r.convergence_check_results;
@@ -196,18 +195,19 @@ jsonParser &append_completion_check_results_to_json(
 /// \endcode
 template <typename ConfigType>
 jsonParser &append_trajectory_results_to_json(
-    monte::Results<ConfigType> const &results, jsonParser &json) {
-  if (results.trajectory.size() < 2) {
-    std::stringstream msg;
-    msg << "Error in append_trajectory_results_to_json: "
-        << "results.trajectory.size() < 2. Cannot write states.";
-    throw std::runtime_error(msg.str());
+    Results<ConfigType> const &results, jsonParser &json) {
+  ensure_initialized_arrays(json, {"initial_states", "final_states"});
+  if (results.initial_state.has_value()) {
+    json["initial_states"].push_back(*results.initial_state);
+  } else {
+    json["initial_states"].push_back(jsonParser::null());
   }
 
-  ensure_initialized_arrays(json, {"initial_states", "final_states"});
-  json["initial_states"].push_back(results.trajectory.front());
-  json["final_states"].push_back(results.trajectory.back());
-
+  if (results.final_state.has_value()) {
+    json["final_states"].push_back(*results.final_state);
+  } else {
+    json["final_states"].push_back(jsonParser::null());
+  }
   return json;
 }
 
@@ -245,10 +245,10 @@ void jsonResultsIO<_ConfigType>::write(results_type const &results,
                                        Index run_index) {
   write_summary(results, m_sampling_functions);
   if (m_write_trajectory) {
-    write_trajectory(results.trajectory, run_index);
+    write_trajectory(results.sample_trajectory, run_index);
   }
   if (m_write_observations) {
-    write_observations(results.sampled_data, run_index);
+    write_observations(results, run_index);
   }
 }
 
@@ -305,12 +305,11 @@ void jsonResultsIO<_ConfigType>::write_summary(
   ensure_initialized_objects(json, {"conditions", "sampled_data",
                                     "completion_check_results", "trajectory"});
 
-  for (auto const &condition : results.conditions) {
-    append_condition_to_json(condition, json["conditions"], results,
-                             sampling_functions);
+  for (auto const &condition : results.initial_state->conditions) {
+    append_condition_to_json(condition, json["conditions"], sampling_functions);
   }
 
-  for (auto const &quantity : results.sampled_data.samplers) {
+  for (auto const &quantity : results.samplers) {
     append_sampled_data_to_json(quantity, json["sampled_data"], results,
                                 sampling_functions);
   }
@@ -326,7 +325,7 @@ void jsonResultsIO<_ConfigType>::write_summary(
   fs::path summary_path = m_output_dir / "summary.json";
   SafeOfstream file;
   file.open(summary_path);
-  json.print(file.ofstream());
+  json.print(file.ofstream(), -1);
   file.close();
 }
 
@@ -338,7 +337,7 @@ template <typename _ConfigType>
 void jsonResultsIO<_ConfigType>::write_trajectory(
     std::vector<config_type> const &trajectory, Index run_index) {
   jsonParser json(trajectory);
-  json.write(run_dir(run_index) / "trajectory.json");
+  json.write(run_dir(run_index) / "trajectory.json", -1);
 }
 
 /// \brief Write run.<index>/observations.json
@@ -356,20 +355,20 @@ void jsonResultsIO<_ConfigType>::write_trajectory(
 /// }
 /// \endcode
 template <typename _ConfigType>
-void jsonResultsIO<_ConfigType>::write_observations(
-    monte::SampledData const &sampled_data, Index run_index) {
+void jsonResultsIO<_ConfigType>::write_observations(results_type const &results,
+                                                    Index run_index) {
   jsonParser json = jsonParser::object();
-  if (sampled_data.count.size()) {
-    json["count"] = sampled_data.count;
+  if (results.sample_count.size()) {
+    json["count"] = results.sample_count;
   }
-  if (sampled_data.count.size()) {
-    json["time"] = sampled_data.time;
+  if (results.sample_time.size()) {
+    json["time"] = results.sample_time;
   }
-  for (auto const &pair : sampled_data.samplers) {
+  for (auto const &pair : results.samplers) {
     json[pair.first]["component_names"] = pair.second->component_names();
     json[pair.first]["value"] = pair.second->values();
   }
-  json.write(run_dir(run_index) / "observations.json");
+  json.write(run_dir(run_index) / "observations.json", -1);
 }
 
 /// \brief Read existing summary.json file, if exists, else provided default

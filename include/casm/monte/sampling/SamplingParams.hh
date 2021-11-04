@@ -8,12 +8,6 @@
 namespace CASM {
 namespace monte {
 
-/// How often to sample runs
-enum class SAMPLE_MODE { BY_STEP, BY_PASS, BY_TIME };
-
-/// How to sample by time
-enum class SAMPLE_METHOD { LINEAR, LOG };
-
 /// What to sample and how
 struct SamplingParams {
   /// Default constructor
@@ -28,42 +22,50 @@ struct SamplingParams {
   ///
   /// Default=SAMPLE_METHOD::LINEAR
   ///
-  /// Parameters for determining when samples are taken by count
-  ///
   /// For SAMPLE_METHOD::LINEAR, take the n-th sample when:
   ///
-  ///    sample/pass = ceil( begin + (period / samples_per_period) * n )
+  ///    sample/pass = round( begin + (period / samples_per_period) * n )
   ///           time = begin + (period / samples_per_period) * n
   ///
   /// For SAMPLE_METHOD::LOG, take the n-th sample when:
   ///
-  ///    sample/pass = ceil( begin + period ^ ( (n + shift) /
+  ///    sample/pass = round( begin + period ^ ( (n + shift) /
   ///                      samples_per_period ) )
   ///           time = begin + period ^ ( (n + shift) / samples_per_period )
   ///
   SAMPLE_METHOD sample_method;
 
-  // --- Parameters for determining when samples are taken by count ---
+  // --- Parameters for determining when samples are taken ---
 
   double begin;
   double period;
   double samples_per_period;
   double shift;
 
-  /// \brief What to sample
+  /// \brief What quantities to sample
+  ///
+  /// These name must match StateSamplingFunction names.
   ///
   /// Default={}
   std::vector<std::string> sampler_names;
 
-  /// \brief Whether to sample the complete configuration
+  /// \brief If true, save the configuration when a sample is taken
   ///
   /// Default=false
-  bool sample_trajectory;
+  bool do_sample_trajectory;
 };
 
-/// The pass/step/time when a particular sample is due
-double sample_due(SamplingParams const &sampling_params,
-                  CountType sample_index);
+// /// The pass/step/time when a particular sample should be taken
+// double sample_at(SamplingParams const &sampling_params, CountType
+// sample_index);
+//
+// /// \brief Returns true if samples should be taken - count based sampling
+// bool sample_is_due(SamplingParams const &sampling_params,
+//                    CountType sample_index, CountType count);
+//
+// /// \brief Returns true if samples should be taken - time based sampling
+// bool sample_is_due(SamplingParams const &sampling_params,
+//                    CountType sample_index, TimeType time);
 
 }  // namespace monte
 }  // namespace CASM
@@ -92,21 +94,67 @@ inline SamplingParams::SamplingParams()
       samples_per_period(1.0),
       shift(0.0),
       sampler_names({}),
-      sample_trajectory(false) {}
+      do_sample_trajectory(false) {}
 
-/// The pass/step/time when a particular sample is due
-inline double sample_due(SamplingParams const &sampling_params,
-                         CountType sample_index) {
-  SamplingParams const &s = sampling_params;
-  double n = static_cast<double>(sample_index);
-  double value;
-  if (s.sample_method == SAMPLE_METHOD::LINEAR) {
-    value = s.begin + (s.period / s.samples_per_period) * n;
-  } else /* sample_method == SAMPLE_METHOD::LOG */ {
-    value = s.begin + std::pow(s.period, (n + s.shift) / s.samples_per_period);
-  }
-  return value;
-}
+// /// The pass/step/time when a particular sample should be taken
+// inline double sample_at(SamplingParams const &sampling_params,
+//                         CountType sample_index) {
+//   SamplingParams const &s = sampling_params;
+//   double n = static_cast<double>(sample_index);
+//   double value;
+//   if (s.sample_method == SAMPLE_METHOD::LINEAR) {
+//     value = s.begin + (s.period / s.samples_per_period) * n;
+//   } else /* sample_method == SAMPLE_METHOD::LOG */ {
+//     value = s.begin + std::pow(s.period, (n + s.shift) /
+//     s.samples_per_period);
+//   }
+//   return value;
+// }
+//
+// /// \brief Returns true if samples should be taken - count based sampling
+// inline bool sample_is_due(SamplingParams const &sampling_params,
+//                           CountType sample_index, CountType count) {
+//   return count == static_cast<CountType>(
+//                       std::round(sample_at(sampling_params, sample_index)));
+// }
+//
+// /// \brief Returns true if samples should be taken - time based sampling
+// inline bool sample_is_due(SamplingParams const &sampling_params,
+//                           CountType sample_index, TimeType time) {
+//   return time >= sample_at(sampling_params, sample_index);
+// }
+//
+//
+// /// The pass/step/time when a particular sample should be taken
+// inline double sample_at(SAMPLE_METHOD sample_method,
+//                         double begin,
+//                         double period,
+//                         double samples_per_period,
+//                         double shift,
+//                         CountType sample_index) {
+//   SamplingParams const &s = sampling_params;
+//   double n = static_cast<double>(sample_index);
+//   double value;
+//   if (sample_method == SAMPLE_METHOD::LINEAR) {
+//     value = begin + (period / samples_per_period) * n;
+//   } else /* sample_method == SAMPLE_METHOD::LOG */ {
+//     value = begin + std::pow(period, (n + shift) / samples_per_period);
+//   }
+//   return value;
+// }
+//
+// /// \brief Returns true if samples should be taken - count based sampling
+// inline bool sample_is_due(SamplingParams const &sampling_params,
+//                           CountType sample_index, CountType count) {
+//   return count == static_cast<CountType>(
+//                       std::round(sample_at(sampling_params, sample_index)));
+// }
+//
+// /// \brief Returns true if samples should be taken - time based sampling
+// inline bool sample_is_due(SamplingParams const &sampling_params,
+//                           CountType sample_index, TimeType time) {
+//   return time >= sample_at(sampling_params, sample_index);
+// }
 
 }  // namespace monte
 }  // namespace CASM

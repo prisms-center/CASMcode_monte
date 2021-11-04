@@ -1,12 +1,23 @@
 #ifndef CASM_monte_StateSampler
 #define CASM_monte_StateSampler
 
+#include "casm/monte/definitions.hh"
 #include "casm/monte/sampling/Sampler.hh"
+#include "casm/monte/sampling/SamplingParams.hh"
 #include "casm/monte/state/State.hh"
 
 namespace CASM {
 namespace monte {
 
+/// \brief A function to be evaluated when taking a sample of a Monte Carlo
+///     calculation state
+///
+/// - Each StateSamplingFunction takes a State<ConfigType> and returns an
+///   Eigen::VectorXd
+/// - A StateSamplingFunction has additional information (name, description,
+///   component_names) to enable specifying convergence criteria, allow input
+///   and output descriptions, help and error messages, etc.
+///
 template <typename _ConfigType>
 struct StateSamplingFunction {
   typedef _ConfigType ConfigType;
@@ -22,11 +33,22 @@ struct StateSamplingFunction {
       std::vector<std::string> const &_component_names,
       std::function<Eigen::VectorXd(State<ConfigType> const &)> _function);
 
+  /// \brief Function name (and quantity to be sampled)
   std::string name;
+
+  /// \brief Description of the function
   std::string description;
+
+  /// \brief A name for each component of the resulting Eigen::VectorXd
+  ///
+  /// Can be string representing an index (i.e "0", "1", "2", etc.) or can
+  /// be a descriptive string (i.e. "Mg", "Va", "O", etc.)
   std::vector<std::string> component_names;
+
+  /// \brief The function to be evaluated
   std::function<Eigen::VectorXd(State<ConfigType> const &)> function;
 
+  /// \brief Evaluates `function`
   Eigen::VectorXd operator()(State<ConfigType> const &state) const;
 };
 
@@ -34,45 +56,279 @@ template <typename ConfigType>
 using StateSamplingFunctionMap =
     std::map<std::string, StateSamplingFunction<ConfigType>>;
 
-/// StateSampler stores vector valued samples in a matrix
+/// \brief A data structure to help encapsulate typical Monte Carlo sampling
 ///
-/// This just holds a StateSamplingFunction and a Sampler together
+/// - Holds information describing what to sample, and when
+/// - Holds the functions that take the samples
+/// - Holds `step`, `pass`, and `time` counters
+/// - Holds the data that is sampled, and when it was sampled
+/// - Includes methods for incrementing the step/pass/time, and checking if a
+///   sample is due and taking the sample
 template <typename _ConfigType>
-class StateSampler {
- public:
+struct StateSampler {
   typedef _ConfigType ConfigType;
 
-  /// \brief Sampler constructor
-  StateSampler(StateSamplingFunction<ConfigType> _function);
+  // --- Parameters for determining when samples are taken, what is sampled ---
 
-  /// \brief Add a new sample
-  void sample(State<ConfigType> const &state);
+  /// \brief Sample by step, pass, or time
+  ///
+  /// Default=SAMPLE_MODE::BY_PASS
+  SAMPLE_MODE sample_mode;
 
-  /// Get sampling function
-  StateSamplingFunction<ConfigType> const &function() const;
+  /// \brief Sample linearly or logarithmically
+  ///
+  /// Default=SAMPLE_METHOD::LINEAR
+  ///
+  /// For SAMPLE_METHOD::LINEAR, take the n-th sample when:
+  ///
+  ///    sample/pass = round( begin + (period / samples_per_period) * n )
+  ///           time = begin + (period / samples_per_period) * n
+  ///
+  /// For SAMPLE_METHOD::LOG, take the n-th sample when:
+  ///
+  ///    sample/pass = round( begin + period ^ ( (n + shift) /
+  ///                      samples_per_period ) )
+  ///           time = begin + period ^ ( (n + shift) / samples_per_period )
+  ///
+  SAMPLE_METHOD sample_method;
 
-  /// Get generic sampler
-  std::shared_ptr<Sampler> const &sampler() const;
+  /// \brief See `sample_method`
+  double begin;
 
- private:
-  /// Function: [](State<ConfigType> const &state) -> Eigen::VectorXd
-  StateSamplingFunction<ConfigType> m_function;
+  /// \brief See `sample_method`
+  double period;
 
-  std::shared_ptr<Sampler> m_sampler;
+  /// \brief See `sample_method`
+  double samples_per_period;
+
+  /// \brief See `sample_method`
+  double shift;
+
+  /// \brief State sampling functions to be used when taking a sample
+  ///
+  /// Each function takes a State<ConfigType> and returns an Eigen::VectorXd
+  std::vector<StateSamplingFunction<ConfigType>> functions;
+
+  /// \brief If true, save the configuration when a sample is taken
+  ///
+  /// Default=false
+  bool do_sample_trajectory;
+
+  /// --- Step / pass / time tracking ---
+
+  /// \brief Tracks the number of Monte Carlo steps
+  CountType step;
+
+  /// \brief Tracks the number of Monte Carlo passes
+  CountType pass;
+
+  /// \brief The number of steps per pass
+  ///
+  /// Typically the number of steps per pass is set equal to the number of
+  /// mutating sites
+  CountType steps_per_pass;
+
+  /// \brief Equal to either the number of steps or passes, depending on
+  ///     sampling mode.
+  CountType count;
+
+  /// \brief Monte Carlo time, if applicable
+  TimeType time;
+
+  // --- Sampled data ---
+
+  /// \brief Map of <quantity name>:<sampler>
+  ///
+  /// A `Sampler` stores Eigen::MatrixXd with the raw sampled data. Rows of the
+  /// matrix corresponds to individual samples of VectorXd. The matrices are
+  /// constructed with extra rows and encapsulated in a class so that
+  /// resizing can be done intelligently as needed. Sampler provides
+  /// accessors so that the data can be efficiently accessed by index or by
+  /// component name for equilibration and convergence checking of
+  /// individual components.
+  std::map<std::string, std::shared_ptr<Sampler>> samplers;
+
+  /// \brief The count (either step or pass) when a sample was taken
+  std::vector<CountType> sample_count;
+
+  /// \brief The time when a sample was taken, if applicable
+  std::vector<TimeType> sample_time;
+
+  /// \brief The configuration when a sample was taken
+  ///
+  /// The trajectory is sampled if `sample_trajectory==true`
+  std::vector<ConfigType> sample_trajectory;
+
+  /// \brief Constructor
+  ///
+  /// Note: Call `reset(double _steps_per_pass)` before sampling begins.
+  StateSampler(SamplingParams const &_sampling_params,
+               StateSamplingFunctionMap<ConfigType> const &sampling_functions)
+      : StateSampler(
+            _sampling_params.sample_mode,
+            {},  // functions populated in constructor body
+            _sampling_params.sample_method, _sampling_params.begin,
+            _sampling_params.period, _sampling_params.samples_per_period,
+            _sampling_params.shift, _sampling_params.do_sample_trajectory) {
+    // populate functions, samplers
+    for (std::string name : _sampling_params.sampler_names) {
+      auto const &function = sampling_functions.at(name);
+      auto shared_sampler = std::make_shared<Sampler>(function.component_names);
+      functions.push_back(function);
+      samplers.emplace(name, shared_sampler);
+    }
+  }
+
+  /// \brief Constructor
+  ///
+  /// \param _sample_mode Sample by step, pass, or time
+  /// \param _functions State sampling functions to be used when taking a
+  ///     sample. Each function takes a `State<ConfigType>` and returns an
+  ///     `Eigen::VectorXd`.
+  /// \param _sample_method Whether to take linearly spaced or logarithmically
+  ///     spaced samples.
+  /// \param _sample_begin When the first sample is taken. See `sample_method`.
+  /// \param _sampling_period A number of counts, or period of time. Used to
+  ///     specify sampling spacing. See `sample_method`.
+  /// \param _samples_per_period How many samples to take per the specified
+  ///     period. See `sample_method`.
+  /// \param _log_sampling_shift Controls logarithmically sampling spacing. See
+  ///     `sample_method`.
+  /// \param _do_sample_trajectory If true, save the configuration when a sample
+  ///     is taken
+  ///
+  /// Note: Call `reset(double _steps_per_pass)` before sampling begins.
+  StateSampler(SAMPLE_MODE _sample_mode,
+               std::vector<StateSamplingFunction<ConfigType>> const &_functions,
+               SAMPLE_METHOD _sample_method = SAMPLE_METHOD::LINEAR,
+               double _sample_begin = 0.0, double _sampling_period = 1.0,
+               double _samples_per_period = 1.0,
+               double _log_sampling_shift = 0.0,
+               bool _do_sample_trajectory = false)
+      : sample_mode(_sample_mode),
+        sample_method(_sample_method),
+        begin(_sample_begin),
+        period(_sampling_period),
+        samples_per_period(_samples_per_period),
+        shift(_log_sampling_shift),
+        functions(_functions),
+        do_sample_trajectory(_do_sample_trajectory) {
+    reset(1.0);
+  }
+
+  /// \brief Reset sampler to be ready for sampling
+  ///
+  /// Reset does the following:
+  /// - Set step / pass / count / time to zero
+  /// - Set steps_per_pass
+  /// - Clear all sampled data containers
+  void reset(double _steps_per_pass) {
+    steps_per_pass = _steps_per_pass;
+    step = 0;
+    pass = 0;
+    count = 0;
+    time = 0.0;
+    samplers.clear();
+    for (auto const &function : functions) {
+      auto shared_sampler = std::make_shared<Sampler>(function.component_names);
+      samplers.emplace(function.name, shared_sampler);
+    }
+    sample_count.clear();
+    sample_time.clear();
+    sample_trajectory.clear();
+  }
+
+  /// \brief Add samples
+  ///
+  /// Note: Call `reset(double _steps_per_pass)` before sampling begins.
+  void sample(State<ConfigType> const &state) {
+    // - Record count
+    sample_count.push_back(count);
+
+    // - Record configuration
+    if (do_sample_trajectory) {
+      sample_trajectory.push_back(state.configuration);
+    }
+
+    // - Record data
+    for (auto const &function : functions) {
+      auto const &shared_sampler = samplers.at(function.name);
+      shared_sampler->push_back(function(state));
+    }
+  }
+
+  /// \brief Return the count / time when the sample_index-th sample should be
+  ///     taken
+  double sample_at(CountType sample_index) const {
+    double n = static_cast<double>(sample_index);
+    if (sample_method == SAMPLE_METHOD::LINEAR) {
+      return begin + (period / samples_per_period) * n;
+    } else /* sample_method == SAMPLE_METHOD::LOG */ {
+      return begin + std::pow(period, (n + shift) / samples_per_period);
+    }
+  }
+
+  /// \brief Return true if sample is due (count based sampling)
+  ///
+  /// \returns True if `count == count when sample is due`
+  bool sample_is_due() const {
+    double value = sample_at(sample_count.size());
+    return count == static_cast<CountType>(std::round(value));
+  }
+
+  /// \brief Return true if sample is due (time based sampling)
+  ///
+  /// \returns True if `time + time_increment >= time when sample is due`
+  bool sample_is_due(double time_increment) const {
+    return (time + time_increment) >= sample_at(sample_time.size());
+  }
+
+  /// \brief Sample data, if due (count based sampling)
+  ///
+  /// Note:
+  /// - Call `reset(double _steps_per_pass)` before sampling begins.
+  /// - Apply chosen event before this
+  /// - Call `increment_step()` before this
+  void sample_data_if_due(monte::State<ConfigType> const &state) {
+    if (!sample_is_due()) {
+      return;
+    }
+    // Sample is due...
+    sample(state);
+  }
+
+  /// \brief Sample data, if due (time based sampling)
+  ///
+  /// Note:
+  /// - Call `reset(double _steps_per_pass)` before sampling begins.
+  /// - Apply chosen event after this
+  /// - Call `increment_step()` after this
+  /// - Call `increment_time(double time_increment)` after this
+  void sample_data_if_due(monte::State<ConfigType> const &state,
+                          double time_increment) {
+    if (!sample_is_due(time_increment)) {
+      // Sample is not due
+      return;
+    }
+    sample(state);
+    sample_time.push_back(time_increment);
+  }
+
+  /// \brief Increment by one step (updating pass, count as appropriate)
+  void increment_step() {
+    ++step;
+    if (step == steps_per_pass) {
+      ++pass;
+      step = 0;
+    }
+
+    // If sampling by step, set count to step. Otherwise, set count to pass.
+    count = (sample_mode == SAMPLE_MODE::BY_STEP) ? step : pass;
+  }
+
+  /// \brief Increment time
+  void increment_time(double time_increment) { time += time_increment; }
 };
-
-template <typename ConfigType>
-std::unique_ptr<StateSampler<ConfigType>> make_conditions_sampler(
-    std::string name, std::string description, std::string condition_name);
-
-template <typename ConfigType>
-std::unique_ptr<StateSampler<ConfigType>> make_properties_sampler(
-    std::string name, std::string description, std::string property_name);
-
-template <typename ConfigType>
-std::unique_ptr<StateSampler<ConfigType>> make_configuration_sampler(
-    std::string name, std::string description,
-    std::function<Eigen::VectorXd(ConfigType const &)> function);
 
 /// \brief Get component names for a particular function, else use defaults
 template <typename ConfigType>
@@ -114,63 +370,6 @@ template <typename _ConfigType>
 Eigen::VectorXd StateSamplingFunction<_ConfigType>::operator()(
     State<ConfigType> const &state) const {
   return function(state);
-}
-
-/// \brief StateSampler constructor
-template <typename _ConfigType>
-StateSampler<_ConfigType>::StateSampler(
-    StateSamplingFunction<ConfigType> _function)
-    : m_function(_function),
-      m_sampler(std::make_shared<Sampler>(m_function.component_names)) {}
-
-/// \brief Add a new sample
-template <typename _ConfigType>
-void StateSampler<_ConfigType>::sample(State<ConfigType> const &state) {
-  m_sampler->push_back(m_function(state));
-}
-
-/// Get sampling function
-template <typename _ConfigType>
-StateSamplingFunction<_ConfigType> const &StateSampler<_ConfigType>::function()
-    const {
-  return m_function;
-}
-
-/// Get generic sampler
-template <typename _ConfigType>
-std::shared_ptr<Sampler> const &StateSampler<_ConfigType>::sampler() const {
-  return m_sampler;
-}
-
-template <typename ConfigType>
-std::unique_ptr<StateSampler<ConfigType>> make_conditions_sampler(
-    std::string name, std::string description, std::string condition_name) {
-  auto lambda = [=](State<ConfigType> const &state) {
-    return state.conditions.at(condition_name);
-  };
-  StateSamplingFunction<ConfigType> f(name, description, lambda);
-  return std::make_unique<StateSampler<ConfigType>>(f);
-}
-
-template <typename ConfigType>
-std::unique_ptr<StateSampler<ConfigType>> make_properties_sampler(
-    std::string name, std::string description, std::string property_name) {
-  auto lambda = [=](State<ConfigType> const &state) {
-    return state.properties.at(property_name);
-  };
-  StateSamplingFunction<ConfigType> f(name, description, lambda);
-  return std::make_unique<StateSampler<ConfigType>>(f);
-}
-
-template <typename ConfigType>
-std::unique_ptr<StateSampler<ConfigType>> make_configuration_sampler(
-    std::string name, std::string description,
-    std::function<Eigen::VectorXd(ConfigType const &)> function) {
-  auto lambda = [=](State<ConfigType> const &state) {
-    return function(state.configuration);
-  };
-  StateSamplingFunction<ConfigType> f(name, description, lambda);
-  return std::make_unique<StateSampler<ConfigType>>(f);
 }
 
 /// \brief Get component names for a particular function, else use defaults

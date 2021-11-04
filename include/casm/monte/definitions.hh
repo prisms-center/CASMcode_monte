@@ -10,6 +10,12 @@
 namespace CASM {
 namespace monte {
 
+/// How often to sample runs
+enum class SAMPLE_MODE { BY_STEP, BY_PASS, BY_TIME };
+
+/// How to sample by time
+enum class SAMPLE_METHOD { LINEAR, LOG };
+
 typedef long CountType;
 typedef double TimeType;
 
@@ -17,7 +23,7 @@ typedef double TimeType;
 typedef std::map<std::string, Eigen::VectorXd> VectorValueMap;
 
 struct CompletionCheckParams;
-struct SamplingParams;
+class CompletionCheck;
 
 template <typename _ConfigType, typename _RunInfoType>
 class ConfigGenerator;
@@ -32,6 +38,7 @@ class ResultsIO;
 template <typename _ConfigType>
 class jsonResultsIO;
 
+struct SamplingParams;
 template <typename _ConfigType>
 struct State;
 
@@ -41,7 +48,7 @@ template <typename _ConfigType>
 class IncrementalConditionsStateGenerator;
 
 template <typename _ConfigType>
-class StateSampler;
+struct StateSampler;
 
 template <typename _ConfigType>
 struct StateSamplingFunction;

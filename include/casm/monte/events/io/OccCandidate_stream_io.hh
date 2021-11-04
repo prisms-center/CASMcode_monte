@@ -17,20 +17,24 @@ class OccCandidateList;
 class OccSwap;
 
 }  // namespace monte
+}  // namespace CASM
+
+namespace std {
+
+std::ostream &operator<<(std::ostream &sout,
+                         std::pair<CASM::monte::OccCandidate const &,
+                                   CASM::monte::Conversions const &>
+                             value);
 
 std::ostream &operator<<(
     std::ostream &sout,
-    std::pair<monte::OccCandidate const &, monte::Conversions const &> value);
-
-std::ostream &operator<<(
-    std::ostream &sout,
-    std::pair<monte::OccSwap const &, monte::Conversions const &> value);
-
-std::ostream &operator<<(
-    std::ostream &sout,
-    std::pair<monte::OccCandidateList const &, monte::Conversions const &>
+    std::pair<CASM::monte::OccSwap const &, CASM::monte::Conversions const &>
         value);
 
-}  // namespace CASM
+std::ostream &operator<<(std::ostream &sout,
+                         std::pair<CASM::monte::OccCandidateList const &,
+                                   CASM::monte::Conversions const &>
+                             value);
+}  // namespace std
 
 #endif

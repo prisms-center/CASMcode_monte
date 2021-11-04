@@ -17,9 +17,10 @@ using namespace CASM;
 void random_config(test::Configuration &config, monte::Conversions &convert,
                    MTRand &mtrand);
 
-void run_case(std::shared_ptr<xtal::BasicStructure const> shared_prim,
-              Eigen::Matrix3l T, MTRand &mtrand,
-              monte::StateSampler<test::Configuration> &sampler) {
+std::shared_ptr<monte::Sampler> run_case(
+    std::shared_ptr<xtal::BasicStructure const> shared_prim, Eigen::Matrix3l T,
+    MTRand &mtrand,
+    monte::StateSamplingFunction<test::Configuration> &function) {
   ScopedNullLogging logging;
 
   monte::Conversions convert(*shared_prim, T);
@@ -38,16 +39,21 @@ void run_case(std::shared_ptr<xtal::BasicStructure const> shared_prim,
   monte::OccLocation occ_loc(convert, cand_list);
   occ_loc.initialize(occupation);
 
+  // construct Sampler
+  auto shared_sampler =
+      std::make_shared<monte::Sampler>(function.component_names);
+
   Index count = 0;
   monte::OccEvent e;
   while (count < 1000000) {
     if (count % 1000 == 0) {
-      sampler.sample(state);
+      shared_sampler->push_back(function(state.configuration));
     }
     propose_canonical_event(e, occ_loc, canonical_swaps, mtrand);
     occ_loc.apply(e, occupation);
     ++count;
   }
+  return shared_sampler;
 }
 
 TEST(SamplingTest, CompNSamplingTest) {
@@ -67,10 +73,9 @@ TEST(SamplingTest, CompNSamplingTest) {
             state.configuration.occupation);
       });
 
-  monte::StateSampler<test::Configuration> comp_n_sampler(comp_n_sampling_f);
-  run_case(shared_prim, T, mtrand, comp_n_sampler);
+  std::shared_ptr<monte::Sampler> shared_sampler =
+      run_case(shared_prim, T, mtrand, comp_n_sampling_f);
 
-  monte::Sampler const &sampler = *comp_n_sampler.sampler();
-  EXPECT_EQ(sampler.n_samples(), 1000);
-  EXPECT_EQ(sampler.n_components(), 3);
+  EXPECT_EQ(shared_sampler->n_samples(), 1000);
+  EXPECT_EQ(shared_sampler->n_components(), 3);
 }

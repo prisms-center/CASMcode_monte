@@ -4,11 +4,12 @@
 #include "casm/monte/Conversions.hh"
 #include "casm/monte/events/OccCandidate.hh"
 
-namespace CASM {
+namespace std {
 
-std::ostream &operator<<(
-    std::ostream &sout,
-    std::pair<monte::OccCandidate const &, monte::Conversions const &> value) {
+std::ostream &operator<<(std::ostream &sout,
+                         std::pair<CASM::monte::OccCandidate const &,
+                                   CASM::monte::Conversions const &>
+                             value) {
   sout << "(" << value.second.species_name(value.first.species_index) << ", "
        << value.first.asym << ")";
   return sout;
@@ -16,8 +17,9 @@ std::ostream &operator<<(
 
 std::ostream &operator<<(
     std::ostream &sout,
-    std::pair<monte::OccSwap const &, monte::Conversions const &> value) {
-  using namespace monte;
+    std::pair<CASM::monte::OccSwap const &, CASM::monte::Conversions const &>
+        value) {
+  using namespace CASM::monte;
   sout << std::pair<OccCandidate const &, Conversions const &>(
               value.first.cand_a, value.second)
        << " <-> "
@@ -28,11 +30,12 @@ std::ostream &operator<<(
 
 /// \brief Write OccCandidateList to stream, including all possible canonical
 ///     and grand canonical swaps
-std::ostream &operator<<(
-    std::ostream &sout,
-    std::pair<monte::OccCandidateList const &, monte::Conversions const &>
-        value) {
-  using namespace monte;
+std::ostream &operator<<(std::ostream &sout,
+                         std::pair<CASM::monte::OccCandidateList const &,
+                                   CASM::monte::Conversions const &>
+                             value) {
+  using CASM::Index;
+  using namespace CASM::monte;
   typedef std::pair<OccCandidate const &, Conversions const &> cand_pair;
   typedef std::pair<OccSwap const &, Conversions const &> swap_pair;
   Conversions const &convert = value.second;
@@ -80,4 +83,4 @@ std::ostream &operator<<(
   return sout;
 }
 
-}  // namespace CASM
+}  // namespace std

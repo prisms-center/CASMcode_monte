@@ -92,6 +92,10 @@ std::tuple<bool, double, double> _calc_rho(Eigen::VectorXd const &observations,
 ///
 IndividualConvergenceCheckResult convergence_check(
     Eigen::VectorXd const &observations, double precision, double confidence) {
+  if (observations.size() == 0) {
+    throw std::runtime_error(
+        "Error in convergence_check: observations.size()==0");
+  }
   IndividualConvergenceCheckResult result;
   result.is_converged = false;
   result.mean = observations.mean();
@@ -123,8 +127,8 @@ IndividualConvergenceCheckResult convergence_check(
 
 /// \brief Check convergence of all requested properties
 ///
-/// \param convergence_check_params Sampler components to check, with requested
-///     precision and confidence
+/// \param requested_precision Sampler components to check, with requested
+///     precision
 /// \param confidence Confidence level for calculated precision of mean.
 ///     Typical value is 0.95.
 /// \param N_samples_for_equilibration Number of samples to exclude from
@@ -134,18 +138,17 @@ IndividualConvergenceCheckResult convergence_check(
 /// \returns A ConvergenceCheckResults instance. Note that
 ///     N_samples_for_statistics is set to the total number of samples
 ///     if no convergence checks are requested (when
-///     `convergence_check_params.size() == 0`), otherwise it will be equal to
+///     `requested_precision.size() == 0`), otherwise it will be equal to
 ///     `get_n_samples(samplers) - N_samples_for_equilibration`.
 ConvergenceCheckResults convergence_check(
-    std::map<SamplerComponent, SamplerConvergenceParams> const
-        &convergence_check_params,
+    std::map<SamplerComponent, double> const &requested_precision,
     double confidence, CountType N_samples_for_equilibration,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers) {
   ConvergenceCheckResults results;
   CountType N_samples = get_n_samples(samplers);
 
   // if nothing to check, return
-  if (!convergence_check_params.size()) {
+  if (!requested_precision.size()) {
     results.N_samples_for_statistics = N_samples;
     return results;
   }
@@ -162,9 +165,9 @@ ConvergenceCheckResults convergence_check(
   results.all_converged = true;
 
   // check requested sampler components for equilibration
-  for (auto const &p : convergence_check_params) {
+  for (auto const &p : requested_precision) {
     SamplerComponent const &key = p.first;
-    SamplerConvergenceParams const &value = p.second;
+    double const &precision = p.second;
 
     // find and validate sampler name && component index
     Sampler const &sampler = *find_or_throw(samplers, key)->second;
@@ -173,7 +176,7 @@ ConvergenceCheckResults convergence_check(
     IndividualConvergenceCheckResult current =
         convergence_check(sampler.component(key.component_index)
                               .tail(results.N_samples_for_statistics),
-                          value.precision, confidence);
+                          precision, confidence);
 
     // combine results
     results.all_converged &= current.is_converged;

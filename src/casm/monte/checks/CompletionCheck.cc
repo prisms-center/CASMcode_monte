@@ -4,7 +4,10 @@ namespace CASM {
 namespace monte {
 
 CompletionCheck::CompletionCheck(CompletionCheckParams params)
-    : m_params(params) {}
+    : m_params(params) {
+  m_results.confidence = m_params.confidence;
+  m_results.is_complete = false;
+}
 
 /// \brief Check for equilibration and convergence, then set m_results
 void CompletionCheck::_check(
@@ -13,27 +16,22 @@ void CompletionCheck::_check(
     CountType n_samples) {
   m_results = CompletionCheckResults();
   m_results.confidence = m_params.confidence;
-
-  // if minimums not met -> continue
-  if (!all_minimums_met(m_params.cutoff_params, count, time, n_samples)) {
-    m_results.is_complete = false;
-    return;
-  }
+  m_results.is_complete = false;
 
   // if auto convergence mode:
-  if (m_params.convergence_check_params.size()) {
+  if (m_params.requested_precision.size()) {
     // check for equilibration
     bool check_all = false;
-    m_results.equilibration_check_results = equilibration_check(
-        m_params.convergence_check_params, samplers, check_all);
+    m_results.equilibration_check_results =
+        equilibration_check(m_params.requested_precision, samplers, check_all);
 
     // if all requested to converge are equilibrated, then check convergence
     if (m_results.equilibration_check_results.all_equilibrated) {
-      m_results.convergence_check_results = convergence_check(
-          m_params.convergence_check_params, m_params.confidence,
-          m_results.equilibration_check_results
-              .N_samples_for_all_to_equilibrate,
-          samplers);
+      m_results.convergence_check_results =
+          convergence_check(m_params.requested_precision, m_params.confidence,
+                            m_results.equilibration_check_results
+                                .N_samples_for_all_to_equilibrate,
+                            samplers);
     }
 
     // if all requested to converge are converged, then complete
@@ -41,11 +39,6 @@ void CompletionCheck::_check(
       m_results.is_complete = true;
       return;
     }
-  }
-
-  // if any maximum met, stop
-  if (any_maximum_met(m_params.cutoff_params, count, time, n_samples)) {
-    m_results.is_complete = true;
   }
 }
 

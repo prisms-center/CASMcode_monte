@@ -4,22 +4,43 @@
 #include <vector>
 
 #include "casm/monte/checks/CompletionCheck.hh"
-#include "casm/monte/sampling/SampledData.hh"
 #include "casm/monte/state/State.hh"
 
 namespace CASM {
 namespace monte {
 
 /// \brief Standard Monte Carlo calculation results data structure
+///
+/// This data structure stores results for Monte Carlo calculations, assuming
+/// constant conditions.
 template <typename ConfigType>
 struct Results {
-  Results(State<ConfigType> const &_initial_state)
-      : conditions(_initial_state.conditions),
-        trajectory(1, _initial_state.configuration) {}
+  /// Initial state
+  std::optional<State<ConfigType>> initial_state;
 
-  VectorValueMap conditions;
-  SampledData sampled_data;
-  std::vector<ConfigType> trajectory;
+  /// Final state
+  std::optional<State<ConfigType>> final_state;
+
+  /// Map of <sampler name>:<sampler>
+  /// - `Sampler` stores a Eigen::MatrixXd with sampled data. Rows of the matrix
+  ///   corresponds to individual VectorXd samples. The matrices are
+  ///   constructed with extra rows and encapsulated in a class so that
+  ///   resizing can be done intelligently as needed. Sampler provides
+  ///   accessors so that the data can be efficiently accessed by index or by
+  ///   component name for equilibration and convergence checking of
+  ///   individual components.
+  std::map<std::string, std::shared_ptr<Sampler>> samplers;
+
+  /// Vector of counts (could be pass or step) when a sample occurred
+  std::vector<CountType> sample_count;
+
+  /// Vector of times when a sample occurred
+  std::vector<TimeType> sample_time;
+
+  /// Vector of the configuration when a sample occurred
+  std::vector<ConfigType> sample_trajectory;
+
+  /// Completion check results
   CompletionCheckResults completion_check_results;
 };
 

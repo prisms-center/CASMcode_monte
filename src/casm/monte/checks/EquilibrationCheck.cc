@@ -47,6 +47,10 @@ namespace monte {
 ///
 IndividualEquilibrationCheckResult equilibration_check(
     Eigen::VectorXd const &observations, double prec) {
+  if (observations.size() == 0) {
+    throw std::runtime_error(
+        "Error in equilibration_check: observations.size()==0");
+  }
   CountType start1, start2, N;
   IndividualEquilibrationCheckResult result;
   double sum1, sum2;
@@ -112,8 +116,8 @@ IndividualEquilibrationCheckResult equilibration_check(
 
 /// \brief Check convergence of all requested properties
 ///
-/// \param convergence_check_params Sampler components to check, with requested
-///     precision and confidence
+/// \param requested_precision Sampler components to check, with requested
+///     precision
 /// \param N_samples_for_equilibration Number of samples to exclude from
 ///     statistics because the system is out of equilibrium
 /// \param samplers All samplers
@@ -124,13 +128,12 @@ IndividualEquilibrationCheckResult equilibration_check(
 ///     `convergence_check_params.size() == 0`), otherwise it will be equal to
 ///     `get_n_samples(samplers) - N_samples_for_equilibration`.
 EquilibrationCheckResults equilibration_check(
-    std::map<SamplerComponent, SamplerConvergenceParams> const
-        &convergence_check_params,
+    std::map<SamplerComponent, double> const &requested_precision,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
     bool check_all) {
   EquilibrationCheckResults results;
 
-  if (!convergence_check_params.size()) {
+  if (!requested_precision.size()) {
     return results;
   }
 
@@ -138,9 +141,9 @@ EquilibrationCheckResults equilibration_check(
   results.all_equilibrated = true;
 
   // check requested sampler components for equilibration
-  for (auto const &p : convergence_check_params) {
+  for (auto const &p : requested_precision) {
     SamplerComponent const &key = p.first;
-    SamplerConvergenceParams const &value = p.second;
+    double const &precision = p.second;
 
     // find and validate sampler name && component index
     auto sampler_it = find_or_throw(samplers, key);
@@ -148,7 +151,7 @@ EquilibrationCheckResults equilibration_check(
     // do equilibration check
     IndividualEquilibrationCheckResult current = equilibration_check(
         sampler_it->second->component(key.component_index),  // observations
-        value.precision);
+        precision);
 
     // combine results
     results.N_samples_for_all_to_equilibrate =

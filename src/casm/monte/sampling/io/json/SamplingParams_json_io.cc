@@ -1,5 +1,6 @@
 #include "casm/monte/sampling/io/json/SamplingParams_json_io.hh"
 
+#include "casm/casm_io/container/json_io.hh"
 #include "casm/casm_io/json/InputParser_impl.hh"
 #include "casm/monte/sampling/SamplingParams.hh"
 
@@ -49,9 +50,8 @@ namespace monte {
 ///     If true, request that the entire configuration is saved each time
 ///     samples are taken.
 ///
-template <typename ConfigType>
 void parse(InputParser<SamplingParams> &parser,
-           StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+           std::set<std::string> const &sampling_function_names,
            bool time_sampling_allowed) {
   SamplingParams sampling_params;
 
@@ -116,7 +116,7 @@ void parse(InputParser<SamplingParams> &parser,
   // "quantities"
   parser.optional(sampling_params.sampler_names, "quantities");
   for (std::string name : sampling_params.sampler_names) {
-    if (!sampling_functions.count(name)) {
+    if (!sampling_function_names.count(name)) {
       std::stringstream msg;
       msg << "Error: \"" << name << "\" is not a sampling option.";
       parser.insert_error("quantities", msg.str());
@@ -124,7 +124,7 @@ void parse(InputParser<SamplingParams> &parser,
   }
 
   // "sample_trajectory"
-  parser.optional(sampling_params.sample_trajectory, "sample_trajectory");
+  parser.optional(sampling_params.do_sample_trajectory, "sample_trajectory");
 
   if (parser.valid()) {
     parser.value = std::make_unique<SamplingParams>(sampling_params);

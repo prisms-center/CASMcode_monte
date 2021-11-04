@@ -7,7 +7,6 @@
 #include "casm/monte/checks/CutoffCheck.hh"
 #include "casm/monte/checks/EquilibrationCheck.hh"
 #include "casm/monte/definitions.hh"
-#include "casm/monte/sampling/SampledData.hh"
 #include "casm/monte/sampling/Sampler.hh"
 
 namespace CASM {
@@ -20,8 +19,9 @@ struct CompletionCheckParams {
   /// \brief Completion check parameters that don't depend on the sampled values
   CutoffCheckParams cutoff_params;
 
-  /// \brief Sampler components that must be checked for convergence
-  std::map<SamplerComponent, SamplerConvergenceParams> convergence_check_params;
+  /// \brief Sampler components that must be checked for convergence, and the
+  ///     estimated precision to which the mean must be converged
+  std::map<SamplerComponent, double> requested_precision;
 
   /// \brief Confidence level for calculated precision of mean
   double confidence = 0.95;
@@ -69,8 +69,6 @@ class CompletionCheck {
       std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
       CountType count, TimeType time);
 
-  bool is_complete(SampledData const &sampled_data);
-
   CompletionCheckResults const &results() const { return m_results; }
 
  private:
@@ -112,20 +110,24 @@ inline bool CompletionCheck::is_complete(
   return _is_complete(samplers, count, time);
 }
 
-inline bool CompletionCheck::is_complete(SampledData const &sampled_data) {
-  return _is_complete(sampled_data.samplers, get_count(sampled_data),
-                      get_time(sampled_data));
-}
-
 inline bool CompletionCheck::_is_complete(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
     std::optional<CountType> count, std::optional<TimeType> time) {
   CountType n_samples = get_n_samples(samplers);
-  if (n_samples < m_params.check_begin ||
-      n_samples % m_params.check_frequency != 0) {
+  // if all minimums not met, continue
+  if (!all_minimums_met(m_params.cutoff_params, count, time, n_samples)) {
     return false;
   }
-  _check(samplers, count, time, n_samples);
+  if (n_samples >= m_params.check_begin &&
+      n_samples % m_params.check_frequency == 0) {
+    _check(samplers, count, time, n_samples);
+  }
+  // if any maximum met, stop
+  if (any_maximum_met(m_params.cutoff_params, count, time, n_samples)) {
+    m_results = CompletionCheckResults();
+    m_results.confidence = m_params.confidence;
+    m_results.is_complete = true;
+  }
   return m_results.is_complete;
 }
 

@@ -125,6 +125,10 @@ Conversions::Conversions(
   }
 }
 
+Index Conversions::l_size() const {
+  return m_l_and_bijk_converter.total_sites();
+}
+
 Index Conversions::l_to_b(Index l) const {
   return m_l_and_bijk_converter(l).sublattice();
 }
@@ -154,6 +158,10 @@ Index Conversions::bijk_to_unitl(xtal::UnitCellCoord const &bijk) const {
 
 Index Conversions::bijk_to_asym(xtal::UnitCellCoord const &bijk) const {
   return l_to_asym(bijk_to_l(bijk));
+}
+
+Index Conversions::unitl_size() const {
+  return m_unitl_and_bijk_converter.total_sites();
 }
 
 Index Conversions::unitl_to_b(Index unitl) const {

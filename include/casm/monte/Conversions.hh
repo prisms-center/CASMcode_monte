@@ -52,6 +52,7 @@ class Conversions {
               Eigen::Matrix3l const &unit_transformation_matrix_to_super,
               std::vector<Index> const &unitl_to_asym);
 
+  Index l_size() const;
   Index l_to_b(Index l) const;
   xtal::UnitCell l_to_ijk(Index l) const;
   xtal::UnitCellCoord l_to_bijk(Index l) const;
@@ -62,6 +63,7 @@ class Conversions {
   Index bijk_to_unitl(xtal::UnitCellCoord const &bijk) const;
   Index bijk_to_asym(xtal::UnitCellCoord const &bijk) const;
 
+  Index unitl_size() const;
   Index unitl_to_b(Index unitl) const;
   xtal::UnitCellCoord unitl_to_bijk(Index unitl) const;
   Index unitl_to_asym(Index unitl) const;

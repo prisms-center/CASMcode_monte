@@ -126,9 +126,27 @@ class OccCandidateList {
   Index m_end;
 };
 
+/// \brief Check that OccCandidate is valid (won't cause segfaults)
+bool is_valid(Conversions const &convert, OccCandidate const &cand);
+
+/// \brief Check that swap is valid (won't cause segfaults)
+bool is_valid(Conversions const &convert, OccCandidate const &cand_a,
+              OccCandidate const &cand_b);
+
+/// \brief Check that swap is valid (won't cause segfaults)
+bool is_valid(Conversions const &convert, OccSwap const &swap);
+
+/// \brief Check that species are different and allowed on both sites
+bool allowed_canonical_swap(Conversions const &convert, OccCandidate cand_a,
+                            OccCandidate cand_b);
+
 /// \brief Construct OccSwap allowed for canonical Monte Carlo
 std::vector<OccSwap> make_canonical_swaps(
     Conversions const &convert, OccCandidateList const &occ_candidate_list);
+
+/// \brief Check that species are different and allowed on both sites
+bool allowed_grand_canonical_swap(Conversions const &convert,
+                                  OccCandidate cand_a, OccCandidate cand_b);
 
 /// \brief Construct OccSwap allowed for grand canonical Monte Carlo
 std::vector<OccSwap> make_grand_canonical_swaps(
