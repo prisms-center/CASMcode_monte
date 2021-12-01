@@ -89,6 +89,8 @@ OccEvent &propose_canonical_event(OccEvent &e, OccLocation const &occ_location,
                                   OccSwap const &swap, MTRand &mtrand) {
   e.occ_transform.resize(2);
   e.species_traj.resize(0);
+  e.linear_site_index.resize(2);
+  e.new_occ.resize(2);
 
   OccTransform &transform_a = e.occ_transform[0];
   Mol const &mol_a = occ_location.choose_mol(swap.cand_a, mtrand);
@@ -105,6 +107,12 @@ OccEvent &propose_canonical_event(OccEvent &e, OccLocation const &occ_location,
   transform_b.asym = swap.cand_b.asym;
   transform_b.from_species = swap.cand_b.species_index;
   transform_b.to_species = swap.cand_a.species_index;
+
+  for (Index i = 0; i < 2; ++i) {
+    OccTransform const &t = e.occ_transform[i];
+    e.linear_site_index[i] = t.l;
+    e.new_occ[i] = occ_location.convert().occ_index(t.asym, t.to_species);
+  }
 
   return e;
 }
@@ -210,6 +218,8 @@ OccEvent &propose_grand_canonical_event(OccEvent &e,
                                         OccSwap const &swap, MTRand &mtrand) {
   e.occ_transform.resize(1);
   e.species_traj.resize(0);
+  e.linear_site_index.resize(1);
+  e.new_occ.resize(1);
 
   OccTransform &transform = e.occ_transform[0];
   Mol const &mol = occ_location.choose_mol(swap.cand_a, mtrand);
@@ -218,6 +228,10 @@ OccEvent &propose_grand_canonical_event(OccEvent &e,
   transform.asym = swap.cand_a.asym;
   transform.from_species = swap.cand_a.species_index;
   transform.to_species = swap.cand_b.species_index;
+
+  e.linear_site_index[0] = transform.l;
+  e.new_occ[0] =
+      occ_location.convert().occ_index(transform.asym, transform.to_species);
 
   return e;
 }

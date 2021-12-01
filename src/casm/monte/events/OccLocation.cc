@@ -162,5 +162,8 @@ Index OccLocation::mol_id(const OccCandidate &cand, Index loc) const {
 /// Convert from config index to variable site index
 Index OccLocation::l_to_mol_id(Index l) const { return m_l_to_mol[l]; }
 
+/// Get Conversions objects
+Conversions const &OccLocation::convert() const { return m_convert; }
+
 }  // namespace monte
 }  // namespace CASM

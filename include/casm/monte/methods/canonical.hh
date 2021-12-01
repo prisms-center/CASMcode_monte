@@ -169,12 +169,7 @@ Results<ConfigType> canonical(State<ConfigType> const &initial_state,
                               MTRand &random_number_generator,
                               StateSampler<ConfigType> &state_sampler,
                               CompletionCheck &completion_check) {
-  auto &log = CASM::log();
-  log.increase_indent();
-  log.begin("Canonical Monte Carlo Run");
-
   // Prepare state
-  log.indent() << "Prepare state" << std::endl;
   State<ConfigType> state = initial_state;
 
   // Initialize occupation tracking
@@ -186,87 +181,59 @@ Results<ConfigType> canonical(State<ConfigType> const &initial_state,
   //   even in dilute compositions.
   // - The OccLocation::mol_size() is the number of "mol" (possibly molecular
   //   occupants) that may mutate. Use this for `steps_per_pass`.
-  log.indent() << "Prepare occupation tracking" << std::endl;
   OccCandidateList occ_candidate_list(convert);
   OccLocation occ_location(convert, occ_candidate_list);
   occ_location.initialize(get_occupation(state.configuration));
   CountType steps_per_pass = occ_location.mol_size();
-  log.indent() << "steps_per_pass: " << steps_per_pass << std::endl;
 
   // Prepare properties
-  log.indent() << "Prepare properties" << std::endl;
   state.properties["potential_energy"] = Eigen::VectorXd(1);
-  log.indent() << "Prepare properties 1" << std::endl;
   double &potential_energy_intensive = state.properties["potential_energy"](0);
 
   // Set calculator (so it evaluates state)
   // and calculate initial potential energy
-  log.indent() << "Prepare properties 2" << std::endl;
   set(potential_energy_calculator, state);
-  log.indent() << "Prepare properties 3" << std::endl;
   potential_energy_intensive = potential_energy_calculator.intensive_value();
 
   // Reset state_sampler
-  log.indent() << "Reset state_sampler" << std::endl;
   state_sampler.reset(steps_per_pass);
 
   // Sample initial state, if requested by sampling_params
-  log.indent() << "Sample initial state, if requested" << std::endl;
   state_sampler.sample_data_if_due(state);
 
   // Used within the main loop:
-  log.indent() << "Prepare for main loop" << std::endl;
   OccEvent event;
   double beta = 1.0 / (CASM::KB * state.conditions.at("temperature")(0));
   double n_unitcells =
       get_transformation_matrix_to_super(state.configuration).determinant();
 
   // Main loop
-  log.indent() << "Beginning main loop..." << std::endl;
   while (!completion_check.is_complete(state_sampler.samplers,
                                        state_sampler.count)) {
-    log.increase_indent();
-    log.begin("Monte Carlo step");
     // Propose an event
-    log.indent() << "Propose event" << std::endl;
     propose_canonical_event(event, occ_location, canonical_swaps,
                             random_number_generator);
 
     // Calculate change in potential energy (extensive) due to event
-    log.indent() << "Calculate delta_potential_energy" << std::endl;
-    OccTransform const &t = event.occ_transform[0];
-    Index linear_site_index = t.l;
-    int new_occ = convert.occ_index(t.asym, t.to_species);
-    double delta_potential_energy =
-        potential_energy_calculator.occ_delta_value(linear_site_index, new_occ);
+    double delta_potential_energy = potential_energy_calculator.occ_delta_value(
+        event.linear_site_index, event.new_occ);
 
     // Accept or reject event
-    log.indent() << "Check event" << std::endl;
     bool accept = metropolis_acceptance(delta_potential_energy, beta,
                                         random_number_generator);
 
     // Apply accepted event
     if (accept) {
-      log.indent() << "Accept event" << std::endl;
       occ_location.apply(event, get_occupation(state.configuration));
       potential_energy_intensive += (delta_potential_energy / n_unitcells);
-    } else {
-      log.indent() << "Reject event" << std::endl;
     }
 
     // Increment count
-    log.indent() << "Increment steps / passes" << std::endl;
     state_sampler.increment_step();
 
     // Sample data, if a sample is due
-    log.indent() << "Sample state, if a sample is due" << std::endl;
     state_sampler.sample_data_if_due(state);
-    log.decrease_indent();
-    log << std::endl;
   }
-  log.indent() << "Completed main loop" << std::endl;
-  log.decrease_indent();
-  log << std::endl;
 
   Results<ConfigType> results;
   results.initial_state = initial_state;

@@ -60,6 +60,8 @@ struct SpeciesTraj {
 };
 
 struct OccEvent {
+  std::vector<Index> linear_site_index;
+  std::vector<int> new_occ;
   std::vector<OccTransform> occ_transform;
   std::vector<SpeciesTraj> species_traj;
 };
@@ -138,10 +140,13 @@ class OccLocation {
   /// Convert from config index to variable site index
   Index l_to_mol_id(Index l) const;
 
- private:
-  const Conversions &m_convert;
+  /// Get Conversions objects
+  Conversions const &convert() const;
 
-  const OccCandidateList &m_candidate_list;
+ private:
+  Conversions const &m_convert;
+
+  OccCandidateList const &m_candidate_list;
 
   /// Gives a list of all Mol of the same {asym, species}-type allowed to mutate
   ///   m_loc[cand_index][i] -> m_mol index
