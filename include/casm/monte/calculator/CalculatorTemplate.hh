@@ -33,15 +33,20 @@ class CalculatorTemplate {
   double extensive_value();
 
   /// \brief Change in extensive value due to occupation change
-  double occ_delta_value(Index linear_site_index, int new_occ);
+  double occ_delta_extensive_value(Index linear_site_index, int new_occ);
+
+  /// \brief Calculate change in cluster expansion value due to a series of
+  ///     occupation changes
+  double occ_delta_extensive_value(std::vector<Index> const &linear_site_index,
+                                   std::vector<int> const &new_occ);
 
   /// \brief Change in extensive value due to local DoF value change
-  double local_delta_value(DoFKey const &key, Index linear_site_index,
-                           Eigen::VectorXd const &new_value);
+  double local_delta_extensive_value(DoFKey const &key, Index linear_site_index,
+                                     Eigen::VectorXd const &new_value);
 
   /// \brief Change in extensive value due to global DoF value change
-  double global_delta_value(DoFKey const &key,
-                            Eigen::VectorXd const &new_value);
+  double global_delta_extensive_value(DoFKey const &key,
+                                      Eigen::VectorXd const &new_value);
 
   /// \brief Return the coordinates of sites (relative to the origin unit cell)
   ///     where a change in DoF values requires this calculators values to be

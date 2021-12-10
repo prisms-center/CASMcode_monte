@@ -8,7 +8,7 @@
 namespace CASM {
 namespace monte {
 
-/// Choose a swap type from a list of allowed canonical swap types
+/// \brief Choose a swap type from a list of allowed canonical swap types
 ///
 /// \param occ_location Contains lookup table with occupant locations for
 /// efficient choosing in dilute systems.
@@ -72,7 +72,7 @@ OccSwap const &choose_canonical_swap(OccLocation const &occ_location,
   throw std::runtime_error("Error in choose_canonical_swap");
 }
 
-/// Propose canonical OccEvent, given choice of OccSwap
+/// \brief Propose canonical OccEvent of particular swap type
 ///
 /// \param e [out] The OccEvent that will be populated with the proposed event.
 /// \param occ_location Contains lookup table with occupant locations for
@@ -85,8 +85,10 @@ OccSwap const &choose_canonical_swap(OccLocation const &occ_location,
 /// Method:
 /// Stochastically choose which two sites (consistent with the given swap type)
 /// will be swapped by using the list of sites of each candidate type.
-OccEvent &propose_canonical_event(OccEvent &e, OccLocation const &occ_location,
-                                  OccSwap const &swap, MTRand &mtrand) {
+OccEvent &propose_canonical_event_from_swap(OccEvent &e,
+                                            OccLocation const &occ_location,
+                                            OccSwap const &swap,
+                                            MTRand &mtrand) {
   e.occ_transform.resize(2);
   e.species_traj.resize(0);
   e.linear_site_index.resize(2);
@@ -117,7 +119,7 @@ OccEvent &propose_canonical_event(OccEvent &e, OccLocation const &occ_location,
   return e;
 }
 
-/// Propose canonical OccEvent
+/// \brief Propose canonical OccEvent from list of swap types
 ///
 /// \param e [out] The OccEvent that will be populated with the proposed event.
 /// \param occ_location Contains lookup table with occupant locations for
@@ -142,10 +144,10 @@ OccEvent &propose_canonical_event(OccEvent &e, OccLocation const &occ_location,
                                   MTRand &mtrand) {
   auto const &swap =
       choose_canonical_swap(occ_location, canonical_swap, mtrand);
-  return propose_canonical_event(e, occ_location, swap, mtrand);
+  return propose_canonical_event_from_swap(e, occ_location, swap, mtrand);
 }
 
-/// Choose a swap type from a list of allowed grand canonical swap types
+/// \brief Choose a swap type from a list of allowed grand canonical swap types
 ///
 /// \param occ_location Contains lookup table with occupant locations for
 /// efficient choosing in dilute systems.
@@ -209,13 +211,13 @@ OccSwap const &choose_grand_canonical_swap(
   throw std::runtime_error("Error in choose_grand_canonical_swap");
 }
 
-/// Propose grand canonical OccEvent
+/// \brief Propose grand canonical OccEvent of particular swap type
 ///
 /// Given the choice of OccSwap, this method stochastically chooses which site
 /// the swap occurs on.
-OccEvent &propose_grand_canonical_event(OccEvent &e,
-                                        OccLocation const &occ_location,
-                                        OccSwap const &swap, MTRand &mtrand) {
+OccEvent &propose_grand_canonical_event_from_swap(
+    OccEvent &e, OccLocation const &occ_location, OccSwap const &swap,
+    MTRand &mtrand) {
   e.occ_transform.resize(1);
   e.species_traj.resize(0);
   e.linear_site_index.resize(1);
@@ -236,13 +238,13 @@ OccEvent &propose_grand_canonical_event(OccEvent &e,
   return e;
 }
 
-/// Propose grand canonical OccEvent
+/// \brief Propose grand canonical OccEvent from list of swap types
 OccEvent &propose_grand_canonical_event(
     OccEvent &e, OccLocation const &occ_location,
     std::vector<OccSwap> const &grand_canonical_swap, MTRand &mtrand) {
   auto const &swap =
       choose_grand_canonical_swap(occ_location, grand_canonical_swap, mtrand);
-  return propose_grand_canonical_event(e, occ_location, swap, mtrand);
+  return propose_grand_canonical_event_from_swap(e, occ_location, swap, mtrand);
 }
 
 }  // namespace monte

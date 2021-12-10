@@ -59,10 +59,22 @@ struct SpeciesTraj {
   SpeciesLocation to;
 };
 
+/// \brief Describes a Monte Carlo event that modifies occupation
 struct OccEvent {
+  /// \brief Linear site indices, indicating on which sites the occupation will
+  ///     be modified
   std::vector<Index> linear_site_index;
+
+  /// \brief Occupant indices, indicating the new occupation index on the sites
+  ///     being modified
   std::vector<int> new_occ;
+
+  /// \brief Information used to update occupant tracking information stored in
+  ///     OccLocation
   std::vector<OccTransform> occ_transform;
+
+  /// \brief Information used to update occupant tracking information stored in
+  ///     OccLocation - use if tracking species trajectories for KMC
   std::vector<SpeciesTraj> species_traj;
 };
 
