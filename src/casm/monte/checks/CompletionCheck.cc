@@ -14,12 +14,10 @@ void CompletionCheck::_check(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
     std::optional<CountType> count, std::optional<TimeType> time,
     CountType n_samples) {
-  m_results = CompletionCheckResults();
-  m_results.confidence = m_params.confidence;
-  m_results.is_complete = false;
-
   // if auto convergence mode:
   if (m_params.requested_precision.size()) {
+    m_results.convergence_check_performed = true;
+
     // check for equilibration
     bool check_all = false;
     m_results.equilibration_check_results =

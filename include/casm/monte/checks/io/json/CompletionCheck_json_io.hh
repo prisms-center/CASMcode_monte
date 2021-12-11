@@ -16,6 +16,9 @@ template <typename ConfigType>
 void parse(InputParser<CompletionCheckParams> &parser,
            StateSamplingFunctionMap<ConfigType> const &sampling_functions);
 
+/// \brief CompletionCheckResults to JSON
+jsonParser &to_json(CompletionCheckResults const &value, jsonParser &json);
+
 // --- Inline definitions ---
 
 namespace CompletionCheck_json_io_impl {

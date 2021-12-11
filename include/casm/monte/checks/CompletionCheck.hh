@@ -38,6 +38,26 @@ struct CompletionCheckParams {
 
 /// \brief Stores completion check results
 struct CompletionCheckResults {
+  /// Minimums cutoff check results
+  bool has_all_minimums_met = false;
+
+  /// Maximums cutoff check results
+  bool has_any_maximum_met = false;
+
+  /// Current count (if given)
+  std::optional<CountType> count;
+
+  /// Current time (if given)
+  std::optional<TimeType> time;
+
+  /// Current number of samples
+  CountType n_samples = 0;
+
+  /// Equilibration and convergence checks are performed if:
+  /// - n_samples >= check_begin && n_samples % check_frequency == 0, and
+  /// - requested_precision.size() > 0
+  bool convergence_check_performed = false;
+
   /// True if calculation is complete, either due to convergence or cutoff
   bool is_complete = false;
 
@@ -114,20 +134,34 @@ inline bool CompletionCheck::_is_complete(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
     std::optional<CountType> count, std::optional<TimeType> time) {
   CountType n_samples = get_n_samples(samplers);
-  // if all minimums not met, continue
-  if (!all_minimums_met(m_params.cutoff_params, count, time, n_samples)) {
+
+  m_results = CompletionCheckResults();
+  m_results.confidence = m_params.confidence;
+  m_results.count = count;
+  m_results.time = time;
+  m_results.n_samples = n_samples;
+  m_results.has_all_minimums_met =
+      all_minimums_met(m_params.cutoff_params, count, time, n_samples);
+
+  // if all minimums not met, continue, otherwise can stop
+  if (!m_results.has_all_minimums_met) {
     return false;
   }
+
+  // check equilibration and convergence
   if (n_samples >= m_params.check_begin &&
       n_samples % m_params.check_frequency == 0) {
     _check(samplers, count, time, n_samples);
   }
-  // if any maximum met, stop
-  if (any_maximum_met(m_params.cutoff_params, count, time, n_samples)) {
-    m_results = CompletionCheckResults();
-    m_results.confidence = m_params.confidence;
+
+  // if any maximum met, stop even if not converged
+  m_results.has_any_maximum_met =
+      any_maximum_met(m_params.cutoff_params, count, time, n_samples);
+
+  if (m_results.has_any_maximum_met) {
     m_results.is_complete = true;
   }
+
   return m_results.is_complete;
 }
 

@@ -17,6 +17,10 @@
 #include "casm/monte/sampling/SamplingParams.hh"
 #include "casm/monte/state/StateSampler.hh"
 
+// debug
+#include "casm/casm_io/json/jsonParser.hh"
+#include "casm/monte/checks/io/json/CompletionCheck_json_io.hh"
+
 namespace CASM {
 namespace monte {
 

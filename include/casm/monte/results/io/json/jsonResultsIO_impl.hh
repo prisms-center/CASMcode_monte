@@ -124,7 +124,7 @@ jsonParser &append_sampled_data_to_json(
       // if is a quantity specifically asked to be converged,
       //     use existing results
       result = result_it->second;
-    } else {
+    } else if (convergence_r.N_samples_for_statistics != 0) {
       // if not a quantity specifically asked to be converged,
       //     do convergence check
       double required_precision = 0.0;
@@ -228,7 +228,7 @@ template <typename _ConfigType>
 std::vector<typename jsonResultsIO<_ConfigType>::state_type>
 jsonResultsIO<_ConfigType>::read_final_states() {
   jsonParser json = read_summary();
-  return json["final_states"].get<std::vector<state_type>>();
+  return json["trajectory"]["final_states"].get<std::vector<state_type>>();
 }
 
 /// \brief Write results
