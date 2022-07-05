@@ -81,10 +81,6 @@ class OccSwap : public Comparisons<CRTPBase<OccSwap>> {
 
 /// List of asym / species_index pairs indicating allowed variable occupation
 /// dof
-///
-/// This stores lists of allowed swaps of potential canonical or grand
-/// canonical events, by type only (asymmetric unit and type of occupant before
-/// and after), not by which particular sites are changing.
 class OccCandidateList {
  public:
   typedef std::vector<OccCandidate>::const_iterator const_iterator;

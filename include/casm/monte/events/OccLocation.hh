@@ -16,13 +16,16 @@ struct OccCandidate;
 class OccSwap;
 class OccCandidateList;
 
-/// \brief Represents an indivisible molecule component
-struct Species {
-  Species(xtal::UnitCellCoord _bijk_begin) : bijk_begin(_bijk_begin) {}
+/// \brief Represents an atom in a molecule
+struct Atom {
+  Atom(xtal::UnitCellCoord _bijk_begin)
+      : bijk_begin(_bijk_begin), delta_ijk(0, 0, 0) {}
 
-  Index species_index;             ///< Species type index
-  Index id;                        ///< Location in OccLocation.m_species
+  Index species_index;  ///< Species type index
+  Index atom_index;     ///< Index into xtal::Molecule for this species_index
+  Index id;             ///< Location in OccLocation.m_atoms
   xtal::UnitCellCoord bijk_begin;  ///< Saves initial position
+  xtal::UnitCell delta_ijk;        ///< Saves change in position
   Index mol_comp_begin;            ///< Saves initial Mol.component index
 };
 
@@ -36,7 +39,7 @@ struct Mol {
   Index species_index;  ///< Species type index (must be consistent with
                         ///< config.occ(l))
   std::vector<Index>
-      component;  ///< Location of component Specie in OccLocation.m_species
+      component;  ///< Location of component atom in OccLocation.m_atoms
   Index loc;      ///< Location in OccLocation.m_loc
 };
 
@@ -48,15 +51,16 @@ struct OccTransform {
   Index to_species;    ///< Species index after transformation
 };
 
-struct SpeciesLocation {
+struct AtomLocation {
   Index l;         ///< Config occupant that is being transformed
   Index mol_id;    ///< Location in OccLocation.m_mol
   Index mol_comp;  ///< Location in mol.components
 };
 
-struct SpeciesTraj {
-  SpeciesLocation from;
-  SpeciesLocation to;
+struct AtomTraj {
+  AtomLocation from;
+  AtomLocation to;
+  xtal::UnitCell delta_ijk;
 };
 
 /// \brief Describes a Monte Carlo event that modifies occupation
@@ -75,7 +79,7 @@ struct OccEvent {
 
   /// \brief Information used to update occupant tracking information stored in
   ///     OccLocation - use if tracking species trajectories for KMC
-  std::vector<SpeciesTraj> species_traj;
+  std::vector<AtomTraj> atom_traj;
 };
 
 /// \brief Stores data to enable efficient proposal and update of occupation
@@ -102,7 +106,7 @@ struct OccEvent {
 /// - Both `loc`, and `mol` are updated.
 ///
 /// For molecule support:
-/// - `species` list (type=Monte::Species, shape=(number of atom components,)),
+/// - `species` list (type=Monte::Atom, shape=(number of atom components,)),
 ///    stores information about individual atom components of molecules,
 ///    including species_index, initial site, initial molecule component index
 /// - `Mol` also store indices of their atom components in the `species` list
@@ -111,7 +115,8 @@ class OccLocation {
   typedef Index size_type;
 
   OccLocation(const Conversions &_convert,
-              const OccCandidateList &_candidate_list);
+              const OccCandidateList &_candidate_list,
+              bool _update_species = false);
 
   /// Fill tables with occupation info
   void initialize(Eigen::VectorXi const &occupation);
@@ -164,8 +169,8 @@ class OccLocation {
   ///   m_loc[cand_index][i] -> m_mol index
   std::vector<std::vector<Index> > m_loc;
 
-  /// Holds Monte::Species objects
-  std::vector<Species> m_species;
+  /// Holds Monte::Atom objects
+  std::vector<Atom> m_atoms;
 
   /// Holds Mol objects, one for each mutating site in the configuration
   std::vector<Mol> m_mol;
@@ -173,8 +178,8 @@ class OccLocation {
   /// l_to_mol[l] -> Mol.id, m_mol.size() otherwise
   std::vector<Index> m_l_to_mol;
 
-  /// If true, update Species location during apply
-  bool m_update_species;
+  /// If true, update Atom location during apply
+  bool m_update_atoms;
 
   /// Data structure used store temporaries during apply
   std::vector<Mol> m_tmol;

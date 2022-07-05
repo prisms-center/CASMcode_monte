@@ -1,5 +1,6 @@
 #include "casm/monte/events/OccLocation.hh"
 
+#include "casm/crystallography/Molecule.hh"
 #include "casm/external/MersenneTwister/MersenneTwister.h"
 #include "casm/monte/Conversions.hh"
 #include "casm/monte/events/OccCandidate.hh"
@@ -7,17 +8,25 @@
 namespace CASM {
 namespace monte {
 
+/// \brief Constructor
+///
+/// \param _convert Conversions object
+/// \param _candidate_list Specifies allowed types of occupants
+///     by {asymmetric unit index, species index}
+/// \param _update_atoms If true, track species trajectories when
+///     applying OccEvent
 OccLocation::OccLocation(const Conversions &_convert,
-                         const OccCandidateList &_candidate_list)
+                         const OccCandidateList &_candidate_list,
+                         bool _update_atoms)
     : m_convert(_convert),
       m_candidate_list(_candidate_list),
       m_loc(_candidate_list.size()),
-      m_update_species(false) {}
+      m_update_atoms(false) {}
 
 /// Fill tables with occupation info
 void OccLocation::initialize(Eigen::VectorXi const &occupation) {
   m_mol.clear();
-  m_species.clear();
+  m_atoms.clear();
   m_l_to_mol.clear();
   for (auto &vec : m_loc) {
     vec.clear();
@@ -47,15 +56,16 @@ void OccLocation::initialize(Eigen::VectorXi const &occupation) {
       mol.species_index = species_index;
       mol.loc = m_loc[cand_index].size();
 
-      if (m_update_species) {
-        // only atoms now
-        for (Index j = 0; j < 1; j++) {
-          Species spec(m_convert.l_to_bijk(l));
-          spec.species_index = species_index;
-          spec.id = m_species.size();
-          mol.component.push_back(spec.id);
+      if (m_update_atoms) {
+        int n_atoms = m_convert.species_to_mol(species_index).atoms().size();
+        for (Index atom_index = 0; atom_index < n_atoms; ++atom_index) {
+          Atom atom(m_convert.l_to_bijk(l));
+          atom.species_index = species_index;
+          atom.atom_index = atom_index;
+          atom.id = m_atoms.size();
+          mol.component.push_back(atom.id);
 
-          m_species.push_back(spec);
+          m_atoms.push_back(atom);
         }
       }
 
@@ -66,7 +76,7 @@ void OccLocation::initialize(Eigen::VectorXi const &occupation) {
       m_l_to_mol.push_back(Nmut);
     }
   }
-  if (m_update_species) {
+  if (m_update_atoms) {
     m_tmol = m_mol;
   }
 }
@@ -85,7 +95,7 @@ Mol const &OccLocation::choose_mol(OccCandidate const &cand,
 /// Update occupation vector and this to reflect that event 'e' occurred
 void OccLocation::apply(const OccEvent &e, Eigen::VectorXi &occupation) {
   // copy original Mol.component
-  if (m_update_species) {
+  if (m_update_atoms) {
     for (const auto &occ : e.occ_transform) {
       m_tmol[occ.mol_id].component = m_mol[occ.mol_id].component;
     }
@@ -108,7 +118,7 @@ void OccLocation::apply(const OccEvent &e, Eigen::VectorXi &occupation) {
     // set Mol.species index
     mol.species_index = occ.to_species;
 
-    if (m_update_species) {
+    if (m_update_atoms) {
       mol.component.resize(m_convert.components_size(mol.species_index));
     }
 
@@ -118,11 +128,16 @@ void OccLocation::apply(const OccEvent &e, Eigen::VectorXi &occupation) {
     m_loc[cand_index].push_back(mol.id);
   }
 
-  if (m_update_species) {
+  if (m_update_atoms) {
     // update Mol.component
-    for (const auto &traj : e.species_traj) {
+    for (const auto &traj : e.atom_traj) {
       m_mol[traj.to.mol_id].component[traj.to.mol_comp] =
           m_tmol[traj.from.mol_id].component[traj.from.mol_comp];
+    }
+    // update species delta_ijk
+    for (const auto &traj : e.atom_traj) {
+      Index id = m_mol[traj.to.mol_id].component[traj.to.mol_comp];
+      m_atoms[id].delta_ijk += traj.delta_ijk;
     }
   }
 }

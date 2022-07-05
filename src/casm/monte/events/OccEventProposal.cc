@@ -90,7 +90,7 @@ OccEvent &propose_canonical_event_from_swap(OccEvent &e,
                                             OccSwap const &swap,
                                             MTRand &mtrand) {
   e.occ_transform.resize(2);
-  e.species_traj.resize(0);
+  e.atom_traj.resize(0);
   e.linear_site_index.resize(2);
   e.new_occ.resize(2);
 
@@ -219,7 +219,7 @@ OccEvent &propose_grand_canonical_event_from_swap(
     OccEvent &e, OccLocation const &occ_location, OccSwap const &swap,
     MTRand &mtrand) {
   e.occ_transform.resize(1);
-  e.species_traj.resize(0);
+  e.atom_traj.resize(0);
   e.linear_site_index.resize(1);
   e.new_occ.resize(1);
 
