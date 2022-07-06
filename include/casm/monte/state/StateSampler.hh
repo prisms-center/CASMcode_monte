@@ -56,6 +56,25 @@ template <typename ConfigType>
 using StateSamplingFunctionMap =
     std::map<std::string, StateSamplingFunction<ConfigType>>;
 
+template <typename ConfigType, typename ValueType>
+void set_value(std::map<SamplerComponent, ValueType> &component_map,
+               StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+               std::string const &sampler_name, ValueType const &value);
+
+template <typename ConfigType, typename ValueType>
+void set_value_by_component_index(
+    std::map<SamplerComponent, double> &component_map,
+    StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+    std::string const &sampler_name, Index component_index,
+    ValueType const &value);
+
+template <typename ConfigType, typename ValueType>
+void set_value_by_component_name(
+    std::map<SamplerComponent, double> &component_map,
+    StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+    std::string const &sampler_name, std::string const &component_name,
+    ValueType const &value);
+
 /// \brief A data structure to help encapsulate typical Monte Carlo sampling
 ///
 /// - Holds information describing what to sample, and when
@@ -370,6 +389,114 @@ template <typename _ConfigType>
 Eigen::VectorXd StateSamplingFunction<_ConfigType>::operator()(
     State<ConfigType> const &state) const {
   return function(state);
+}
+
+/// \brief Adds values in a map of SamplerComponent -> ValueType
+///
+/// \param component_map Map to add a std::pair<SamplerComponent, ValueType>
+/// into \param sampling_functions Container of sampling functions referred to
+/// \param sampler_name The name of a StateSamplingFunction in
+/// `sampling_functions` \param value The value added to `component_map` for
+/// each SamplerComponent
+///     of the StateSamplingFunction specified by `sampler_name`.
+///
+/// \throws std::runtime_error if `sampler_name` cannot be found.
+template <typename ConfigType, typename ValueType>
+void set_value(std::map<SamplerComponent, ValueType> &component_map,
+               StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+               std::string const &sampler_name, ValueType const &value) {
+  auto it = sampling_functions.find(sampler_name);
+  if (it == sampling_functions.end()) {
+    std::stringstream ss;
+    ss << "Error: no sampling function with name '" << sampler_name << "'";
+    throw std::runtime_error(ss.str());
+  }
+  Index component_index = 0;
+  for (std::string const &component_name : it->second.component_names) {
+    component_map.emplace(
+        SamplerComponent(sampler_name, component_index, component_name), value);
+    ++component_index;
+  }
+}
+
+/// \brief Adds a value in a map of SamplerComponent -> ValueType
+///
+/// \param component_map Map to add a std::pair<SamplerComponent, ValueType>
+/// into \param sampling_functions Container of sampling functions referred to
+/// \param sampler_name The name of a StateSamplingFunction in
+/// `sampling_functions` \param component_index An index into components of the
+/// StateSamplingFunction
+///     specified by `sample_name`.
+/// \param value The value added to `component_map` for the SamplerComponent
+///     specified by `sampler_name` and `component_name`.
+///
+/// \throws std::runtime_error if either `sampler_name` cannot be found or
+///     `component_index` is out of range.
+template <typename ConfigType, typename ValueType>
+void set_value_by_component_index(
+    std::map<SamplerComponent, double> &component_map,
+    StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+    std::string const &sampler_name, Index component_index,
+    ValueType const &value) {
+  auto it = sampling_functions.find(sampler_name);
+  if (it == sampling_functions.end()) {
+    std::stringstream ss;
+    ss << "Error: no sampling function with name '" << sampler_name << "'";
+    throw std::runtime_error(ss.str());
+  }
+  if (component_index >= it->second.component_names.size()) {
+    std::stringstream ss;
+    ss << "Error: component index " << component_index
+       << " is out of range for sampling function '" << sampler_name << "'";
+    throw std::runtime_error(ss.str());
+  }
+  component_map.emplace(
+      SamplerComponent(sampler_name, component_index,
+                       it->second.component_names[component_index]),
+      value);
+}
+
+/// \brief Adds a value in a map of SamplerComponent -> ValueType
+///
+/// \param component_map Map to add a std::pair<SamplerComponent, ValueType>
+/// into \param sampling_functions Container of sampling functions referred to
+/// \param sampler_name The name of a StateSamplingFunction in
+/// `sampling_functions` \param component_name A name in `component_names` of
+/// the StateSamplingFunction
+///     specified by `sample_name`.
+/// \param value The value added to `component_map` for the SamplerComponent
+///     specified by `sampler_name` and `component_name`.
+///
+/// \throws std::runtime_error if either `sampler_name` or `component_name`
+/// cannot
+///     be found.
+template <typename ConfigType, typename ValueType>
+void set_value_by_component_name(
+    std::map<SamplerComponent, double> &component_map,
+    StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+    std::string const &sampler_name, std::string const &component_name,
+    ValueType const &value) {
+  auto it = sampling_functions.find(sampler_name);
+  if (it == sampling_functions.end()) {
+    std::stringstream ss;
+    ss << "Error: no sampling function with name '" << sampler_name << "'";
+    throw std::runtime_error(ss.str());
+  }
+  Index component_index = 0;
+  for (auto const &name : it->second.component_names) {
+    if (name == component_name) {
+      component_map.emplace(
+          SamplerComponent(sampler_name, component_index, name), value);
+      return;
+    }
+    ++component_index;
+  }
+
+  // Error if component_name not found
+  std::stringstream ss;
+  ss << "Error: component name '" << component_name
+     << "' is not found for sampling function '" << sampler_name << "'";
+  throw std::runtime_error(ss.str());
 }
 
 /// \brief Get component names for a particular function, else use defaults

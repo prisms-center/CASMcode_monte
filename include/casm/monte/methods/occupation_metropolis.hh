@@ -7,6 +7,7 @@
 
 #include "casm/casm_io/Log.hh"
 #include "casm/monte/Conversions.hh"
+#include "casm/monte/MethodLog.hh"
 #include "casm/monte/checks/CompletionCheck.hh"
 #include "casm/monte/events/OccCandidate.hh"
 #include "casm/monte/events/OccEventProposal.hh"
@@ -43,7 +44,8 @@ Results<ConfigType> occupation_metropolis(
     State<ConfigType> const &initial_state, CalculatorType potential,
     Conversions const &convert, std::vector<OccSwap> const &possible_swaps,
     ProposeOccEventFuntionType propose_event_f, MTRand &random_number_generator,
-    StateSampler<ConfigType> &state_sampler, CompletionCheck &completion_check);
+    StateSampler<ConfigType> &state_sampler, CompletionCheck &completion_check,
+    MethodLog method_log = MethodLog());
 
 // --- Implementation ---
 
@@ -72,6 +74,7 @@ Results<ConfigType> occupation_metropolis(
 /// \param state_sampler A StateSampler<ConfigType>, determines what is sampled
 ///     and when, and holds sampled data until returned by results
 /// \param completion_check A CompletionCheck method
+/// \param method_log A MethedLog
 ///
 /// \returns A Results<ConfigType> instance with run results.
 ///
@@ -101,8 +104,8 @@ Results<ConfigType> occupation_metropolis(
     State<ConfigType> const &initial_state, CalculatorType potential,
     Conversions const &convert, std::vector<OccSwap> const &possible_swaps,
     ProposeOccEventFuntionType propose_event_f, MTRand &random_number_generator,
-    StateSampler<ConfigType> &state_sampler,
-    CompletionCheck &completion_check) {
+    StateSampler<ConfigType> &state_sampler, CompletionCheck &completion_check,
+    MethodLog method_log) {
   // Prepare state
   State<ConfigType> state = initial_state;
 
@@ -141,9 +144,29 @@ Results<ConfigType> occupation_metropolis(
   OccEvent event;
   double beta = 1.0 / (CASM::KB * state.conditions.at("temperature")(0));
 
+  // Log method status
+  Log &log = method_log.log;
+  std::optional<double> &log_frequency = method_log.log_frequency;
+  log.restart_clock();
+  log.begin_lap();
+
   // Main loop
   while (!completion_check.is_complete(state_sampler.samplers,
                                        state_sampler.count)) {
+    // Log method status
+    if (log_frequency.has_value() && log.lap_time() > *log_frequency) {
+      method_log.reset();
+      jsonParser json;
+      json["status"] = "incomplete";
+      json["time"] = log.time_s();
+      to_json(completion_check.results(), json["convergence_check_results"]);
+      // for (auto const &pair : state_sampler.samplers) {
+      //   json[pair.first] = pair.second->values();
+      // }
+      log << json << std::endl;
+      log.begin_lap();
+    }
+
     // Propose an event
     propose_event_f(event, occ_location, possible_swaps,
                     random_number_generator);
@@ -167,6 +190,16 @@ Results<ConfigType> occupation_metropolis(
 
     // Sample data, if a sample is due
     state_sampler.sample_data_if_due(state);
+  }
+
+  // Log method status
+  if (log_frequency.has_value()) {
+    method_log.reset();
+    jsonParser json;
+    json["status"] = "complete";
+    json["time"] = log.time_s();
+    to_json(completion_check.results(), json["convergence_check_results"]);
+    log << json << std::endl;
   }
 
   Results<ConfigType> results;

@@ -14,6 +14,7 @@ jsonParser &to_json(IndividualConvergenceCheckResult const &value,
   json["mean"] = value.mean;
   json["squared_norm"] = value.squared_norm;
   json["calculated_precision"] = value.calculated_precision;
+  json["requested_precision"] = value.requested_precision;
   return json;
 }
 

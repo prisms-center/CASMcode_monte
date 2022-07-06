@@ -15,7 +15,7 @@ struct IndividualConvergenceCheckResult {
   /// \brief Mean of property (<X>)
   double mean;
 
-  /// \brief Squared norm of property (<X*X>)
+  /// \brief Squared norm of property (\sum_i X_i*X_i)
   double squared_norm;
 
   /// \brief Calculated absolute precision in <X>
@@ -23,6 +23,9 @@ struct IndividualConvergenceCheckResult {
   /// Notes:
   /// - See `convergence_check` function for calculation details
   double calculated_precision;
+
+  /// \brief Requested absolute precision in <X>
+  double requested_precision;
 };
 
 /// \brief Check convergence of a range of observations

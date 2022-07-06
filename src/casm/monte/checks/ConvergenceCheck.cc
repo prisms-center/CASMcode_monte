@@ -100,6 +100,7 @@ IndividualConvergenceCheckResult convergence_check(
   result.is_converged = false;
   result.mean = observations.mean();
   result.squared_norm = observations.squaredNorm();
+  result.requested_precision = precision;
 
   // try to calculate variance taking into account correlations
   bool found_rho;
