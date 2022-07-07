@@ -75,6 +75,9 @@ class Conversions {
   Eigen::Matrix3l const &unit_transformation_matrix_to_super() const;
   Eigen::Matrix3l const &transformation_matrix_to_super() const;
 
+  xtal::UnitCellCoordIndexConverter const &unit_index_converter() const;
+  xtal::UnitCellCoordIndexConverter const &index_converter() const;
+
   Index occ_size(Index asym) const;
   Index species_index(Index asym, Index occ_index) const;
   Index occ_index(Index asym, Index species_index) const;

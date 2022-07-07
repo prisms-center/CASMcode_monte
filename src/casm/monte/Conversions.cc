@@ -186,6 +186,24 @@ std::set<Index> const &Conversions::asym_to_unitl(Index asym) const {
   return m_asym_to_unitl[asym];
 }
 
+Eigen::Matrix3l const &Conversions::unit_transformation_matrix_to_super()
+    const {
+  return m_unit_transformation_matrix_to_super;
+}
+
+Eigen::Matrix3l const &Conversions::transformation_matrix_to_super() const {
+  return m_transformation_matrix_to_super;
+}
+
+xtal::UnitCellCoordIndexConverter const &Conversions::unit_index_converter()
+    const {
+  return m_unitl_and_bijk_converter;
+}
+
+xtal::UnitCellCoordIndexConverter const &Conversions::index_converter() const {
+  return m_l_and_bijk_converter;
+}
+
 Index Conversions::occ_size(Index asym) const {
   return m_occ_to_species[asym].size();
 }
