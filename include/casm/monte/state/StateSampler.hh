@@ -351,8 +351,20 @@ struct StateSampler {
 
 /// \brief Get component names for a particular function, else use defaults
 template <typename ConfigType>
-std::vector<std::string> get_component_names(
+std::vector<std::string> get_scalar_component_names(
+    std::string const &function_name, double const &value,
+    StateSamplingFunctionMap<ConfigType> const &sampling_functions);
+
+/// \brief Get component names for a particular function, else use defaults
+template <typename ConfigType>
+std::vector<std::string> get_vector_component_names(
     std::string const &function_name, Eigen::VectorXd const &value,
+    StateSamplingFunctionMap<ConfigType> const &sampling_functions);
+
+/// \brief Get component names for a particular function, else use defaults
+template <typename ConfigType>
+std::vector<std::string> get_matrix_component_names(
+    std::string const &function_name, Eigen::MatrixXd const &value,
     StateSamplingFunctionMap<ConfigType> const &sampling_functions);
 
 }  // namespace monte
@@ -504,22 +516,76 @@ void set_value_by_component_name(
 /// Notes:
 /// - Used for naming conditions vector components using a sampling function
 ///   of the same name.
-/// - If function not found, returns default component names ("0", "1", "2",
-///   ...)
+/// - If function not found, returns default component names ("0")
 /// - Throws if function found, but component_names dimension does not match
-///   `dimension`.
 template <typename ConfigType>
-std::vector<std::string> get_component_names(
-    std::string const &function_name, Index dimension,
+std::vector<std::string> get_scalar_component_names(
+    std::string const &function_name, double const &value,
     StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
   auto function_it = sampling_functions.find(function_name);
   if (function_it == sampling_functions.end()) {
-    return default_component_names(dimension);
+    return default_component_names(1);
   } else {
-    if (function_it->second.component_names.size() != dimension) {
+    if (function_it->second.component_names.size() != 1) {
       std::stringstream msg;
-      msg << "Error in get_component_names: Dimension of \"" << function_name
-          << "\" (" << dimension
+      msg << "Error in get_scalar_component_names: Dimension of \""
+          << function_name << "\" (" << 1
+          << ") does not match the corresponding sampling function.";
+      throw std::runtime_error(msg.str());
+    }
+    return function_it->second.component_names;
+  }
+}
+
+/// \brief Get component names for a particular function, else use defaults
+///
+/// Notes:
+/// - Used for naming conditions vector components using a sampling function
+///   of the same name.
+/// - If function not found, returns default component names ("0", "1", "2",
+///   ...)
+/// - Throws if function found, but component_names dimension does not match
+///   value.size().
+template <typename ConfigType>
+std::vector<std::string> get_vector_component_names(
+    std::string const &function_name, Eigen::VectorXd const &value,
+    StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+  auto function_it = sampling_functions.find(function_name);
+  if (function_it == sampling_functions.end()) {
+    return default_component_names(value.size());
+  } else {
+    if (function_it->second.component_names.size() != value.size()) {
+      std::stringstream msg;
+      msg << "Error in get_vector_component_names: Dimension of \""
+          << function_name << "\" (" << value.size()
+          << ") does not match the corresponding sampling function.";
+      throw std::runtime_error(msg.str());
+    }
+    return function_it->second.component_names;
+  }
+}
+
+/// \brief Get component names for a particular function, else use defaults
+///
+/// Notes:
+/// - Used for naming conditions vector components using a sampling function
+///   of the same name.
+/// - If function not found, returns default component names ("0", "1", "2",
+///   ...)
+/// - Throws if function found, but component_names dimension does not match
+///   value.size().
+template <typename ConfigType>
+std::vector<std::string> get_matrix_component_names(
+    std::string const &function_name, Eigen::MatrixXd const &value,
+    StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+  auto function_it = sampling_functions.find(function_name);
+  if (function_it == sampling_functions.end()) {
+    return colmajor_component_names(value.rows(), value.cols());
+  } else {
+    if (function_it->second.component_names.size() != value.size()) {
+      std::stringstream msg;
+      msg << "Error in get_matrix_component_names: Dimension of \""
+          << function_name << "\" (" << value.size()
           << ") does not match the corresponding sampling function.";
       throw std::runtime_error(msg.str());
     }

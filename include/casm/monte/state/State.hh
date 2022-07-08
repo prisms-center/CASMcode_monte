@@ -6,6 +6,7 @@
 
 #include "casm/global/eigen.hh"
 #include "casm/monte/definitions.hh"
+#include "casm/monte/state/ValueMap.hh"
 
 namespace CASM {
 namespace monte {
@@ -15,9 +16,8 @@ template <typename _ConfigType>
 struct State {
   typedef _ConfigType ConfigType;
 
-  State(ConfigType const &_configuration,
-        VectorValueMap _conditions = VectorValueMap(),
-        VectorValueMap _properties = VectorValueMap())
+  State(ConfigType const &_configuration, ValueMap _conditions = ValueMap(),
+        ValueMap _properties = ValueMap())
       : configuration(_configuration),
         conditions(_conditions),
         properties(_properties) {}
@@ -31,13 +31,13 @@ struct State {
   /// chemical potential (for grand canonical Monte Carlo), composition (for
   /// canonical Monte Carlo), etc., depending on the type of Monte Carlo
   /// calculation
-  VectorValueMap conditions;
+  ValueMap conditions;
 
   /// Properties of the state
   ///
   /// Properties of the state could be formation_energy, potential_energy,
   /// comp_n, etc., depending on the type of Monte Carlo calculation.
-  VectorValueMap properties;
+  ValueMap properties;
 };
 
 }  // namespace monte

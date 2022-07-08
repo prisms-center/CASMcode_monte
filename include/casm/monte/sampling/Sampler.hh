@@ -10,7 +10,21 @@
 namespace CASM {
 namespace monte {
 
+/// \brief Return scalar as size=1 Eigen::VectorXd
+inline Eigen::VectorXd reshaped(double value) {
+  return Eigen::VectorXd::Constant(1, value);
+}
+
+/// \brief Return vector or matrix as column-major Eigen::VectorXd
+inline Eigen::VectorXd reshaped(Eigen::MatrixXd const &value) {
+  return value.reshaped();
+}
+
 /// \brief Sampler stores vector valued samples in a matrix
+///
+/// \note For sampling scalars, a size=1 vector is expected. For
+///     sampling matrices, column-major order is expected. These
+///     can be obtained with `reshaped(value)`.
 class Sampler {
  public:
   /// \brief Return type for a column vector block
@@ -87,6 +101,10 @@ class Sampler {
 
 /// \brief Construct vector of ["0", "1", ..., std::string(n_components-1)]
 std::vector<std::string> default_component_names(Index n_components);
+
+/// \brief Construct vector of (row,col) names ["0,0", "1,0", ...,
+/// "n_rows-1,n_cols-1"]
+std::vector<std::string> colmajor_component_names(Index n_rows, Index n_cols);
 
 struct SamplerComponent {
   /// \brief Constructor
@@ -228,6 +246,19 @@ inline std::vector<std::string> default_component_names(Index n_components) {
   std::vector<std::string> result;
   for (Index i = 0; i < n_components; ++i) {
     result.push_back(std::to_string(i));
+  }
+  return result;
+}
+
+/// \brief Construct vector of (row,col) names ["0,0", "1,0", ...,
+/// std::string(n_rows*n_cols-1)]
+inline std::vector<std::string> colmajor_component_names(Index n_rows,
+                                                         Index n_cols) {
+  std::vector<std::string> result;
+  for (Index i = 0; i < n_cols; ++i) {
+    for (Index j = 0; j < n_rows; ++j) {
+      result.push_back(std::to_string(j) + "," + std::to_string(i));
+    }
   }
   return result;
 }

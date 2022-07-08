@@ -19,9 +19,6 @@ enum class SAMPLE_METHOD { LINEAR, LOG };
 typedef long CountType;
 typedef double TimeType;
 
-/// Map of value name to vector value
-typedef std::map<std::string, Eigen::VectorXd> VectorValueMap;
-
 struct CompletionCheckParams;
 class CompletionCheck;
 
@@ -41,6 +38,8 @@ class jsonResultsIO;
 struct SamplingParams;
 template <typename _ConfigType>
 struct State;
+
+struct ValueMap;
 
 template <typename _ConfigType, typename _RunInfoType>
 class StateGenerator;

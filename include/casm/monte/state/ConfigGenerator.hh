@@ -29,7 +29,7 @@ class ConfigGenerator {
 
   /// \brief Generate a configuration, using information from a set of
   /// conditions and info from previous runs
-  virtual ConfigType operator()(VectorValueMap const &conditions,
+  virtual ConfigType operator()(ValueMap const &conditions,
                                 std::vector<RunInfoType> const &run_info) = 0;
 };
 

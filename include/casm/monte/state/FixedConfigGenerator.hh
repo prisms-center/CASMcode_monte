@@ -25,7 +25,7 @@ class FixedConfigGenerator
       : m_configuration(configuration) {}
 
   ConfigType operator()(
-      VectorValueMap const &conditions,
+      ValueMap const &conditions,
       std::vector<State<ConfigType>> const &finished_states) override {
     return m_configuration;
   }

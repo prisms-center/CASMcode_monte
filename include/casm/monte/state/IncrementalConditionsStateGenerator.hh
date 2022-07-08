@@ -20,10 +20,8 @@ namespace monte {
 /// This method generates states using the following steps:
 /// 1) Set indepedently determined conditions, using:
 ///    \code
-///    VectorValueMap conditions = initial_conditions;
-///    for (auto const &pair : conditions_increment) {
-///      conditions.at(pair.first) += final_states.size() * incr_value;
-///    }
+///    ValueMap conditions = make_incremented_values(
+///        initial_conditions, conditions_increment, final_states.size());
 ///    \endcode
 /// 2) Generate an initial configuration, using:
 ///    \code
@@ -39,7 +37,7 @@ namespace monte {
 /// 4) Set dependent conditions, using:
 ///    \code
 ///    for (auto const &pair : m_dependent_conditions) {
-///      state.conditions[pair.first] = pair.second(state);
+///      state.conditions.vector_values[pair.first] = pair.second(state);
 ///    }
 ///    \endcode
 /// 5) Return `state`.
@@ -71,11 +69,12 @@ class IncrementalConditionsStateGenerator
   ///     generated configuration. For example, a composition sampling function
   ///     could be provided to set the composition for a canonical Monte Carlo
   ///     calculation directly from the initial configuration proposed by
-  ///     `_config_generator`.
+  ///     `_config_generator`. Currently restricted to setting vector valued
+  ///     conditions.
   IncrementalConditionsStateGenerator(
       std::unique_ptr<ConfigGeneratorType> _config_generator,
-      VectorValueMap const &_initial_conditions,
-      VectorValueMap const &_conditions_increment, Index _n_states,
+      ValueMap const &_initial_conditions,
+      ValueMap const &_conditions_increment, Index _n_states,
       bool _dependent_runs,
       StateSamplingFunctionMap<ConfigType> const &_dependent_conditions = {})
       : m_config_generator(std::move(_config_generator)),
@@ -87,10 +86,8 @@ class IncrementalConditionsStateGenerator
     std::stringstream msg;
     msg << "Error constructing IncrementalConditionsStateGenerator: "
         << "Mismatch between initial conditions and conditions increment.";
-    for (auto const &pair : m_conditions_increment) {
-      if (!m_initial_conditions.count(pair.first)) {
-        throw std::runtime_error(msg.str());
-      }
+    if (is_mismatched(m_initial_conditions, m_conditions_increment)) {
+      throw std::runtime_error(msg.str());
     }
   }
 
@@ -104,10 +101,8 @@ class IncrementalConditionsStateGenerator
   State<ConfigType> next_state(
       std::vector<State<ConfigType>> const &final_states) override {
     // Make conditions
-    VectorValueMap conditions = m_initial_conditions;
-    for (auto const &pair : m_conditions_increment) {
-      conditions.at(pair.first) += final_states.size() * pair.second;
-    }
+    ValueMap conditions = make_incremented_values(
+        m_initial_conditions, m_conditions_increment, final_states.size());
 
     // Make configuration
     ConfigType configuration =
@@ -120,7 +115,7 @@ class IncrementalConditionsStateGenerator
 
     // Set dependent conditions
     for (auto const &pair : m_dependent_conditions) {
-      state.conditions[pair.first] = pair.second(state);
+      state.conditions.vector_values[pair.first] = pair.second(state);
     }
 
     // Finished
@@ -129,8 +124,8 @@ class IncrementalConditionsStateGenerator
 
  private:
   std::unique_ptr<ConfigGeneratorType> m_config_generator;
-  VectorValueMap m_initial_conditions;
-  VectorValueMap m_conditions_increment;
+  ValueMap m_initial_conditions;
+  ValueMap m_conditions_increment;
   Index m_n_states;
   bool m_dependent_runs;
   StateSamplingFunctionMap<ConfigType> m_dependent_conditions;

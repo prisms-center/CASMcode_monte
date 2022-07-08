@@ -45,23 +45,28 @@ inline jsonParser &ensure_initialized_arrays(jsonParser &json,
 /// \brief Append condition value to results summary JSON
 ///
 /// \code
-/// <condition_name> {
+/// <condition_name>: {
 ///   "component_names": ["0", "1", "2", "3", ...],
 ///   <component_name>: [...]  <-- appends to
 /// }
 /// \endcode
 ///
-template <typename ConfigType>
-jsonParser &append_condition_to_json(
-    std::pair<std::string, Eigen::VectorXd> condition, jsonParser &json,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
-  std::string const &name = condition.first;
-  Eigen::VectorXd const &value = condition.second;
+/// For matrix-valued conditions, uses on column-major unrolling:
+/// \code
+/// <condition_name>: {
+///   "component_names": ["0,0", "1,0", "2,0", "0,1", ...],
+///   "0,0": [...],  <-- appends to
+///   "1,0": [...],  <-- appends to
+///   ...
+/// }
+/// \endcode
+///
+///
+inline jsonParser &append_condition_to_json(
+    std::string const &name, Eigen::VectorXd const &value,
+    std::vector<std::string> const &component_names, jsonParser &json) {
   ensure_initialized_objects(json, {name});
   auto &j = json[name];
-
-  std::vector<std::string> component_names =
-      get_component_names(name, value.size(), sampling_functions);
 
   // write component names
   j["component_names"] = component_names;
@@ -76,6 +81,39 @@ jsonParser &append_condition_to_json(
     ++i;
   }
   return json;
+}
+
+template <typename ConfigType>
+jsonParser &append_scalar_condition_to_json(
+    std::pair<std::string, double> const &condition, jsonParser &json,
+    StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+  return append_condition_to_json(
+      condition.first, reshaped(condition.second),
+      get_scalar_component_names(condition.first, condition.second,
+                                 sampling_functions),
+      json);
+}
+
+template <typename ConfigType>
+jsonParser &append_vector_condition_to_json(
+    std::pair<std::string, Eigen::VectorXd> const &condition, jsonParser &json,
+    StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+  return append_condition_to_json(
+      condition.first, reshaped(condition.second),
+      get_vector_component_names(condition.first, condition.second,
+                                 sampling_functions),
+      json);
+}
+
+template <typename ConfigType>
+jsonParser &append_matrix_condition_to_json(
+    std::pair<std::string, Eigen::MatrixXd> const &condition, jsonParser &json,
+    StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+  return append_condition_to_json(
+      condition.first, reshaped(condition.second),
+      get_matrix_component_names(condition.first, condition.second,
+                                 sampling_functions),
+      json);
 }
 
 /// \brief Append sampled data quantity to summary JSON
@@ -100,8 +138,16 @@ jsonParser &append_sampled_data_to_json(
   ensure_initialized_objects(json, {quantity_name});
   auto &quantity_json = json[quantity_name];
 
-  std::vector<std::string> component_names = get_component_names(
-      quantity_name, sampler.n_components(), sampling_functions);
+  auto function_it = sampling_functions.find(quantity_name);
+  if (function_it == sampling_functions.end()) {
+    std::stringstream msg;
+    msg << "Error in append_sampled_data_to_json: No matching sampling "
+           "function found for '"
+        << quantity_name << "'.";
+    throw std::runtime_error(msg.str());
+  }
+  std::vector<std::string> component_names =
+      function_it->second.component_names;
 
   // write component names
   quantity_json["component_names"] = component_names;
@@ -305,8 +351,20 @@ void jsonResultsIO<_ConfigType>::write_summary(
   ensure_initialized_objects(json, {"conditions", "sampled_data",
                                     "completion_check_results", "trajectory"});
 
-  for (auto const &condition : results.initial_state->conditions) {
-    append_condition_to_json(condition, json["conditions"], sampling_functions);
+  for (auto const &condition :
+       results.initial_state->conditions.scalar_values) {
+    append_scalar_condition_to_json(condition, json["conditions"],
+                                    sampling_functions);
+  }
+  for (auto const &condition :
+       results.initial_state->conditions.vector_values) {
+    append_vector_condition_to_json(condition, json["conditions"],
+                                    sampling_functions);
+  }
+  for (auto const &condition :
+       results.initial_state->conditions.matrix_values) {
+    append_matrix_condition_to_json(condition, json["conditions"],
+                                    sampling_functions);
   }
 
   for (auto const &quantity : results.samplers) {

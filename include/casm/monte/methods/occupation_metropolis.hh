@@ -91,12 +91,12 @@ Results<ConfigType> occupation_metropolis(
 ///        std::vector<int> const &new_occ)`
 ///
 /// Required state conditions:
-/// - `temperature`: size=1
+/// - scalar value `temperature`:
 ///   The temperature in K.
 /// - any others required by `potential`
 ///
 /// State properties that are set:
-/// - `potential_energy`: size=1
+/// - scalar value `potential_energy`:
 ///   The intensive potential energy (eV / unit cell).
 ///
 template <typename ConfigType, typename CalculatorType>
@@ -126,8 +126,9 @@ Results<ConfigType> occupation_metropolis(
       get_transformation_matrix_to_super(state.configuration).determinant();
 
   // Prepare properties
-  state.properties["potential_energy"] = Eigen::VectorXd(1);
-  double &potential_energy_intensive = state.properties["potential_energy"](0);
+  state.properties.scalar_values["potential_energy"] = 0.;
+  double &potential_energy_intensive =
+      state.properties.scalar_values["potential_energy"];
 
   // Set formation energy calculator (so it evaluates state)
   // and calculate initial potential energy
@@ -142,7 +143,8 @@ Results<ConfigType> occupation_metropolis(
 
   // Used within the main loop:
   OccEvent event;
-  double beta = 1.0 / (CASM::KB * state.conditions.at("temperature")(0));
+  double beta =
+      1.0 / (CASM::KB * state.conditions.scalar_values.at("temperature"));
 
   // Log method status
   Log &log = method_log.log;
