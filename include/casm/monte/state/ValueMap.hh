@@ -10,7 +10,7 @@
 namespace CASM {
 namespace monte {
 
-/// Map of value name to vector value
+/// Map of value name to scalar/vector/matrix value
 struct ValueMap {
   std::map<std::string, double> scalar_values;
   std::map<std::string, Eigen::VectorXd> vector_values;
