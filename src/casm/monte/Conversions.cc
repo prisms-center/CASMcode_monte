@@ -3,6 +3,7 @@
 #include "casm/crystallography/BasicStructure.hh"
 #include "casm/crystallography/BasicStructureTools.hh"
 #include "casm/misc/algorithm.hh"
+#include "casm/monte/misc/BasicStructureTools.hh"
 
 namespace CASM {
 namespace monte {
@@ -34,8 +35,9 @@ std::vector<Index> make_b_to_asym(const xtal::BasicStructure &struc) {
 /// asymmetric unit.
 Conversions::Conversions(xtal::BasicStructure const &prim,
                          Eigen::Matrix3l const &transformation_matrix_to_super)
-    : Conversions(prim, transformation_matrix_to_super,
-                  Eigen::Matrix3l::Identity(), make_b_to_asym(prim)) {}
+    : Conversions(prim, molecule_list_all_orientations(prim),
+                  transformation_matrix_to_super, Eigen::Matrix3l::Identity(),
+                  make_b_to_asym(prim)) {}
 
 /// \brief Constructor (user specified asymmetric unit with reduced symmetry)
 ///
@@ -54,13 +56,16 @@ Conversions::Conversions(xtal::BasicStructure const &prim,
 Conversions::Conversions(xtal::BasicStructure const &prim,
                          Eigen::Matrix3l const &transformation_matrix_to_super,
                          std::vector<Index> const &b_to_asym)
-    : Conversions(prim, transformation_matrix_to_super,
-                  Eigen::Matrix3l::Identity(), b_to_asym) {}
+    : Conversions(prim, molecule_list_all_orientations(prim),
+                  transformation_matrix_to_super, Eigen::Matrix3l::Identity(),
+                  b_to_asym) {}
 
 /// \brief Constructor (user specified asymmetric unit with reduced
 /// translational symmetry)
 ///
 /// \param prim The primitive structure
+/// \param species_list Vector of all distinct molecules, including each
+///     orientation.
 /// \param transformation_matrix_to_super Defines a supercell lattice,
 ///     S = P * T, where S = supercell lattice column matrix, P = prim lattice
 ///     column matrix, T = transformation_matrix_to_super.
@@ -79,6 +84,7 @@ Conversions::Conversions(xtal::BasicStructure const &prim,
 ///
 Conversions::Conversions(
     xtal::BasicStructure const &prim,
+    std::vector<xtal::Molecule> const &species_list,
     Eigen::Matrix3l const &transformation_matrix_to_super,
     Eigen::Matrix3l const &unit_transformation_matrix_to_super,
     std::vector<Index> const &unitl_to_asym)
@@ -89,8 +95,8 @@ Conversions::Conversions(
       m_transformation_matrix_to_super(transformation_matrix_to_super),
       m_l_and_bijk_converter(transformation_matrix_to_super,
                              prim.basis().size()),
-      m_struc_mol(xtal::struc_molecule(prim)),
-      m_struc_molname(xtal::struc_molecule_name(prim)),
+      m_struc_mol(species_list),
+      m_struc_molname(make_orientation_name_list(m_struc_mol, prim)),
       m_unitl_to_asym(unitl_to_asym) {
   // find m_Nasym
   m_Nasym =
@@ -110,11 +116,20 @@ Conversions::Conversions(
   // make m_occ_to_species and m_species_to_occ
 
   // [b][occ] -> species
-  auto index_converter = xtal::make_index_converter(prim, m_struc_molname);
+  auto index_converter = xtal::make_index_converter(prim, m_struc_mol);
 
   // [b][species] -> occ, index_converter[b].size() if not allowed
-  auto index_converter_inv =
-      xtal::make_index_converter_inverse(prim, m_struc_molname);
+  std::vector<std::vector<Index>> index_converter_inv;
+  for (Index b = 0; b < index_converter.size(); ++b) {
+    std::vector<Index> occ_indices(m_struc_mol.size(),
+                                   index_converter[b].size());
+    Index occ_index = 0;
+    for (auto species_index : index_converter[b]) {
+      occ_indices[species_index] = occ_index;
+      ++occ_index;
+    }
+    index_converter_inv.push_back(occ_indices);
+  }
 
   m_occ_to_species.resize(m_Nasym);
   m_species_to_occ.resize(m_Nasym);

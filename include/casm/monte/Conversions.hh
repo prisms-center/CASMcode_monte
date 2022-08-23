@@ -33,6 +33,9 @@ namespace monte {
 ///   prim.basis()[b].occupant_dof(), for some b or asym)
 /// - species_index: Index into the molecule list for the prim (index into
 ///   vector returned from xtal::struc_molecule)
+///
+/// Notes:
+/// - There is a distinct species_index for each orientation of a Molecule
 class Conversions {
  public:
   /// \brief Constructor (uses asymmetric unit determined from prim factor
@@ -48,6 +51,7 @@ class Conversions {
   /// \brief Constructor (user specified asymmetric unit with reduced
   ///     translational symmetry)
   Conversions(xtal::BasicStructure const &prim,
+              std::vector<xtal::Molecule> const &species_list,
               Eigen::Matrix3l const &transformation_matrix_to_super,
               Eigen::Matrix3l const &unit_transformation_matrix_to_super,
               std::vector<Index> const &unitl_to_asym);

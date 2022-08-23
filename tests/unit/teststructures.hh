@@ -60,6 +60,7 @@ inline CASM::xtal::BasicStructure ZrO_prim() {
   struc.push_back(Site(Coordinate(Eigen::Vector3d(1. / 3., 2. / 3., 3. / 4.),
                                   struc.lattice(), FRAC),
                        std::vector<Molecule>{Va, O}));
+  struc.set_unique_names({{"Zr"}, {"Zr"}, {"Va", "O"}, {"Va", "O"}});
 
   return struc;
 }
@@ -81,6 +82,7 @@ inline CASM::xtal::BasicStructure FCC_binary_prim() {
   struc.push_back(
       Site(Coordinate(Eigen::Vector3d::Zero(), struc.lattice(), CART),
            std::vector<Molecule>{A, B}));
+  struc.set_unique_names({{"A"}, {"B"}});
 
   return struc;
 }
@@ -103,6 +105,7 @@ inline CASM::xtal::BasicStructure FCC_ternary_prim() {
   struc.push_back(
       Site(Coordinate(Eigen::Vector3d::Zero(), struc.lattice(), CART),
            std::vector<Molecule>{A, B, C}));
+  struc.set_unique_names({{"A", "B", "C"}});
 
   return struc;
 }
@@ -123,6 +126,7 @@ inline CASM::xtal::BasicStructure SimpleCubic_GLstrain_prim() {
   struc.push_back(
       Site(Coordinate(Eigen::Vector3d::Zero(), struc.lattice(), CART),
            std::vector<Molecule>{A}));
+  struc.set_unique_names({{"A"}});
 
   // Add global DoF
   // GLstrain: Green-Lagrange strain
@@ -147,6 +151,7 @@ inline CASM::xtal::BasicStructure SimpleCubic_disp_prim() {
   Site site{Coordinate(Eigen::Vector3d::Zero(), struc.lattice(), CART),
             std::vector<Molecule>{A}, std::vector<SiteDoFSet>{disp_dofset}};
   struc.push_back(site);
+  struc.set_unique_names({{"A"}});
 
   return struc;
 }
