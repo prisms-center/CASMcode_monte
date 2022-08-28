@@ -78,10 +78,10 @@ Results<ConfigType> occupation_metropolis(
 ///
 /// \returns A Results<ConfigType> instance with run results.
 ///
-/// Required interface for `ConfigType`:
-/// - `Eigen::VectorXi &get_occupation(ConfigType const &configuration)`
+/// Required interface for `State<ConfigType>`:
+/// - `Eigen::VectorXi &get_occupation(State<ConfigType> const &configuration)`
 /// - `Eigen::Matrix3l const &get_transformation_matrix_to_super(
-///        ConfigType const &configuration)`
+///        State<ConfigType> const &state)`
 ///
 /// Required interface for `CalculatorType potential`:
 /// - `void set(CalculatorType &potential, State<ConfigType> const &state)`
@@ -120,10 +120,9 @@ Results<ConfigType> occupation_metropolis(
   //   occupants) that may mutate. Use this for `steps_per_pass`.
   OccCandidateList occ_candidate_list(convert);
   OccLocation occ_location(convert, occ_candidate_list);
-  occ_location.initialize(get_occupation(state.configuration));
+  occ_location.initialize(get_occupation(state));
   CountType steps_per_pass = occ_location.mol_size();
-  double n_unitcells =
-      get_transformation_matrix_to_super(state.configuration).determinant();
+  double n_unitcells = get_transformation_matrix_to_super(state).determinant();
 
   // Prepare properties
   state.properties.scalar_values["potential_energy"] = 0.;
@@ -183,7 +182,7 @@ Results<ConfigType> occupation_metropolis(
 
     // Apply accepted event
     if (accept) {
-      occ_location.apply(event, get_occupation(state.configuration));
+      occ_location.apply(event, get_occupation(state));
       potential_energy_intensive += (delta_potential_energy / n_unitcells);
     }
 

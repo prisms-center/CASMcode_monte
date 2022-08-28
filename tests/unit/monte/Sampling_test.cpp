@@ -47,7 +47,7 @@ std::shared_ptr<monte::Sampler> run_case(
   monte::OccEvent e;
   while (count < 1000000) {
     if (count % 1000 == 0) {
-      shared_sampler->push_back(function(state.configuration));
+      shared_sampler->push_back(function(state));
     }
     propose_canonical_event(e, occ_loc, canonical_swaps, mtrand);
     occ_loc.apply(e, occupation);

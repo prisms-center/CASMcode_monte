@@ -16,8 +16,9 @@ template <typename _ConfigType>
 struct State {
   typedef _ConfigType ConfigType;
 
-  State(ConfigType const &_configuration, ValueMap _conditions = ValueMap(),
-        ValueMap _properties = ValueMap())
+  explicit State(ConfigType const &_configuration,
+                 ValueMap _conditions = ValueMap(),
+                 ValueMap _properties = ValueMap())
       : configuration(_configuration),
         conditions(_conditions),
         properties(_properties) {}
