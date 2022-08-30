@@ -13,15 +13,13 @@ namespace monte {
 
 /// \brief Represents an atom in a molecule
 struct Atom {
-  Atom(xtal::UnitCellCoord _bijk_begin)
-      : bijk_begin(_bijk_begin), delta_ijk(0, 0, 0) {}
-
   Index species_index;  ///< Species type index
   Index atom_index;     ///< Index into xtal::Molecule for this species_index
   Index id;             ///< Location in OccLocation.m_atoms
-  xtal::UnitCellCoord bijk_begin;  ///< Saves initial position
   xtal::UnitCell delta_ijk;        ///< Saves change in position
-  Index mol_comp_begin;            ///< Saves initial Mol.component index
+  Index species_index_begin;       ///< Saves initial species type index
+  Index atom_index_begin;          ///< Saves initial atom position index
+  xtal::UnitCellCoord bijk_begin;  ///< Saves initial position
 };
 
 /// \brief Represents the occupant on a site

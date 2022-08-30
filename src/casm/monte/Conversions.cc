@@ -88,7 +88,8 @@ Conversions::Conversions(
     Eigen::Matrix3l const &transformation_matrix_to_super,
     Eigen::Matrix3l const &unit_transformation_matrix_to_super,
     std::vector<Index> const &unitl_to_asym)
-    : m_unit_transformation_matrix_to_super(
+    : m_unitcell_index_converter(transformation_matrix_to_super),
+      m_unit_transformation_matrix_to_super(
           unit_transformation_matrix_to_super),
       m_unitl_and_bijk_converter(unit_transformation_matrix_to_super,
                                  prim.basis().size()),
@@ -208,6 +209,11 @@ Eigen::Matrix3l const &Conversions::unit_transformation_matrix_to_super()
 
 Eigen::Matrix3l const &Conversions::transformation_matrix_to_super() const {
   return m_transformation_matrix_to_super;
+}
+
+xtal::UnitCellIndexConverter const &Conversions::unitcell_index_converter()
+    const {
+  return m_unitcell_index_converter;
 }
 
 xtal::UnitCellCoordIndexConverter const &Conversions::unit_index_converter()

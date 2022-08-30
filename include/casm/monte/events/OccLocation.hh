@@ -73,6 +73,15 @@ class OccLocation {
   /// Access Mol by id
   Mol const &mol(Index mol_id) const;
 
+  /// Total number of atoms
+  size_type atom_size() const;
+
+  /// Access Atom by id
+  Atom &atom(Index atom_id);
+
+  /// Access Atom by id
+  Atom const &atom(Index atom_id) const;
+
   /// Access the OccCandidateList
   OccCandidateList const &candidate_list() const;
 

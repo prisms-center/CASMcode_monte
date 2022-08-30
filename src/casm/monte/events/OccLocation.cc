@@ -21,7 +21,7 @@ OccLocation::OccLocation(const Conversions &_convert,
     : m_convert(_convert),
       m_candidate_list(_candidate_list),
       m_loc(_candidate_list.size()),
-      m_update_atoms(false) {}
+      m_update_atoms(_update_atoms) {}
 
 /// Fill tables with occupation info
 void OccLocation::initialize(Eigen::VectorXi const &occupation) {
@@ -59,11 +59,15 @@ void OccLocation::initialize(Eigen::VectorXi const &occupation) {
       if (m_update_atoms) {
         int n_atoms = m_convert.species_to_mol(species_index).atoms().size();
         for (Index atom_index = 0; atom_index < n_atoms; ++atom_index) {
-          Atom atom(m_convert.l_to_bijk(l));
+          Atom atom;
           atom.species_index = species_index;
           atom.atom_index = atom_index;
           atom.id = m_atoms.size();
           mol.component.push_back(atom.id);
+          atom.delta_ijk = xtal::UnitCell(0, 0, 0);
+          atom.bijk_begin = m_convert.l_to_bijk(l);
+          atom.species_index_begin = species_index;
+          atom.atom_index_begin = atom_index;
 
           m_atoms.push_back(atom);
         }
@@ -129,15 +133,18 @@ void OccLocation::apply(const OccEvent &e, Eigen::VectorXi &occupation) {
   }
 
   if (m_update_atoms) {
-    // update Mol.component
     for (const auto &traj : e.atom_traj) {
-      m_mol[traj.to.mol_id].component[traj.to.mol_comp] =
-          m_tmol[traj.from.mol_id].component[traj.from.mol_comp];
-    }
-    // update species delta_ijk
-    for (const auto &traj : e.atom_traj) {
-      Index id = m_mol[traj.to.mol_id].component[traj.to.mol_comp];
-      m_atoms[id].delta_ijk += traj.delta_ijk;
+      auto &to_mol = m_mol[traj.to.mol_id];
+      auto &from_mol = m_tmol[traj.from.mol_id];
+      Index atom_id = from_mol.component[traj.from.mol_comp];
+
+      // update Mol.component
+      to_mol.component[traj.to.mol_comp] = atom_id;
+
+      // update atom species_index, atom_index, delta_ijk
+      m_atoms[atom_id].species_index = to_mol.species_index;
+      m_atoms[atom_id].atom_index = traj.to.mol_comp;
+      m_atoms[atom_id].delta_ijk += traj.delta_ijk;
     }
   }
 }
@@ -148,6 +155,15 @@ OccLocation::size_type OccLocation::mol_size() const { return m_mol.size(); }
 Mol &OccLocation::mol(Index mol_id) { return m_mol[mol_id]; }
 
 const Mol &OccLocation::mol(Index mol_id) const { return m_mol[mol_id]; }
+
+/// Total number of atoms
+OccLocation::size_type OccLocation::atom_size() const { return m_atoms.size(); }
+
+/// Access Atom by id
+Atom &OccLocation::atom(Index atom_id) { return m_atoms[atom_id]; }
+
+/// Access Atom by id
+Atom const &OccLocation::atom(Index atom_id) const { return m_atoms[atom_id]; }
 
 /// Access the OccCandidateList
 OccCandidateList const &OccLocation::candidate_list() const {
