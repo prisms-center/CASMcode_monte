@@ -22,13 +22,14 @@ namespace monte {
 /// \returns true, if event should be accepted; false, if the event should be
 ///     rejected
 ///
-inline bool metropolis_acceptance(double delta_potential_energy, double beta,
-                                  MTRand &random_number_generator) {
+template <typename GeneratorType>
+bool metropolis_acceptance(double delta_potential_energy, double beta,
+                           GeneratorType &random_number_generator) {
   if (delta_potential_energy < 0.0) {
     return true;
   }
 
-  double rand = random_number_generator.rand53();
+  double rand = random_number_generator.random_real(1.0);
   double prob = std::exp(-delta_potential_energy * beta);
   return rand < prob;
 }

@@ -6,20 +6,12 @@
 #include "casm/crystallography/UnitCellCoord.hh"
 #include "casm/global/definitions.hh"
 
-class MTRand;
-
 namespace CASM {
 namespace monte {
 
-/// \brief Represents an atom in a molecule
+/// \brief Track the location of individual atoms
 struct Atom {
-  Index species_index;  ///< Species type index
-  Index atom_index;     ///< Index into xtal::Molecule for this species_index
-  Index id;             ///< Location in OccLocation.m_atoms
-  xtal::UnitCell delta_ijk;        ///< Saves change in position
-  Index species_index_begin;       ///< Saves initial species type index
-  Index atom_index_begin;          ///< Saves initial atom position index
-  xtal::UnitCellCoord bijk_begin;  ///< Saves initial position
+  xtal::UnitCell translation;  ///< Current position
 };
 
 /// \brief Represents the occupant on a site
@@ -44,6 +36,7 @@ struct OccTransform {
   Index to_species;    ///< Species index after transformation
 };
 
+/// Note, for resevoir positions, use l == -1, and mol_id = species_index
 struct AtomLocation {
   Index l;         ///< Config occupant that is being transformed
   Index mol_id;    ///< Location in OccLocation.m_mol

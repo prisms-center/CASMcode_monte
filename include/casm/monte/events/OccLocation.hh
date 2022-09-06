@@ -5,9 +5,8 @@
 
 #include "casm/crystallography/UnitCellCoord.hh"
 #include "casm/global/definitions.hh"
+#include "casm/monte/events/OccCandidate.hh"
 #include "casm/monte/events/OccEvent.hh"
-
-class MTRand;
 
 namespace CASM {
 namespace monte {
@@ -55,14 +54,18 @@ class OccLocation {
   /// Fill tables with occupation info
   void initialize(Eigen::VectorXi const &occupation);
 
-  /// Stochastically choose an occupant of a particular OccCandidate type
-  Mol const &choose_mol(Index cand_index, MTRand &mtrand) const;
-
-  /// Stochastically choose an occupant of a particular OccCandidate type
-  Mol const &choose_mol(OccCandidate const &cand, MTRand &mtrand) const;
-
   /// Update occupation vector and this to reflect that event 'e' occurred
   void apply(OccEvent const &e, Eigen::VectorXi &occupation);
+
+  /// Stochastically choose an occupant of a particular OccCandidate type
+  template <typename GeneratorType>
+  Mol const &choose_mol(Index cand_index,
+                        GeneratorType &random_number_generator) const;
+
+  /// Stochastically choose an occupant of a particular OccCandidate type
+  template <typename GeneratorType>
+  Mol const &choose_mol(OccCandidate const &cand,
+                        GeneratorType &random_number_generator) const;
 
   /// Total number of mutating sites
   size_type mol_size() const;
@@ -124,9 +127,80 @@ class OccLocation {
   /// If true, update Atom location during apply
   bool m_update_atoms;
 
-  /// Data structure used store temporaries during apply
-  std::vector<Mol> m_tmol;
+  /// Data structure used to implement adding "resevoir" molecules during apply
+  std::vector<Mol> m_resevoir_mol;
 };
+
+/// --- Implementation ---
+
+/// Stochastically choose an occupant of a particular OccCandidate type
+template <typename GeneratorType>
+Mol const &OccLocation::choose_mol(
+    Index cand_index, GeneratorType &random_number_generator) const {
+  return mol(m_loc[cand_index][random_number_generator.random_int(
+      m_loc[cand_index].size() - 1)]);
+}
+
+/// Stochastically choose an occupant of a particular OccCandidate type
+template <typename GeneratorType>
+Mol const &OccLocation::choose_mol(
+    OccCandidate const &cand, GeneratorType &random_number_generator) const {
+  return choose_mol(m_candidate_list.index(cand), random_number_generator);
+}
+
+/// Total number of mutating sites
+inline OccLocation::size_type OccLocation::mol_size() const {
+  return m_mol.size();
+}
+
+inline Mol &OccLocation::mol(Index mol_id) { return m_mol[mol_id]; }
+
+inline const Mol &OccLocation::mol(Index mol_id) const { return m_mol[mol_id]; }
+
+/// Total number of atoms
+inline OccLocation::size_type OccLocation::atom_size() const {
+  return m_atoms.size();
+}
+
+/// Access Atom by id
+inline Atom &OccLocation::atom(Index atom_id) { return m_atoms[atom_id]; }
+
+/// Access Atom by id
+inline Atom const &OccLocation::atom(Index atom_id) const {
+  return m_atoms[atom_id];
+}
+
+/// Access the OccCandidateList
+inline OccCandidateList const &OccLocation::candidate_list() const {
+  return m_candidate_list;
+}
+
+/// Total number of mutating sites, of OccCandidate type, specified by index
+inline OccLocation::size_type OccLocation::cand_size(Index cand_index) const {
+  return m_loc[cand_index].size();
+}
+
+/// Total number of mutating sites, of OccCandidate type
+inline OccLocation::size_type OccLocation::cand_size(
+    const OccCandidate &cand) const {
+  return cand_size(m_candidate_list.index(cand));
+}
+
+/// The index into the configuration of a particular mutating site
+inline Index OccLocation::mol_id(Index cand_index, Index loc) const {
+  return m_loc[cand_index][loc];
+}
+
+/// The index into the configuration of a particular mutating site
+inline Index OccLocation::mol_id(const OccCandidate &cand, Index loc) const {
+  return mol_id(m_candidate_list.index(cand), loc);
+}
+
+/// Convert from config index to variable site index
+inline Index OccLocation::l_to_mol_id(Index l) const { return m_l_to_mol[l]; }
+
+/// Get Conversions objects
+inline Conversions const &OccLocation::convert() const { return m_convert; }
 
 }  // namespace monte
 }  // namespace CASM

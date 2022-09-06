@@ -12,6 +12,7 @@ namespace monte {
 
 /// Map of value name to scalar/vector/matrix value
 struct ValueMap {
+  std::map<std::string, double> boolean_values;
   std::map<std::string, double> scalar_values;
   std::map<std::string, Eigen::VectorXd> vector_values;
   std::map<std::string, Eigen::MatrixXd> matrix_values;
@@ -28,6 +29,11 @@ ValueMap make_incremented_values(ValueMap values, ValueMap const &increment,
 
 /// \brief Return true if A and B do not have the same properties
 inline bool is_mismatched(ValueMap const &A, ValueMap const &B) {
+  for (auto const &pair : B.boolean_values) {
+    if (!A.boolean_values.count(pair.first)) {
+      return true;
+    }
+  }
   for (auto const &pair : B.scalar_values) {
     if (!A.scalar_values.count(pair.first)) {
       return true;
@@ -47,6 +53,8 @@ inline bool is_mismatched(ValueMap const &A, ValueMap const &B) {
 }
 
 /// \brief Return values + n_increment*increment
+///
+/// Note: does not change boolean_values
 inline ValueMap make_incremented_values(ValueMap values,
                                         ValueMap const &increment,
                                         double n_increment) {

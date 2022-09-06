@@ -39,11 +39,13 @@ template <typename ConfigType>
 using StateSamplingFunctionMap =
     std::map<std::string, StateSamplingFunction<ConfigType>>;
 
-template <typename ConfigType, typename CalculatorType>
+template <typename ConfigType, typename CalculatorType,
+          typename ProposeOccEventFuntionType, typename GeneratorType>
 Results<ConfigType> occupation_metropolis(
     State<ConfigType> const &initial_state, CalculatorType potential,
     Conversions const &convert, std::vector<OccSwap> const &possible_swaps,
-    ProposeOccEventFuntionType propose_event_f, MTRand &random_number_generator,
+    ProposeOccEventFuntionType propose_event_f,
+    GeneratorType &random_number_generator,
     StateSampler<ConfigType> &state_sampler, CompletionCheck &completion_check,
     MethodLog method_log = MethodLog());
 
@@ -99,11 +101,13 @@ Results<ConfigType> occupation_metropolis(
 /// - scalar value `potential_energy`:
 ///   The intensive potential energy (eV / unit cell).
 ///
-template <typename ConfigType, typename CalculatorType>
+template <typename ConfigType, typename CalculatorType,
+          typename ProposeOccEventFuntionType, typename GeneratorType>
 Results<ConfigType> occupation_metropolis(
     State<ConfigType> const &initial_state, CalculatorType potential,
     Conversions const &convert, std::vector<OccSwap> const &possible_swaps,
-    ProposeOccEventFuntionType propose_event_f, MTRand &random_number_generator,
+    ProposeOccEventFuntionType propose_event_f,
+    GeneratorType &random_number_generator,
     StateSampler<ConfigType> &state_sampler, CompletionCheck &completion_check,
     MethodLog method_log) {
   // Prepare state

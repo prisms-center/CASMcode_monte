@@ -1,8 +1,8 @@
 #include "casm/casm_io/Log.hh"
 #include "casm/composition/CompositionCalculator.hh"
 #include "casm/crystallography/BasicStructure.hh"
-#include "casm/external/MersenneTwister/MersenneTwister.h"
 #include "casm/monte/Conversions.hh"
+#include "casm/monte/RandomNumberGenerator.hh"
 #include "casm/monte/events/OccCandidate.hh"
 #include "casm/monte/events/OccEventProposal.hh"
 #include "casm/monte/events/OccLocation.hh"
@@ -14,12 +14,10 @@
 
 using namespace CASM;
 
-void random_config(test::Configuration &config, monte::Conversions &convert,
-                   MTRand &mtrand);
-
+template <typename GeneratorType>
 std::shared_ptr<monte::Sampler> run_case(
     std::shared_ptr<xtal::BasicStructure const> shared_prim, Eigen::Matrix3l T,
-    MTRand &mtrand,
+    GeneratorType &random_number_generator,
     monte::StateSamplingFunction<test::Configuration> &function) {
   ScopedNullLogging logging;
 
@@ -28,7 +26,7 @@ std::shared_ptr<monte::Sampler> run_case(
   // config with default occupation
   test::Configuration config(shared_prim->basis().size(), T);
   monte::State<test::Configuration> state{config};
-  random_config(state.configuration, convert, mtrand);
+  test::random_config(state.configuration, convert, random_number_generator);
   Eigen::VectorXi &occupation = state.configuration.occupation;
 
   // construct OccCandidateList
@@ -49,15 +47,22 @@ std::shared_ptr<monte::Sampler> run_case(
     if (count % 1000 == 0) {
       shared_sampler->push_back(function(state));
     }
-    propose_canonical_event(e, occ_loc, canonical_swaps, mtrand);
+    propose_canonical_event(e, occ_loc, canonical_swaps,
+                            random_number_generator);
     occ_loc.apply(e, occupation);
     ++count;
   }
   return shared_sampler;
 }
 
-TEST(SamplingTest, CompNSamplingTest) {
-  MTRand mtrand;
+class SamplingTest : public testing::Test {
+ protected:
+  typedef std::mt19937_64 engine_type;
+  typedef monte::RandomNumberGenerator<engine_type> generator_type;
+  generator_type random_number_generator;
+};
+
+TEST_F(SamplingTest, CompNSamplingTest) {
   auto shared_prim =
       std::make_shared<xtal::BasicStructure const>(test::ZrO_prim());
 
@@ -74,7 +79,7 @@ TEST(SamplingTest, CompNSamplingTest) {
       });
 
   std::shared_ptr<monte::Sampler> shared_sampler =
-      run_case(shared_prim, T, mtrand, comp_n_sampling_f);
+      run_case(shared_prim, T, random_number_generator, comp_n_sampling_f);
 
   EXPECT_EQ(shared_sampler->n_samples(), 1000);
   EXPECT_EQ(shared_sampler->n_components(), 3);
