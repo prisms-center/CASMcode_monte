@@ -33,7 +33,7 @@ class Sampler {
       const_vector_block_type;
 
   /// \brief Sampler constructor - default component names
-  Sampler(Index n_components, CountType _capacity_increment = 1000);
+  Sampler(std::vector<Index> _shape, CountType _capacity_increment = 1000);
 
   /// \brief Sampler constructor - custom component names
   Sampler(std::vector<std::string> const &_component_names,
@@ -99,8 +99,8 @@ class Sampler {
   Eigen::MatrixXd m_values;
 };
 
-/// \brief Construct vector of ["0", "1", ..., std::string(n_components-1)]
-std::vector<std::string> default_component_names(Index n_components);
+/// \brief Construct vector of component_names
+std::vector<std::string> default_component_names(std::vector<Index> shape);
 
 /// \brief Construct vector of (row,col) names ["0,0", "1,0", ...,
 /// "n_rows-1,n_cols-1"]
@@ -129,6 +129,11 @@ struct SamplerComponent {
   bool operator<(SamplerComponent const &other) const;
 };
 
+/// \brief Find sampler by name and throw if not found
+inline std::map<std::string, std::shared_ptr<Sampler>>::const_iterator
+find_or_throw(std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
+              std::string const &sampler_name);
+
 /// \brief Find sampler by name, and throw if not found or component index is
 ///     not in a valid range
 std::map<std::string, std::shared_ptr<Sampler>>::const_iterator find_or_throw(
@@ -148,17 +153,26 @@ CountType get_n_samples(
 namespace CASM {
 namespace monte {
 
+inline Index calc_n_components(std::vector<Index> shape) {
+  Index result = 1;
+  for (Index x : shape) {
+    result *= x;
+  }
+  return result;
+}
+
 /// \brief Sampler constructor - default component names
 ///
-/// \param _n_components Size of vectors to be sampled
+/// \param _shape Shape of quantity to be sampled
 /// \param _capacity_increment How much to resize the underlying matrix by
 ///     whenever space runs out.
 ///
 /// Notes:
 /// - Components are given default names ["0", "1", "2", ...)
-inline Sampler::Sampler(Index _n_components, CountType _capacity_increment)
-    : m_n_components(_n_components),
-      m_component_names(default_component_names(_n_components)),
+inline Sampler::Sampler(std::vector<Index> _shape,
+                        CountType _capacity_increment)
+    : m_n_components(calc_n_components(_shape)),
+      m_component_names(default_component_names(_shape)),
       m_n_samples(0),
       m_capacity_increment(_capacity_increment) {}
 
@@ -241,13 +255,28 @@ inline Eigen::MatrixXd::ConstRowXpr Sampler::sample(
   return m_values.row(sample_index);
 }
 
-/// \brief Construct vector of ["0", "1", ..., std::string(n_components-1)]
-inline std::vector<std::string> default_component_names(Index n_components) {
-  std::vector<std::string> result;
-  for (Index i = 0; i < n_components; ++i) {
-    result.push_back(std::to_string(i));
+/// \brief Construct vector of component_names
+///
+/// Shape = [] (scalar) -> {"0"}
+/// Shape = [n] (vector) -> {"0", "1", ..., "n-1"}
+/// Shape = [m, n] (matrix) -> {"0,0", "1,0", ..., "m-1,n-1"}
+inline std::vector<std::string> default_component_names(
+    std::vector<Index> shape) {
+  if (shape.size() == 0) {
+    return {"0"};
+  } else if (shape.size() == 1) {
+    std::vector<std::string> result;
+    for (Index i = 0; i < shape[0]; ++i) {
+      result.push_back(std::to_string(i));
+    }
+    return result;
+  } else if (shape.size() == 2) {
+    return colmajor_component_names(shape[0], shape[1]);
+  } else {
+    throw std::runtime_error(
+        "Error constructing sampler component names: >2 dimensions is not "
+        "supported");
   }
-  return result;
 }
 
 /// \brief Construct vector of (row,col) names ["0,0", "1,0", ...,
@@ -268,6 +297,21 @@ inline bool SamplerComponent::operator<(SamplerComponent const &other) const {
     return this->component_index < other.component_index;
   }
   return this->sampler_name < other.sampler_name;
+}
+
+/// \brief Find sampler by name and throw if not found
+inline std::map<std::string, std::shared_ptr<Sampler>>::const_iterator
+find_or_throw(std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
+              std::string const &sampler_name) {
+  // find and validate sampler name && component index
+  auto sampler_it = samplers.find(sampler_name);
+  if (sampler_it == samplers.end()) {
+    std::stringstream msg;
+    msg << "Error finding sampler component: Sampler '" << sampler_name
+        << "' not found." << std::endl;
+    throw std::runtime_error(msg.str());
+  }
+  return sampler_it;
 }
 
 /// \brief Find sampler by name, and throw if not found or component index is

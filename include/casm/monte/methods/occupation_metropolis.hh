@@ -15,6 +15,7 @@
 #include "casm/monte/events/io/OccCandidate_stream_io.hh"
 #include "casm/monte/methods/metropolis.hh"
 #include "casm/monte/results/Results.hh"
+#include "casm/monte/results/ResultsAnalysisFunction.hh"
 #include "casm/monte/sampling/SamplingParams.hh"
 #include "casm/monte/state/StateSampler.hh"
 
@@ -47,6 +48,7 @@ Results<ConfigType> occupation_metropolis(
     ProposeOccEventFuntionType propose_event_f,
     GeneratorType &random_number_generator,
     StateSampler<ConfigType> &state_sampler, CompletionCheck &completion_check,
+    ResultsAnalysisFunctionMap<ConfigType> const &analysis_functions,
     MethodLog method_log = MethodLog());
 
 // --- Implementation ---
@@ -76,6 +78,7 @@ Results<ConfigType> occupation_metropolis(
 /// \param state_sampler A StateSampler<ConfigType>, determines what is sampled
 ///     and when, and holds sampled data until returned by results
 /// \param completion_check A CompletionCheck method
+/// \param analysis_functions Functions to evaluate after a run completes
 /// \param method_log A MethedLog
 ///
 /// \returns A Results<ConfigType> instance with run results.
@@ -109,6 +112,7 @@ Results<ConfigType> occupation_metropolis(
     ProposeOccEventFuntionType propose_event_f,
     GeneratorType &random_number_generator,
     StateSampler<ConfigType> &state_sampler, CompletionCheck &completion_check,
+    ResultsAnalysisFunctionMap<ConfigType> const &analysis_functions,
     MethodLog method_log) {
   // Prepare state
   State<ConfigType> state = initial_state;
@@ -214,6 +218,7 @@ Results<ConfigType> occupation_metropolis(
   results.sample_count = std::move(state_sampler.sample_count);
   results.sample_trajectory = std::move(state_sampler.sample_trajectory);
   results.completion_check_results = completion_check.results();
+  results.analysis = make_analysis(results, analysis_functions);
   return results;
 }
 

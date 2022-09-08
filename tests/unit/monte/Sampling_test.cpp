@@ -71,8 +71,10 @@ TEST_F(SamplingTest, CompNSamplingTest) {
   std::vector<std::string> components = {"Zr", "Va", "O"};
   composition::CompositionCalculator composition_calculator(
       {"Zr", "Va", "O"}, xtal::allowed_molecule_names(*shared_prim));
+  std::vector<Index> shape;
+  shape.push_back(components.size());
   monte::StateSamplingFunction<test::Configuration> comp_n_sampling_f(
-      "comp_n", "Composition per unit cell", components,
+      "comp_n", "Composition per unit cell", components, shape,
       [&](monte::State<test::Configuration> const &state) {
         return composition_calculator.mean_num_each_component(
             state.configuration.occupation);

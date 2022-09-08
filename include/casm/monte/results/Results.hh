@@ -31,6 +31,9 @@ struct Results {
   ///   individual components.
   std::map<std::string, std::shared_ptr<Sampler>> samplers;
 
+  /// Map of <analysis name>:<value>
+  std::map<std::string, Eigen::VectorXd> analysis;
+
   /// Vector of counts (could be pass or step) when a sample occurred
   std::vector<CountType> sample_count;
 

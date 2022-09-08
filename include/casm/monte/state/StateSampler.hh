@@ -17,6 +17,8 @@ namespace monte {
 /// - A StateSamplingFunction has additional information (name, description,
 ///   component_names) to enable specifying convergence criteria, allow input
 ///   and output descriptions, help and error messages, etc.
+/// - Use `reshaped` (in casm/monte/sampling/Sampler.hh) to output scalars or
+///   matrices as vectors.
 ///
 template <typename _ConfigType>
 struct StateSamplingFunction {
@@ -24,13 +26,14 @@ struct StateSamplingFunction {
 
   /// \brief Constructor - default component names
   StateSamplingFunction(
-      std::string _name, std::string _description, Index _n_components,
+      std::string _name, std::string _description, std::vector<Index> _shape,
       std::function<Eigen::VectorXd(State<ConfigType> const &)> _function);
 
   /// \brief Constructor - custom component names
   StateSamplingFunction(
       std::string _name, std::string _description,
       std::vector<std::string> const &_component_names,
+      std::vector<Index> _shape,
       std::function<Eigen::VectorXd(State<ConfigType> const &)> _function);
 
   /// \brief Function name (and quantity to be sampled)
@@ -38,6 +41,11 @@ struct StateSamplingFunction {
 
   /// \brief Description of the function
   std::string description;
+
+  /// \brief Shape of quantity, with column-major unrolling
+  ///
+  /// Scalar: [], Vector: [n], Matrix: [m, n], etc.
+  std::vector<Index> shape;
 
   /// \brief A name for each component of the resulting Eigen::VectorXd
   ///
@@ -378,21 +386,23 @@ namespace monte {
 /// \brief Constructor - custom component names
 template <typename _ConfigType>
 StateSamplingFunction<_ConfigType>::StateSamplingFunction(
-    std::string _name, std::string _description, Index _n_components,
+    std::string _name, std::string _description, std::vector<Index> _shape,
     std::function<Eigen::VectorXd(State<ConfigType> const &)> _function)
     : name(_name),
       description(_description),
-      component_names(default_component_names(_n_components)),
+      shape(_shape),
+      component_names(default_component_names(shape)),
       function(_function) {}
 
 /// \brief Constructor - custom component names
 template <typename _ConfigType>
 StateSamplingFunction<_ConfigType>::StateSamplingFunction(
     std::string _name, std::string _description,
-    std::vector<std::string> const &_component_names,
+    std::vector<std::string> const &_component_names, std::vector<Index> _shape,
     std::function<Eigen::VectorXd(State<ConfigType> const &)> _function)
     : name(_name),
       description(_description),
+      shape(_shape),
       component_names(_component_names),
       function(_function) {}
 
@@ -522,9 +532,10 @@ template <typename ConfigType>
 std::vector<std::string> get_scalar_component_names(
     std::string const &function_name, double const &value,
     StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+  std::vector<Index> shape({});
   auto function_it = sampling_functions.find(function_name);
   if (function_it == sampling_functions.end()) {
-    return default_component_names(1);
+    return default_component_names(shape);
   } else {
     if (function_it->second.component_names.size() != 1) {
       std::stringstream msg;
@@ -550,9 +561,10 @@ template <typename ConfigType>
 std::vector<std::string> get_vector_component_names(
     std::string const &function_name, Eigen::VectorXd const &value,
     StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+  std::vector<Index> shape({value.size()});
   auto function_it = sampling_functions.find(function_name);
   if (function_it == sampling_functions.end()) {
-    return default_component_names(value.size());
+    return default_component_names(shape);
   } else {
     if (function_it->second.component_names.size() != value.size()) {
       std::stringstream msg;
@@ -578,9 +590,10 @@ template <typename ConfigType>
 std::vector<std::string> get_matrix_component_names(
     std::string const &function_name, Eigen::MatrixXd const &value,
     StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+  std::vector<Index> shape({value.rows(), value.cols()});
   auto function_it = sampling_functions.find(function_name);
   if (function_it == sampling_functions.end()) {
-    return colmajor_component_names(value.rows(), value.cols());
+    return default_component_names(shape);
   } else {
     if (function_it->second.component_names.size() != value.size()) {
       std::stringstream msg;

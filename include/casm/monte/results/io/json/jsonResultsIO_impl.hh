@@ -46,6 +46,7 @@ inline jsonParser &ensure_initialized_arrays(jsonParser &json,
 ///
 /// \code
 /// <condition_name>: {
+///   "shape": [5], // uses empty array [] for scalar
 ///   "component_names": ["0", "1", "2", "3", ...],
 ///   <component_name>: [...]  <-- appends to
 /// }
@@ -54,6 +55,7 @@ inline jsonParser &ensure_initialized_arrays(jsonParser &json,
 /// For matrix-valued conditions, uses on column-major unrolling:
 /// \code
 /// <condition_name>: {
+///   "shape": [rows, cols],
 ///   "component_names": ["0,0", "1,0", "2,0", "0,1", ...],
 ///   "0,0": [...],  <-- appends to
 ///   "1,0": [...],  <-- appends to
@@ -64,9 +66,13 @@ inline jsonParser &ensure_initialized_arrays(jsonParser &json,
 ///
 inline jsonParser &append_condition_to_json(
     std::string const &name, Eigen::VectorXd const &value,
+    std::vector<Index> const &shape,
     std::vector<std::string> const &component_names, jsonParser &json) {
   ensure_initialized_objects(json, {name});
   auto &j = json[name];
+
+  // write shape
+  j["shape"] = shape;
 
   // write component names
   j["component_names"] = component_names;
@@ -88,7 +94,7 @@ jsonParser &append_scalar_condition_to_json(
     std::pair<std::string, double> const &condition, jsonParser &json,
     StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
   return append_condition_to_json(
-      condition.first, reshaped(condition.second),
+      condition.first, reshaped(condition.second), std::vector<Index>(),
       get_scalar_component_names(condition.first, condition.second,
                                  sampling_functions),
       json);
@@ -100,6 +106,7 @@ jsonParser &append_vector_condition_to_json(
     StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
   return append_condition_to_json(
       condition.first, reshaped(condition.second),
+      std::vector<Index>({condition.second.size()}),
       get_vector_component_names(condition.first, condition.second,
                                  sampling_functions),
       json);
@@ -111,6 +118,7 @@ jsonParser &append_matrix_condition_to_json(
     StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
   return append_condition_to_json(
       condition.first, reshaped(condition.second),
+      std::vector<Index>({condition.second.rows(), condition.second.cols()}),
       get_matrix_component_names(condition.first, condition.second,
                                  sampling_functions),
       json);
@@ -120,6 +128,7 @@ jsonParser &append_matrix_condition_to_json(
 ///
 /// \code
 /// <quantity>: {
+///   "shape": [...],   // Scalar: [], Vector: [rows], Matrix: [rows, cols]
 ///   "component_names": ["0", "1", "2", "3", ...],
 ///   <component_name>: {
 ///     "mean": [...], <-- appends to
@@ -148,6 +157,9 @@ jsonParser &append_sampled_data_to_json(
   }
   std::vector<std::string> component_names =
       function_it->second.component_names;
+
+  // write shape
+  quantity_json["shape"] = function_it->second.shape;
 
   // write component names
   quantity_json["component_names"] = component_names;
@@ -231,6 +243,54 @@ jsonParser &append_completion_check_results_to_json(
   return json;
 }
 
+/// \brief Append results analysis values to summary JSON
+///
+/// \code
+/// <name>: {
+///   "shape": [...],   // Scalar: [], Vector: [rows], Matrix: [rows, cols]
+///   "component_names": ["0", "1", "2", "3", ...],
+///   <component_name>: [...] <-- appends to
+/// }
+/// \endcode
+template <typename ConfigType>
+jsonParser &append_results_analysis_to_json(
+    Results<ConfigType> const &results, jsonParser &json,
+    ResultsAnalysisFunctionMap<ConfigType> const &analysis_functions) {
+  // for each analysis value
+  for (auto const &pair : results.analysis) {
+    std::string const &name = pair.first;
+    Eigen::VectorXd const &value = pair.second;
+    jsonParser value_json = json[name];
+
+    ensure_initialized_objects(json, {name});
+    auto function_it = analysis_functions.find(name);
+    if (function_it == analysis_functions.end()) {
+      std::stringstream msg;
+      msg << "Error in append_results_analysis_to_json: No matching analysis "
+             "function found for '"
+          << name << "'.";
+      throw std::runtime_error(msg.str());
+    }
+    std::vector<std::string> component_names =
+        function_it->second.component_names;
+
+    // write shape
+    value_json["shape"] = function_it->second.shape;
+
+    // write component names
+    value_json["component_names"] = component_names;
+
+    // for each component, store result in array
+    Index i = 0;
+    for (auto const &component_name : component_names) {
+      ensure_initialized_arrays(value_json, {component_name});
+      value_json[component_name].push_back(value(i));
+      ++i;
+    }
+  }
+  return json;
+}
+
 /// \brief Append completion check results to summary JSON
 ///
 /// \code
@@ -263,9 +323,11 @@ template <typename _ConfigType>
 jsonResultsIO<_ConfigType>::jsonResultsIO(
     fs::path _output_dir,
     StateSamplingFunctionMap<config_type> _sampling_functions,
+    ResultsAnalysisFunctionMap<config_type> _analysis_functions,
     bool _write_trajectory, bool _write_observations)
     : m_output_dir(_output_dir),
       m_sampling_functions(_sampling_functions),
+      m_analysis_functions(_analysis_functions),
       m_write_trajectory(_write_trajectory),
       m_write_observations(_write_observations) {}
 
@@ -273,7 +335,7 @@ jsonResultsIO<_ConfigType>::jsonResultsIO(
 template <typename _ConfigType>
 std::vector<typename jsonResultsIO<_ConfigType>::state_type>
 jsonResultsIO<_ConfigType>::read_final_states() {
-  jsonParser json = read_summary();
+  jsonParser json = this->read_summary();
   return json["trajectory"]["final_states"].get<std::vector<state_type>>();
 }
 
@@ -289,12 +351,12 @@ jsonResultsIO<_ConfigType>::read_final_states() {
 template <typename _ConfigType>
 void jsonResultsIO<_ConfigType>::write(results_type const &results,
                                        Index run_index) {
-  write_summary(results, m_sampling_functions);
+  this->write_summary(results);
   if (m_write_trajectory) {
-    write_trajectory(results.sample_trajectory, run_index);
+    this->write_trajectory(results, run_index);
   }
   if (m_write_observations) {
-    write_observations(results, run_index);
+    this->write_observations(results, run_index);
   }
 }
 
@@ -310,12 +372,14 @@ void jsonResultsIO<_ConfigType>::write(results_type const &results,
 /// {
 ///   "conditions": {
 ///     <condition_name> {
+///       "shape": [...],
 ///       "component_names": ["0", "1", "2", "3", ...],
 ///       <component_name>: [...]
 ///   },
 ///   "sampled_data": {
 ///     <quantity>: {
-///       component_names: ["0", "1", "2", "3", ...],
+///       "shape": [...],
+///       "component_names": ["0", "1", "2", "3", ...],
 ///       <component_name>: {
 ///         "mean": [...],
 ///         "calculated_precision": [...],
@@ -340,16 +404,21 @@ void jsonResultsIO<_ConfigType>::write(results_type const &results,
 /// \endcode
 ///
 template <typename _ConfigType>
-void jsonResultsIO<_ConfigType>::write_summary(
-    results_type const &results,
-    StateSamplingFunctionMap<_ConfigType> const &sampling_functions) {
+void jsonResultsIO<_ConfigType>::write_summary(results_type const &results) {
   using namespace jsonResultsIO_impl;
 
-  // read existing summary file (create if not existing)
-  jsonParser json = read_summary();
+  StateSamplingFunctionMap<_ConfigType> const &sampling_functions =
+      m_sampling_functions;
+  ResultsAnalysisFunctionMap<_ConfigType> const &analysis_functions =
+      m_analysis_functions;
+  fs::path const &output_dir = m_output_dir;
 
-  ensure_initialized_objects(json, {"conditions", "sampled_data",
-                                    "completion_check_results", "trajectory"});
+  // read existing summary file (create if not existing)
+  jsonParser json = this->read_summary();
+
+  ensure_initialized_objects(
+      json, {"conditions", "sampled_data", "completion_check_results",
+             "analysis", "trajectory"});
 
   for (auto const &condition :
        results.initial_state->conditions.scalar_values) {
@@ -376,11 +445,15 @@ void jsonResultsIO<_ConfigType>::write_summary(
   append_completion_check_results_to_json(results,
                                           json["completion_check_results"]);
 
+  // append results analysis
+  append_results_analysis_to_json(results, json["analysis"],
+                                  analysis_functions);
+
   // append trajectory results (initial and final states)
   append_trajectory_results_to_json(results, json["trajectory"]);
 
   // write summary file
-  fs::path summary_path = m_output_dir / "summary.json";
+  fs::path summary_path = output_dir / "summary.json";
   SafeOfstream file;
   file.open(summary_path);
   json.print(file.ofstream(), -1);
@@ -392,10 +465,10 @@ void jsonResultsIO<_ConfigType>::write_summary(
 /// Output file is a JSON array of the configuration at the time a sample was
 /// taken.
 template <typename _ConfigType>
-void jsonResultsIO<_ConfigType>::write_trajectory(
-    std::vector<config_type> const &trajectory, Index run_index) {
-  jsonParser json(trajectory);
-  json.write(run_dir(run_index) / "trajectory.json", -1);
+void jsonResultsIO<_ConfigType>::write_trajectory(results_type const &results,
+                                                  Index run_index) {
+  jsonParser json(results.sample_trajectory);
+  json.write(this->run_dir(run_index) / "trajectory.json", -1);
 }
 
 /// \brief Write run.<index>/observations.json
