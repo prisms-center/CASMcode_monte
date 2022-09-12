@@ -12,7 +12,7 @@ namespace monte {
 
 /// Map of value name to scalar/vector/matrix value
 struct ValueMap {
-  std::map<std::string, double> boolean_values;
+  std::map<std::string, bool> boolean_values;
   std::map<std::string, double> scalar_values;
   std::map<std::string, Eigen::VectorXd> vector_values;
   std::map<std::string, Eigen::MatrixXd> matrix_values;
