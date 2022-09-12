@@ -56,6 +56,13 @@ template <typename _ConfigType>
 using StateSamplingFunctionMap =
     std::map<std::string, StateSamplingFunction<_ConfigType>>;
 
+template <typename _ConfigType>
+struct ResultsAnalysisFunction;
+
+template <typename ConfigType>
+using ResultsAnalysisFunctionMap =
+    std::map<std::string, ResultsAnalysisFunction<ConfigType>>;
+
 }  // namespace monte
 }  // namespace CASM
 

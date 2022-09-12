@@ -3,8 +3,7 @@
 
 #include <vector>
 
-#include "casm/global/definitions.hh"
-#include "casm/global/eigen.hh"
+#include "casm/monte/definitions.hh"
 #include "casm/monte/misc/math.hh"
 #include "casm/monte/results/Results.hh"
 
@@ -78,10 +77,6 @@ ResultsAnalysisFunction<ConfigType> make_component_covariance_f(
     double normalization_constant = 1.0,
     std::optional<std::string> name = std::nullopt,
     std::optional<std::string> description = std::nullopt);
-
-template <typename ConfigType>
-using ResultsAnalysisFunctionMap =
-    std::map<std::string, ResultsAnalysisFunction<ConfigType>>;
 
 /// \brief Evaluate all analysis functions
 template <typename ConfigType>

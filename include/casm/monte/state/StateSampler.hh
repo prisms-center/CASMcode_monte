@@ -60,10 +60,6 @@ struct StateSamplingFunction {
   Eigen::VectorXd operator()(State<ConfigType> const &state) const;
 };
 
-template <typename ConfigType>
-using StateSamplingFunctionMap =
-    std::map<std::string, StateSamplingFunction<ConfigType>>;
-
 template <typename ConfigType, typename ValueType>
 void set_value(std::map<SamplerComponent, ValueType> &component_map,
                StateSamplingFunctionMap<ConfigType> const &sampling_functions,
