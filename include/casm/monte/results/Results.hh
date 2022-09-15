@@ -21,6 +21,9 @@ struct Results {
   /// Final state
   std::optional<State<ConfigType>> final_state;
 
+  /// Elapsed clocktime
+  std::optional<TimeType> elapsed_clocktime;
+
   /// Map of <sampler name>:<sampler>
   /// - `Sampler` stores a Eigen::MatrixXd with sampled data. Rows of the matrix
   ///   corresponds to individual VectorXd samples. The matrices are
@@ -39,6 +42,9 @@ struct Results {
 
   /// Vector of times when a sample occurred
   std::vector<TimeType> sample_time;
+
+  /// Vector of clocktimes when a sample occurred
+  std::vector<TimeType> sample_clocktime;
 
   /// Vector of the configuration when a sample occurred
   std::vector<ConfigType> sample_trajectory;

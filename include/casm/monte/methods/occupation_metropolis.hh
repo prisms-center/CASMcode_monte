@@ -28,6 +28,7 @@ namespace monte {
 
 struct CompletionCheckParams;
 class Conversions;
+class OccLocation;
 class OccSwap;
 template <typename ConfigType>
 struct Results;
@@ -43,8 +44,8 @@ using StateSamplingFunctionMap =
 template <typename ConfigType, typename CalculatorType,
           typename ProposeOccEventFuntionType, typename GeneratorType>
 Results<ConfigType> occupation_metropolis(
-    State<ConfigType> const &initial_state, CalculatorType potential,
-    Conversions const &convert, std::vector<OccSwap> const &possible_swaps,
+    State<ConfigType> &state, OccLocation &occ_location,
+    CalculatorType &potential, std::vector<OccSwap> const &possible_swaps,
     ProposeOccEventFuntionType propose_event_f,
     GeneratorType &random_number_generator,
     StateSampler<ConfigType> &state_sampler, CompletionCheck &completion_check,
@@ -55,14 +56,14 @@ Results<ConfigType> occupation_metropolis(
 
 /// \brief Run an occupation metropolis Monte Carlo calculation
 ///
-/// \param initial_state The initial state. Consists of both the initial
-///     configuration and conditions. Conditions must include `temperature` and
-///     others as required by `potential`.
+/// \param state The state. Consists of both the initial
+///     configuration and conditions. Conditions must include `temperature`
+///     and any others required by `potential`.
+/// \param occ_location An occupant location tracker, which enables efficient
+///     event proposal. It must already be initialized with the input state.
 /// \param potential A potential calculating method. Should match the interface
-///     described below.
-/// \param convert A monte::Conversions instance, provides necessary index
-///     conversions. Must be consistent with `initial_state` and
-///     `possible_swaps`.
+///     described below and already be set to calculate the potential for the
+///     input state.
 /// \param possible_swaps A vector of possible swap types,
 ///     indicated by the asymmetric unit index and occupant index of the
 ///     sites potentially being swapped. Typically constructed from
@@ -107,28 +108,21 @@ Results<ConfigType> occupation_metropolis(
 template <typename ConfigType, typename CalculatorType,
           typename ProposeOccEventFuntionType, typename GeneratorType>
 Results<ConfigType> occupation_metropolis(
-    State<ConfigType> const &initial_state, CalculatorType potential,
-    Conversions const &convert, std::vector<OccSwap> const &possible_swaps,
+    State<ConfigType> &state, OccLocation &occ_location,
+    CalculatorType &potential, std::vector<OccSwap> const &possible_swaps,
     ProposeOccEventFuntionType propose_event_f,
     GeneratorType &random_number_generator,
     StateSampler<ConfigType> &state_sampler, CompletionCheck &completion_check,
     ResultsAnalysisFunctionMap<ConfigType> const &analysis_functions,
     MethodLog method_log) {
-  // Prepare state
-  State<ConfigType> state = initial_state;
+  if (potential.get() != &state) {
+    throw std::runtime_error(
+        "Error in monte::occupation_metropolis: potential not set to correct "
+        "state");
+  }
 
-  // Initialize occupation tracking
-  // - The OccCandidateList holds a list of OccCandidate, which are
-  //   pairs of (asymmetric unit index, species index) indicating symmetrically
-  //   distinct types of occupants.
-  // - The OccLocation object holds information on where all the occupants are,
-  //   organized by OccCandidate type. This allows for efficient event proposal
-  //   even in dilute compositions.
-  // - The OccLocation::mol_size() is the number of "mol" (possibly molecular
-  //   occupants) that may mutate. Use this for `steps_per_pass`.
-  OccCandidateList occ_candidate_list(convert);
-  OccLocation occ_location(convert, occ_candidate_list);
-  occ_location.initialize(get_occupation(state));
+  State<ConfigType> initial_state = state;
+
   CountType steps_per_pass = occ_location.mol_size();
   double n_unitcells = get_transformation_matrix_to_super(state).determinant();
 
@@ -139,14 +133,10 @@ Results<ConfigType> occupation_metropolis(
 
   // Set formation energy calculator (so it evaluates state)
   // and calculate initial potential energy
-  set(potential, state);
   potential_energy_intensive = potential.extensive_value() / n_unitcells;
 
   // Reset state_sampler
   state_sampler.reset(steps_per_pass);
-
-  // Sample initial state, if requested by sampling_params
-  state_sampler.sample_data_if_due(state);
 
   // Used within the main loop:
   OccEvent event;
@@ -159,9 +149,12 @@ Results<ConfigType> occupation_metropolis(
   log.restart_clock();
   log.begin_lap();
 
+  // Sample initial state, if requested by sampling_params
+  state_sampler.sample_data_if_due(state, log.time_s());
+
   // Main loop
   while (!completion_check.is_complete(state_sampler.samplers,
-                                       state_sampler.count)) {
+                                       state_sampler.count, log.time_s())) {
     // Log method status
     if (log_frequency.has_value() && log.lap_time() > *log_frequency) {
       method_log.reset();
@@ -198,7 +191,7 @@ Results<ConfigType> occupation_metropolis(
     state_sampler.increment_step();
 
     // Sample data, if a sample is due
-    state_sampler.sample_data_if_due(state);
+    state_sampler.sample_data_if_due(state, log.time_s());
   }
 
   // Log method status
@@ -214,8 +207,10 @@ Results<ConfigType> occupation_metropolis(
   Results<ConfigType> results;
   results.initial_state = initial_state;
   results.final_state = state;
+  results.elapsed_clocktime = log.time_s();
   results.samplers = std::move(state_sampler.samplers);
   results.sample_count = std::move(state_sampler.sample_count);
+  results.sample_clocktime = std::move(state_sampler.sample_clocktime);
   results.sample_trajectory = std::move(state_sampler.sample_trajectory);
   results.completion_check_results = completion_check.results();
   results.analysis = make_analysis(results, analysis_functions);

@@ -30,6 +30,10 @@ namespace monte {
 ///     If a time-based calculation, sets minimum and maximum cuttoffs for
 ///     time. Options are `min` and `max`, the same as for `count`.
 ///
+///   clocktime: dict (optional, default={})
+///     Sets minimum and maximum cuttoffs for elapsed calculation time in
+///     seconds. Options are `min` and `max`, the same as for `count`.
+///
 void parse(InputParser<CutoffCheckParams> &parser) {
   CutoffCheckParams params;
   parser.optional(params.min_count, fs::path("count") / "min");
@@ -38,6 +42,8 @@ void parse(InputParser<CutoffCheckParams> &parser) {
   parser.optional(params.max_time, fs::path("time") / "max");
   parser.optional(params.min_sample, fs::path("sample") / "min");
   parser.optional(params.max_sample, fs::path("sample") / "max");
+  parser.optional(params.min_clocktime, fs::path("clocktime") / "min");
+  parser.optional(params.max_clocktime, fs::path("clocktime") / "max");
   if (parser.valid()) {
     parser.value = std::make_unique<CutoffCheckParams>(params);
   }

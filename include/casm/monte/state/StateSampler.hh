@@ -177,6 +177,9 @@ struct StateSampler {
   /// \brief The time when a sample was taken, if applicable
   std::vector<TimeType> sample_time;
 
+  /// \brief The clocktime when a sample was taken, if applicable
+  std::vector<TimeType> sample_clocktime;
+
   /// \brief The configuration when a sample was taken
   ///
   /// The trajectory is sampled if `sample_trajectory==true`
@@ -196,7 +199,8 @@ struct StateSampler {
     // populate functions, samplers
     for (std::string name : _sampling_params.sampler_names) {
       auto const &function = sampling_functions.at(name);
-      auto shared_sampler = std::make_shared<Sampler>(function.component_names);
+      auto shared_sampler =
+          std::make_shared<Sampler>(function.shape, function.component_names);
       functions.push_back(function);
       samplers.emplace(name, shared_sampler);
     }
@@ -253,20 +257,25 @@ struct StateSampler {
     time = 0.0;
     samplers.clear();
     for (auto const &function : functions) {
-      auto shared_sampler = std::make_shared<Sampler>(function.component_names);
+      auto shared_sampler =
+          std::make_shared<Sampler>(function.shape, function.component_names);
       samplers.emplace(function.name, shared_sampler);
     }
     sample_count.clear();
     sample_time.clear();
+    sample_clocktime.clear();
     sample_trajectory.clear();
   }
 
   /// \brief Add samples
   ///
   /// Note: Call `reset(double _steps_per_pass)` before sampling begins.
-  void sample(State<ConfigType> const &state) {
+  void sample(State<ConfigType> const &state, TimeType clocktime) {
     // - Record count
     sample_count.push_back(count);
+
+    // - Record clocktime
+    sample_clocktime.push_back(clocktime);
 
     // - Record configuration
     if (do_sample_trajectory) {
@@ -312,12 +321,13 @@ struct StateSampler {
   /// - Call `reset(double _steps_per_pass)` before sampling begins.
   /// - Apply chosen event before this
   /// - Call `increment_step()` before this
-  void sample_data_if_due(monte::State<ConfigType> const &state) {
+  void sample_data_if_due(monte::State<ConfigType> const &state,
+                          TimeType clocktime) {
     if (!sample_is_due()) {
       return;
     }
     // Sample is due...
-    sample(state);
+    sample(state, clocktime);
   }
 
   /// \brief Sample data, if due (time based sampling)
@@ -328,12 +338,12 @@ struct StateSampler {
   /// - Call `increment_step()` after this
   /// - Call `increment_time(double time_increment)` after this
   void sample_data_if_due(monte::State<ConfigType> const &state,
-                          double time_increment) {
+                          double time_increment, TimeType clocktime) {
     if (!sample_is_due(time_increment)) {
       // Sample is not due
       return;
     }
-    sample(state);
+    sample(state, clocktime);
     sample_time.push_back(time_increment);
   }
 

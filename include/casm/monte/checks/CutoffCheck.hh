@@ -17,28 +17,32 @@ struct CutoffCheckParams {
   std::optional<CountType> min_count;
   std::optional<TimeType> min_time;
   std::optional<CountType> min_sample;
+  std::optional<CountType> min_clocktime;
 
   // --- A calculation does stop when any maximum is met ---
 
   std::optional<CountType> max_count;
   std::optional<TimeType> max_time;
   std::optional<CountType> max_sample;
+  std::optional<CountType> max_clocktime;
 };
 
 bool all_minimums_met(CutoffCheckParams const &cutoff_params,
                       std::optional<CountType> count,
-                      std::optional<TimeType> time, CountType n_samples);
+                      std::optional<TimeType> time, CountType n_samples,
+                      TimeType clocktime);
 
 bool any_maximum_met(CutoffCheckParams const &cutoff_params,
                      std::optional<CountType> count,
-                     std::optional<TimeType> time, CountType n_samples);
+                     std::optional<TimeType> time, CountType n_samples,
+                     TimeType clocktime);
 
 // --- inline definitions ---
 
 inline bool all_minimums_met(CutoffCheckParams const &cutoff_params,
                              std::optional<CountType> count,
-                             std::optional<TimeType> time,
-                             CountType n_samples) {
+                             std::optional<TimeType> time, CountType n_samples,
+                             TimeType clocktime) {
   auto const &p = cutoff_params;
 
   if (p.min_sample.has_value() && n_samples < p.min_sample.value()) {
@@ -55,12 +59,17 @@ inline bool all_minimums_met(CutoffCheckParams const &cutoff_params,
     return false;
   }
 
+  if (p.min_clocktime.has_value() && clocktime < p.min_clocktime.value()) {
+    return false;
+  }
+
   return true;
 }
 
 inline bool any_maximum_met(CutoffCheckParams const &cutoff_params,
                             std::optional<CountType> count,
-                            std::optional<TimeType> time, CountType n_samples) {
+                            std::optional<TimeType> time, CountType n_samples,
+                            TimeType clocktime) {
   auto const &p = cutoff_params;
 
   if (p.max_sample.has_value() && n_samples >= p.max_sample.value()) {
@@ -74,6 +83,10 @@ inline bool any_maximum_met(CutoffCheckParams const &cutoff_params,
 
   if (p.max_time.has_value() && time.has_value() &&
       time.value() >= p.max_time.value()) {
+    return true;
+  }
+
+  if (p.max_clocktime.has_value() && clocktime >= p.max_clocktime.value()) {
     return true;
   }
 

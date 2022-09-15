@@ -4,6 +4,7 @@
 #include "casm/casm_io/SafeOfstream.hh"
 #include "casm/casm_io/container/json_io.hh"
 #include "casm/casm_io/json/jsonParser.hh"
+#include "casm/casm_io/json/optional.hh"
 #include "casm/monte/results/Results.hh"
 #include "casm/monte/results/io/json/jsonResultsIO.hh"
 
@@ -140,29 +141,22 @@ jsonParser &append_matrix_condition_to_json(
 template <typename ConfigType>
 jsonParser &append_sampled_data_to_json(
     std::pair<std::string, std::shared_ptr<Sampler>> quantity, jsonParser &json,
-    Results<ConfigType> const &results,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+    Results<ConfigType> const &results) {
   std::string const &quantity_name = quantity.first;
   Sampler const &sampler = *quantity.second;
   ensure_initialized_objects(json, {quantity_name});
   auto &quantity_json = json[quantity_name];
 
-  auto function_it = sampling_functions.find(quantity_name);
-  if (function_it == sampling_functions.end()) {
-    std::stringstream msg;
-    msg << "Error in append_sampled_data_to_json: No matching sampling "
-           "function found for '"
-        << quantity_name << "'.";
-    throw std::runtime_error(msg.str());
-  }
-  std::vector<std::string> component_names =
-      function_it->second.component_names;
+  std::vector<std::string> component_names = quantity.second->component_names();
+  bool is_scalar = (quantity.second->shape().size() == 0);
 
   // write shape
-  quantity_json["shape"] = function_it->second.shape;
+  quantity_json["shape"] = quantity.second->shape();
 
-  // write component names
-  quantity_json["component_names"] = component_names;
+  // write component names - if not scalar
+  if (!is_scalar) {
+    quantity_json["component_names"] = component_names;
+  }
 
   CompletionCheckResults const &completion_r = results.completion_check_results;
   ConvergenceCheckResults const &convergence_r =
@@ -191,18 +185,32 @@ jsonParser &append_sampled_data_to_json(
           required_precision, completion_r.confidence);
     }
 
-    ensure_initialized_objects(quantity_json, {component_name});
-    auto &component_json = quantity_json[component_name];
-    ensure_initialized_arrays(component_json, {"mean", "calculated_precision"});
-    if (is_requested_to_converge) {
-      ensure_initialized_arrays(component_json, {"is_converged"});
+    jsonParser *_tjson;
+    if (is_scalar) {
+      _tjson = &quantity_json;
+    } else {
+      ensure_initialized_objects(quantity_json, {component_name});
+      _tjson = &(quantity_json[component_name]);
     }
 
-    component_json["mean"].push_back(result.mean);
-    component_json["calculated_precision"].push_back(
-        result.calculated_precision);
+    jsonParser &tjson = *_tjson;
+    ensure_initialized_arrays(tjson, {"mean", "calculated_precision"});
     if (is_requested_to_converge) {
-      component_json["is_converged"].push_back(result.is_converged);
+      ensure_initialized_arrays(tjson, {"is_converged"});
+    }
+
+    if (convergence_r.N_samples_for_statistics != 0) {
+      tjson["mean"].push_back(result.mean);
+      tjson["calculated_precision"].push_back(result.calculated_precision);
+      if (is_requested_to_converge) {
+        tjson["is_converged"].push_back(result.is_converged);
+      }
+    } else {
+      tjson["mean"].push_back("did_not_equilibrate");
+      tjson["calculated_precision"].push_back("did_not_equilibrate");
+      if (is_requested_to_converge) {
+        tjson["is_converged"].push_back(false);
+      }
     }
     ++i;
   }
@@ -213,6 +221,7 @@ jsonParser &append_sampled_data_to_json(
 ///
 /// \code
 /// {
+///   "elapsed_clocktime": [...], <-- appends to
 ///   "all_equilibrated": [...], <-- appends to
 ///   "N_samples_for_all_to_equilibrate": [...], <-- appends to
 ///   "all_converged": [...], <-- appends to
@@ -227,18 +236,27 @@ jsonParser &append_completion_check_results_to_json(
   auto const &convergence_r = completion_r.convergence_check_results;
 
   ensure_initialized_arrays(
-      json, {"all_equilibrated", "N_samples_for_all_to_equilibrate",
-             "all_converged", "N_samples_for_statistics"});
+      json, {"elapsed_clocktime", "all_equilibrated",
+             "N_samples_for_all_to_equilibrate", "all_converged",
+             "N_samples_for_statistics"});
+
+  json["elapsed_clocktime"].push_back(results.elapsed_clocktime);
 
   json["all_equilibrated"].push_back(equilibration_r.all_equilibrated);
 
-  json["N_samples_for_all_to_equilibrate"].push_back(
-      equilibration_r.N_samples_for_all_to_equilibrate);
-
   json["all_converged"].push_back(convergence_r.all_converged);
 
-  json["N_samples_for_statistics"].push_back(
-      convergence_r.N_samples_for_statistics);
+  if (equilibration_r.all_equilibrated) {
+    json["N_samples_for_all_to_equilibrate"].push_back(
+        equilibration_r.N_samples_for_all_to_equilibrate);
+
+    json["N_samples_for_statistics"].push_back(
+        convergence_r.N_samples_for_statistics);
+  } else {
+    json["N_samples_for_all_to_equilibrate"].push_back("did_not_equilibrate");
+
+    json["N_samples_for_statistics"].push_back("did_not_equilibrate");
+  }
 
   return json;
 }
@@ -291,7 +309,7 @@ jsonParser &append_results_analysis_to_json(
   return json;
 }
 
-/// \brief Append completion check results to summary JSON
+/// \brief Append trajectory results to summary JSON
 ///
 /// \code
 /// {
@@ -437,8 +455,7 @@ void jsonResultsIO<_ConfigType>::write_summary(results_type const &results) {
   }
 
   for (auto const &quantity : results.samplers) {
-    append_sampled_data_to_json(quantity, json["sampled_data"], results,
-                                sampling_functions);
+    append_sampled_data_to_json(quantity, json["sampled_data"], results);
   }
 
   // append completion check results
@@ -495,9 +512,18 @@ void jsonResultsIO<_ConfigType>::write_observations(results_type const &results,
   if (results.sample_time.size()) {
     json["time"] = results.sample_time;
   }
+  if (results.sample_clocktime.size()) {
+    json["clocktime"] = results.sample_clocktime;
+  }
   for (auto const &pair : results.samplers) {
-    json[pair.first]["component_names"] = pair.second->component_names();
-    json[pair.first]["value"] = pair.second->values();
+    bool is_scalar = (pair.second->shape().size() == 0);
+    if (is_scalar) {
+      to_json(pair.second->values().col(0), json[pair.first]["value"],
+              jsonParser::as_array());
+    } else {
+      json[pair.first]["component_names"] = pair.second->component_names();
+      json[pair.first]["value"] = pair.second->values();
+    }
   }
   json.write(run_dir(run_index) / "observations.json", -1);
 }

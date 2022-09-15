@@ -16,7 +16,11 @@ jsonParser &to_json(IndividualEquilibrationCheckResult const &value,
                     jsonParser &json) {
   json.put_obj();
   json["is_equilibrated"] = value.is_equilibrated;
-  json["N_samples_for_equilibration"] = value.N_samples_for_equilibration;
+  if (value.is_equilibrated) {
+    json["N_samples_for_equilibration"] = value.N_samples_for_equilibration;
+  } else {
+    json["N_samples_for_equilibration"] = "did_not_equilibrate";
+  }
   return json;
 }
 
@@ -24,8 +28,12 @@ jsonParser &to_json(IndividualEquilibrationCheckResult const &value,
 jsonParser &to_json(EquilibrationCheckResults const &value, jsonParser &json) {
   json.put_obj();
   json["all_equilibrated"] = value.all_equilibrated;
-  json["N_samples_for_all_to_equilibrate"] =
-      value.N_samples_for_all_to_equilibrate;
+  if (value.all_equilibrated) {
+    json["N_samples_for_all_to_equilibrate"] =
+        value.N_samples_for_all_to_equilibrate;
+  } else {
+    json["N_samples_for_equilibration"] = "did_not_equilibrate";
+  }
   json["individual_results"];
   for (auto const &pair : value.individual_results) {
     std::string name =

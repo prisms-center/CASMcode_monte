@@ -36,7 +36,8 @@ class Sampler {
   Sampler(std::vector<Index> _shape, CountType _capacity_increment = 1000);
 
   /// \brief Sampler constructor - custom component names
-  Sampler(std::vector<std::string> const &_component_names,
+  Sampler(std::vector<Index> _shape,
+          std::vector<std::string> const &_component_names,
           CountType _capacity_increment = 1000);
 
   /// \brief Add a new sample
@@ -56,6 +57,9 @@ class Sampler {
 
   /// Return sampled vector component names
   std::vector<std::string> const &component_names() const;
+
+  /// Return sampled quantity shape before unrolling
+  std::vector<Index> const &shape() const;
 
   /// Number of components (vector size) of samples
   Index n_components() const;
@@ -84,6 +88,9 @@ class Sampler {
 
   /// Names to use for components. Size == m_n_components
   std::vector<std::string> m_component_names;
+
+  /// Quantity shape before unrolling
+  std::vector<Index> m_shape;
 
   /// Current number of samples taken
   Index m_n_samples;
@@ -173,6 +180,7 @@ inline Sampler::Sampler(std::vector<Index> _shape,
                         CountType _capacity_increment)
     : m_n_components(calc_n_components(_shape)),
       m_component_names(default_component_names(_shape)),
+      m_shape(_shape),
       m_n_samples(0),
       m_capacity_increment(_capacity_increment) {}
 
@@ -181,10 +189,12 @@ inline Sampler::Sampler(std::vector<Index> _shape,
 /// \param _component_names Names to give to each sampled vector element
 /// \param _capacity_increment How much to resize the underlying matrix by
 ///     whenever space runs out.
-inline Sampler::Sampler(std::vector<std::string> const &_component_names,
+inline Sampler::Sampler(std::vector<Index> _shape,
+                        std::vector<std::string> const &_component_names,
                         CountType _capacity_increment)
     : m_n_components(_component_names.size()),
       m_component_names(_component_names),
+      m_shape(_shape),
       m_n_samples(0),
       m_capacity_increment(_capacity_increment) {
   clear();
@@ -225,6 +235,9 @@ inline void Sampler::set_capacity_increment(CountType _capacity_increment) {
 inline std::vector<std::string> const &Sampler::component_names() const {
   return m_component_names;
 }
+
+/// Return sampled quantity shape before unrolling
+inline std::vector<Index> const &Sampler::shape() const { return m_shape; }
 
 /// Number of components (vector size) of samples
 inline Index Sampler::n_components() const { return m_n_components; }

@@ -50,6 +50,9 @@ struct CompletionCheckResults {
   /// Current time (if given)
   std::optional<TimeType> time;
 
+  /// Elapsed clocktime
+  TimeType clocktime;
+
   /// Current number of samples
   CountType n_samples = 0;
 
@@ -75,26 +78,28 @@ class CompletionCheck {
   CompletionCheck(CompletionCheckParams params);
 
   bool is_complete(
-      std::map<std::string, std::shared_ptr<Sampler>> const &samplers);
+      std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
+      TimeType clocktime);
 
   bool is_complete(
       std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-      CountType count);
+      CountType count, TimeType clocktime);
 
   bool is_complete(
       std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-      TimeType time);
+      TimeType time, TimeType clocktime);
 
   bool is_complete(
       std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-      CountType count, TimeType time);
+      CountType count, TimeType time, TimeType clocktime);
 
   CompletionCheckResults const &results() const { return m_results; }
 
  private:
   bool _is_complete(
       std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-      std::optional<CountType> count, std::optional<TimeType> time);
+      std::optional<CountType> count, std::optional<TimeType> time,
+      TimeType clocktime);
 
   void _check(std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
               std::optional<CountType> count, std::optional<TimeType> time,
@@ -108,40 +113,43 @@ class CompletionCheck {
 // --- Inline definitions ---
 
 inline bool CompletionCheck::is_complete(
-    std::map<std::string, std::shared_ptr<Sampler>> const &samplers) {
-  return _is_complete(samplers, std::nullopt, std::nullopt);
+    std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
+    TimeType clocktime) {
+  return _is_complete(samplers, std::nullopt, std::nullopt, clocktime);
 }
 
 inline bool CompletionCheck::is_complete(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    CountType count) {
-  return _is_complete(samplers, count, std::nullopt);
+    CountType count, TimeType clocktime) {
+  return _is_complete(samplers, count, std::nullopt, clocktime);
 }
 
 inline bool CompletionCheck::is_complete(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    TimeType time) {
-  return _is_complete(samplers, std::nullopt, time);
+    TimeType time, TimeType clocktime) {
+  return _is_complete(samplers, std::nullopt, time, clocktime);
 }
 
 inline bool CompletionCheck::is_complete(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    CountType count, TimeType time) {
-  return _is_complete(samplers, count, time);
+    CountType count, TimeType time, TimeType clocktime) {
+  return _is_complete(samplers, count, time, clocktime);
 }
 
 inline bool CompletionCheck::_is_complete(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    std::optional<CountType> count, std::optional<TimeType> time) {
+    std::optional<CountType> count, std::optional<TimeType> time,
+    TimeType clocktime) {
   CountType n_samples = get_n_samples(samplers);
 
   m_results = CompletionCheckResults();
   m_results.confidence = m_params.confidence;
   m_results.count = count;
   m_results.time = time;
+  m_results.clocktime = clocktime;
   m_results.n_samples = n_samples;
-  m_results.has_all_minimums_met =
-      all_minimums_met(m_params.cutoff_params, count, time, n_samples);
+  m_results.has_all_minimums_met = all_minimums_met(
+      m_params.cutoff_params, count, time, n_samples, clocktime);
 
   // if all minimums not met, continue, otherwise can stop
   if (!m_results.has_all_minimums_met) {
@@ -155,8 +163,8 @@ inline bool CompletionCheck::_is_complete(
   }
 
   // if any maximum met, stop even if not converged
-  m_results.has_any_maximum_met =
-      any_maximum_met(m_params.cutoff_params, count, time, n_samples);
+  m_results.has_any_maximum_met = any_maximum_met(m_params.cutoff_params, count,
+                                                  time, n_samples, clocktime);
 
   if (m_results.has_any_maximum_met) {
     m_results.is_complete = true;

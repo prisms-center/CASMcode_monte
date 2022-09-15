@@ -194,6 +194,10 @@ void _parse_convergence_criteria(
 ///         If a time-based calculation, sets minimum and maximum cuttoffs for
 ///         time. Options are `min` and `max`, the same as for `count`.
 ///
+///       clocktime: dict (optional, default={})
+///         Sets minimum and maximum cuttoffs for elapsed calculation time in
+///         seconds. Options are `min` and `max`, the same as for `count`.
+///
 ///   begin: int (optional, default=10)
 ///     Begin checking convergence of sampled quantities for completion, after
 ///     this many samples have been taken.

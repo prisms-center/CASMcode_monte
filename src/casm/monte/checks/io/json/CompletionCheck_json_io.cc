@@ -16,6 +16,7 @@ jsonParser &to_json(CompletionCheckResults const &value, jsonParser &json) {
   json["has_any_maximum_met"] = value.has_any_maximum_met;
   json["count"] = value.count;
   json["time"] = value.time;
+  json["clocktime"] = value.clocktime;
   json["n_samples"] = value.n_samples;
   json["convergence_check_performed"] = value.convergence_check_performed;
   json["is_complete"] = value.is_complete;
