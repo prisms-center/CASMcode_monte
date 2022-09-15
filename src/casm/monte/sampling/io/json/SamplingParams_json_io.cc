@@ -22,21 +22,24 @@ namespace monte {
 ///
 ///     For "linear" spacing, the n-th sample will be taken when:
 ///
-///         count = ceil(begin + (period / n_samples) * (n))
+///         sample/pass = round( begin + (period / samples_per_period) * n )
+///                time = begin + (period / samples_per_period) * n
 ///
 ///     For "log" spacing, the n-th sample will be taken when:
 ///
-///         count = ceil(begin + period ^ ( (n + shift) / n_samples))
+///         sample/pass = round( begin + period ^ ( (n + shift) /
+///                           samples_per_period ) )
+///                time = begin + period ^ ( (n + shift) / samples_per_period )
 ///
 ///   begin: number (optional, default=0.0)
-///     The number of pass/step at which to begin sampling.
+///     The number of pass/step or amount of time at which to begin
+///     sampling.
 ///
 ///   period: number (required)
-///     The number of pass/step in which the first `"n_samples"` samples should
-///     be taken.
+///     A number of pass/step or amount of time.
 ///
 ///   samples_per_period: number (optional, default=1.0)
-///    The number of samples to be taken in the specified `"period"`.
+///     The number of samples to be taken in the specified `"period"`.
 ///
 ///   shift: number (optional, default=0.0)
 ///     Used with `"spacing": "log"`.

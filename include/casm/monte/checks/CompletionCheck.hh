@@ -38,6 +38,9 @@ struct CompletionCheckParams {
 
 /// \brief Stores completion check results
 struct CompletionCheckResults {
+  /// Parameters used for the completion check
+  CompletionCheckParams params;
+
   /// Minimums cutoff check results
   bool has_all_minimums_met = false;
 
@@ -143,6 +146,7 @@ inline bool CompletionCheck::_is_complete(
   CountType n_samples = get_n_samples(samplers);
 
   m_results = CompletionCheckResults();
+  m_results.params = m_params;
   m_results.confidence = m_params.confidence;
   m_results.count = count;
   m_results.time = time;

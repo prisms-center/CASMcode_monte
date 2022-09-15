@@ -159,6 +159,8 @@ jsonParser &append_sampled_data_to_json(
   }
 
   CompletionCheckResults const &completion_r = results.completion_check_results;
+  EquilibrationCheckResults const &equilibration_r =
+      completion_r.equilibration_check_results;
   ConvergenceCheckResults const &convergence_r =
       completion_r.convergence_check_results;
 
@@ -167,23 +169,9 @@ jsonParser &append_sampled_data_to_json(
   for (auto const &component_name : component_names) {
     SamplerComponent key(quantity_name, i, component_name);
 
-    auto result_it = convergence_r.individual_results.find(key);
+    auto const &requested_precision = completion_r.params.requested_precision;
     bool is_requested_to_converge =
-        (result_it != convergence_r.individual_results.end());
-    IndividualConvergenceCheckResult result;
-
-    if (is_requested_to_converge) {
-      // if is a quantity specifically asked to be converged,
-      //     use existing results
-      result = result_it->second;
-    } else if (convergence_r.N_samples_for_statistics != 0) {
-      // if not a quantity specifically asked to be converged,
-      //     do convergence check
-      double required_precision = 0.0;
-      result = convergence_check(
-          sampler.component(i).tail(convergence_r.N_samples_for_statistics),
-          required_precision, completion_r.confidence);
-    }
+        (requested_precision.find(key) != requested_precision.end());
 
     jsonParser *_tjson;
     if (is_scalar) {
@@ -199,19 +187,41 @@ jsonParser &append_sampled_data_to_json(
       ensure_initialized_arrays(tjson, {"is_converged"});
     }
 
-    if (convergence_r.N_samples_for_statistics != 0) {
-      tjson["mean"].push_back(result.mean);
-      tjson["calculated_precision"].push_back(result.calculated_precision);
-      if (is_requested_to_converge) {
-        tjson["is_converged"].push_back(result.is_converged);
-      }
-    } else {
+    if (!equilibration_r.all_equilibrated ||
+        convergence_r.N_samples_for_statistics == 0) {
       tjson["mean"].push_back("did_not_equilibrate");
       tjson["calculated_precision"].push_back("did_not_equilibrate");
       if (is_requested_to_converge) {
         tjson["is_converged"].push_back(false);
       }
+    } else {
+      auto result_it = convergence_r.individual_results.find(key);
+      if (result_it != convergence_r.individual_results.end()) {
+        // if is a quantity specifically asked to be converged,
+        //     use existing results
+        auto const &result = result_it->second;
+
+        tjson["mean"].push_back(result.mean);
+        tjson["calculated_precision"].push_back(result.calculated_precision);
+        tjson["is_converged"].push_back(result.is_converged);
+      } else {
+        // if not a quantity specifically asked to be converged,
+        //     do convergence check
+        double _precision = 0.0;
+        if (is_requested_to_converge) {
+          _precision = requested_precision.at(key);
+        }
+        auto result = convergence_check(
+            sampler.component(i).tail(convergence_r.N_samples_for_statistics),
+            _precision, completion_r.confidence);
+        tjson["mean"].push_back(result.mean);
+        tjson["calculated_precision"].push_back(result.calculated_precision);
+        if (is_requested_to_converge) {
+          tjson["is_converged"].push_back(result.is_converged);
+        }
+      }
     }
+
     ++i;
   }
   return json;
@@ -226,6 +236,7 @@ jsonParser &append_sampled_data_to_json(
 ///   "N_samples_for_all_to_equilibrate": [...], <-- appends to
 ///   "all_converged": [...], <-- appends to
 ///   "N_samples_for_statistics": [...], <-- appends to
+///   "N_samples": [...], <-- appends to
 /// }
 /// \endcode
 template <typename ConfigType>
@@ -238,7 +249,7 @@ jsonParser &append_completion_check_results_to_json(
   ensure_initialized_arrays(
       json, {"elapsed_clocktime", "all_equilibrated",
              "N_samples_for_all_to_equilibrate", "all_converged",
-             "N_samples_for_statistics"});
+             "N_samples_for_statistics", "N_samples"});
 
   json["elapsed_clocktime"].push_back(results.elapsed_clocktime);
 
@@ -257,6 +268,8 @@ jsonParser &append_completion_check_results_to_json(
 
     json["N_samples_for_statistics"].push_back("did_not_equilibrate");
   }
+
+  json["N_samples"].push_back(get_n_samples(results.samplers));
 
   return json;
 }
@@ -413,6 +426,7 @@ void jsonResultsIO<_ConfigType>::write(results_type const &results,
 ///     "N_samples_for_all_to_equilibrate": [...],
 ///     "all_converged": [...],
 ///     "N_samples_for_statistics": [...],
+///     "N_samples": [...],
 ///   },
 ///   "trajectory": {
 ///     "initial_states": [...],

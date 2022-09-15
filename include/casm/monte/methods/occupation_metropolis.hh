@@ -170,8 +170,14 @@ Results<ConfigType> occupation_metropolis(
     }
 
     // Propose an event
-    propose_event_f(event, occ_location, possible_swaps,
-                    random_number_generator);
+    try {
+      propose_event_f(event, occ_location, possible_swaps,
+                      random_number_generator);
+    } catch (std::exception &e) {
+      CASM::err_log() << std::endl
+                      << "Error proposing event: " << e.what() << std::endl;
+      break;
+    }
 
     // Calculate change in potential energy (extensive) due to event
     double delta_potential_energy = potential.occ_delta_extensive_value(

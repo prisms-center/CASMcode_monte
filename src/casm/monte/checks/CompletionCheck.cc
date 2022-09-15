@@ -5,6 +5,7 @@ namespace monte {
 
 CompletionCheck::CompletionCheck(CompletionCheckParams params)
     : m_params(params) {
+  m_results.params = m_params;
   m_results.confidence = m_params.confidence;
   m_results.is_complete = false;
 }
