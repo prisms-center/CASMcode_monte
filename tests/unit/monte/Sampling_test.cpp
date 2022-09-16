@@ -38,8 +38,8 @@ std::shared_ptr<monte::Sampler> run_case(
   occ_loc.initialize(occupation);
 
   // construct Sampler
-  auto shared_sampler =
-      std::make_shared<monte::Sampler>(function.component_names);
+  auto shared_sampler = std::make_shared<monte::Sampler>(
+      function.shape, function.component_names);
 
   Index count = 0;
   monte::OccEvent e;

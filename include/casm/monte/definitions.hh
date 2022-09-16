@@ -63,6 +63,14 @@ template <typename ConfigType>
 using ResultsAnalysisFunctionMap =
     std::map<std::string, ResultsAnalysisFunction<ConfigType>>;
 
+class Conversions;
+
+struct OccCandidate;
+class OccCandidateList;
+struct OccEvent;
+class OccLocation;
+class OccSwap;
+
 }  // namespace monte
 }  // namespace CASM
 

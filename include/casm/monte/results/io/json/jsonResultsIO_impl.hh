@@ -287,11 +287,15 @@ template <typename ConfigType>
 jsonParser &append_results_analysis_to_json(
     Results<ConfigType> const &results, jsonParser &json,
     ResultsAnalysisFunctionMap<ConfigType> const &analysis_functions) {
+  CompletionCheckResults const &completion_r = results.completion_check_results;
+  EquilibrationCheckResults const &equilibration_r =
+      completion_r.equilibration_check_results;
+
   // for each analysis value
   for (auto const &pair : results.analysis) {
     std::string const &name = pair.first;
     Eigen::VectorXd const &value = pair.second;
-    jsonParser value_json = json[name];
+    jsonParser &value_json = json[name];
 
     ensure_initialized_objects(json, {name});
     auto function_it = analysis_functions.find(name);
@@ -302,21 +306,37 @@ jsonParser &append_results_analysis_to_json(
           << name << "'.";
       throw std::runtime_error(msg.str());
     }
-    std::vector<std::string> component_names =
-        function_it->second.component_names;
 
     // write shape
     value_json["shape"] = function_it->second.shape;
 
-    // write component names
-    value_json["component_names"] = component_names;
+    bool is_scalar = (function_it->second.shape.size() == 0);
 
-    // for each component, store result in array
-    Index i = 0;
-    for (auto const &component_name : component_names) {
-      ensure_initialized_arrays(value_json, {component_name});
-      value_json[component_name].push_back(value(i));
-      ++i;
+    if (is_scalar) {
+      ensure_initialized_arrays(value_json, {"value"});
+      if (!equilibration_r.all_equilibrated) {
+        value_json["value"].push_back("did_not_equilibrate");
+      } else {
+        value_json["value"].push_back(value(0));
+      }
+    } else {
+      std::vector<std::string> component_names =
+          function_it->second.component_names;
+
+      // write component names
+      value_json["component_names"] = component_names;
+
+      // for each component, store result in array
+      Index i = 0;
+      for (auto const &component_name : component_names) {
+        ensure_initialized_arrays(value_json, {component_name});
+        if (!equilibration_r.all_equilibrated) {
+          value_json[component_name].push_back("did_not_equilibrate");
+        } else {
+          value_json[component_name].push_back(value(i));
+        }
+        ++i;
+      }
     }
   }
   return json;
@@ -509,10 +529,16 @@ void jsonResultsIO<_ConfigType>::write_trajectory(results_type const &results,
 /// {
 ///   "count": [...], // count (i.e. pass/step) at the time sample was taken
 ///   "time": [...], // time when sampled was taken (if exists)
+///   "clocktime": [...], // clocktime when sampled was taken (if exists)
 ///   <quantity>: {
+///     "shape": [...], // Scalar: [], Vector: [rows], Matrix: [rows, cols]
 ///     "component_names": ["0", "1", ...],
-///     "value": [[<matrix>]] // rows are samples, columns are components of
-///                           // the sampled quantity
+///     // scalar quantities are written as a vector, one element for each
+///     sample "value": [scalar0, sample1, sample2, ...],
+///     // vector and matrix quantities are written as an array of vectors,
+///     // one vector for each sample, representing the quantitiy unrolled
+///     // in column-major order
+///     "value": [ [<vector0>], [<vector2>], [<vector3>], ...]
 ///   }
 /// }
 /// \endcode
@@ -530,6 +556,7 @@ void jsonResultsIO<_ConfigType>::write_observations(results_type const &results,
     json["clocktime"] = results.sample_clocktime;
   }
   for (auto const &pair : results.samplers) {
+    json[pair.first]["shape"] = pair.second->shape();
     bool is_scalar = (pair.second->shape().size() == 0);
     if (is_scalar) {
       to_json(pair.second->values().col(0), json[pair.first]["value"],

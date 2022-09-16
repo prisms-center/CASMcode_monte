@@ -198,12 +198,30 @@ void _parse_convergence_criteria(
 ///         Sets minimum and maximum cuttoffs for elapsed calculation time in
 ///         seconds. Options are `min` and `max`, the same as for `count`.
 ///
-///   begin: int (optional, default=10)
-///     Begin checking convergence of sampled quantities for completion, after
-///     this many samples have been taken.
+///   spacing: string (optional, default="log")
+///     The spacing of convergence checks in the specified `"period"`. One of
+///     "linear" or "log".
 ///
-///   frequency: int (optional, default=10)
-///     How many samples in between checking convergence of sampled quantities.
+///     For "linear" spacing, the n-th check will be taken when:
+///
+///         sample = round( begin + (period / checks_per_period) * n )
+///
+///     For "log" spacing, the n-th check will be taken when:
+///
+///         sample = round( begin + period ^ ( (n + shift) /
+///                           checks_per_period ) )
+///
+///   begin: number (optional, default=0.0)
+///     The earliest number of samples at which to begin convergence checking.
+///
+///   period: number (optional, default=10.0)
+///     A number of samples.
+///
+///   checks_per_period: number (optional, default=1.0)
+///     The number of convergence checks to be made in the specified `"period"`.
+///
+///   shift: number (optional, default=1.0)
+///     Used with `"spacing": "log"`.
 ///
 ///   confidence: number (optional, default=0.95)
 ///     Confidence level, in range (0, 1.0), used for calculated precision of
@@ -263,10 +281,45 @@ void parse(InputParser<CompletionCheckParams> &parser,
                               completion_check_params.requested_precision);
 
   parser.optional_else(completion_check_params.confidence, "confidence", 0.95);
-  parser.optional_else<monte::CountType>(completion_check_params.check_begin,
-                                         "begin", 10);
-  parser.optional_else<monte::CountType>(
-      completion_check_params.check_frequency, "frequency", 1);
+
+  // "spacing"
+  std::string spacing = "log";
+  parser.optional(spacing, "spacing");
+  if (spacing == "linear") {
+    completion_check_params.log_spacing = false;
+  } else if (spacing == "log") {
+    completion_check_params.log_spacing = true;
+  } else {
+    parser.insert_error(
+        "spacing", "Error: \"spacing\" must be one of \"linear\", \"log\".");
+  }
+
+  // "begin"
+  completion_check_params.check_begin = 0.0;
+  parser.optional(completion_check_params.check_begin, "begin");
+
+  // "period"
+  completion_check_params.check_period = 10.0;
+  parser.optional(completion_check_params.check_period, "period");
+  if (completion_check_params.log_spacing &&
+      completion_check_params.check_period <= 1.0) {
+    parser.insert_error(
+        "period", "Error: For \"spacing\"==\"log\", \"period\" must > 1.0.");
+  }
+  if (completion_check_params.log_spacing == false &&
+      completion_check_params.check_period <= 0.0) {
+    parser.insert_error(
+        "period", "Error: For \"spacing\"==\"log\", \"period\" must > 0.0.");
+  }
+
+  // "checks_per_period"
+  completion_check_params.checks_per_period = 1.0;
+  parser.optional(completion_check_params.checks_per_period,
+                  "checks_per_period");
+
+  // "shift"
+  completion_check_params.check_shift = 1.0;
+  parser.optional(completion_check_params.check_shift, "shift");
 
   if (parser.valid()) {
     parser.value =

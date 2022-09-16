@@ -3,6 +3,7 @@
 
 #include <optional>
 
+#include "casm/casm_io/Log.hh"
 #include "casm/monte/checks/ConvergenceCheck.hh"
 #include "casm/monte/checks/CutoffCheck.hh"
 #include "casm/monte/checks/EquilibrationCheck.hh"
@@ -26,14 +27,23 @@ struct CompletionCheckParams {
   /// \brief Confidence level for calculated precision of mean
   double confidence = 0.95;
 
-  /// \brief Minimum number of samples before checking for completion
-  CountType check_begin = 10;
+  //  For "linear" spacing, the n-th check will be taken when:
+  //
+  //      sample = round( check_begin + (check_period / checks_per_period) * n )
+  //
+  //  For "log" spacing, the n-th check will be taken when:
+  //
+  //      sample = round( check_begin + check_period ^ ( (n + check_shift) /
+  //                      checks_per_period ) )
 
-  /// \brief How often to check for completion
-  ///
-  /// Check for completion performed if:
-  /// - n_samples % check_frequency == 0 && n_samples >= check_begin
-  CountType check_frequency = 1;
+  /// Logirithmic checking or linear check spacing
+  bool log_spacing = true;
+
+  // Check spacing parameters
+  double check_begin = 0.0;
+  double check_period = 10.0;
+  double checks_per_period = 1.0;
+  double check_shift = 1.0;
 };
 
 /// \brief Stores completion check results
@@ -41,11 +51,8 @@ struct CompletionCheckResults {
   /// Parameters used for the completion check
   CompletionCheckParams params;
 
-  /// Minimums cutoff check results
-  bool has_all_minimums_met = false;
-
-  /// Maximums cutoff check results
-  bool has_any_maximum_met = false;
+  /// \brief Confidence level used for calculated precision of mean
+  double confidence = 0.95;
 
   /// Current count (if given)
   std::optional<CountType> count;
@@ -53,26 +60,47 @@ struct CompletionCheckResults {
   /// Current time (if given)
   std::optional<TimeType> time;
 
-  /// Elapsed clocktime
-  TimeType clocktime;
+  /// Elapsed clocktime (if given)
+  std::optional<TimeType> clocktime;
 
   /// Current number of samples
   CountType n_samples = 0;
+
+  /// Minimums cutoff check results
+  bool has_all_minimums_met = false;
+
+  /// Maximums cutoff check results
+  bool has_any_maximum_met = false;
 
   /// Equilibration and convergence checks are performed if:
   /// - n_samples >= check_begin && n_samples % check_frequency == 0, and
   /// - requested_precision.size() > 0
   bool convergence_check_performed = false;
 
+  EquilibrationCheckResults equilibration_check_results;
+
+  ConvergenceCheckResults convergence_check_results;
+
   /// True if calculation is complete, either due to convergence or cutoff
   bool is_complete = false;
 
-  EquilibrationCheckResults equilibration_check_results;
-
-  /// \brief Confidence level used for calculated precision of mean
-  double confidence = 0.95;
-
-  ConvergenceCheckResults convergence_check_results;
+  void reset(std::optional<CountType> _count, std::optional<TimeType> _time,
+             CountType _n_samples) {
+    // params: do not reset
+    // confidence: do not reset
+    count = _count;
+    time = _time;
+    clocktime = std::nullopt;
+    n_samples = _n_samples;
+    has_all_minimums_met = false;
+    has_any_maximum_met = false;
+    if (convergence_check_performed) {
+      convergence_check_performed = false;
+      equilibration_check_results = EquilibrationCheckResults();
+      convergence_check_results = ConvergenceCheckResults();
+    }
+    is_complete = false;
+  }
 };
 
 /// \brief Checks if a cutoff or convergence criteria are met
@@ -82,27 +110,26 @@ class CompletionCheck {
 
   bool is_complete(
       std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-      TimeType clocktime);
+      Log &log);
 
   bool is_complete(
       std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-      CountType count, TimeType clocktime);
+      CountType count, Log &log);
 
   bool is_complete(
       std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-      TimeType time, TimeType clocktime);
+      TimeType time, Log &log);
 
   bool is_complete(
       std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-      CountType count, TimeType time, TimeType clocktime);
+      CountType count, TimeType time, Log &log);
 
   CompletionCheckResults const &results() const { return m_results; }
 
  private:
   bool _is_complete(
       std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-      std::optional<CountType> count, std::optional<TimeType> time,
-      TimeType clocktime);
+      std::optional<CountType> count, std::optional<TimeType> time, Log &log);
 
   void _check(std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
               std::optional<CountType> count, std::optional<TimeType> time,
@@ -111,47 +138,54 @@ class CompletionCheck {
   CompletionCheckParams m_params;
 
   CompletionCheckResults m_results;
+
+  double m_n_checks = 0.0;
+
+  Index m_last_n_samples = 0.0;
+
+  Index m_last_clocktime = 0.0;
 };
 
 // --- Inline definitions ---
 
 inline bool CompletionCheck::is_complete(
-    std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    TimeType clocktime) {
-  return _is_complete(samplers, std::nullopt, std::nullopt, clocktime);
+    std::map<std::string, std::shared_ptr<Sampler>> const &samplers, Log &log) {
+  return _is_complete(samplers, std::nullopt, std::nullopt, log);
 }
 
 inline bool CompletionCheck::is_complete(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    CountType count, TimeType clocktime) {
-  return _is_complete(samplers, count, std::nullopt, clocktime);
+    CountType count, Log &log) {
+  return _is_complete(samplers, count, std::nullopt, log);
 }
 
 inline bool CompletionCheck::is_complete(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    TimeType time, TimeType clocktime) {
-  return _is_complete(samplers, std::nullopt, time, clocktime);
+    TimeType time, Log &log) {
+  return _is_complete(samplers, std::nullopt, time, log);
 }
 
 inline bool CompletionCheck::is_complete(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    CountType count, TimeType time, TimeType clocktime) {
-  return _is_complete(samplers, count, time, clocktime);
+    CountType count, TimeType time, Log &log) {
+  return _is_complete(samplers, count, time, log);
 }
 
 inline bool CompletionCheck::_is_complete(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    std::optional<CountType> count, std::optional<TimeType> time,
-    TimeType clocktime) {
+    std::optional<CountType> count, std::optional<TimeType> time, Log &log) {
   CountType n_samples = get_n_samples(samplers);
 
-  m_results = CompletionCheckResults();
-  m_results.params = m_params;
-  m_results.confidence = m_params.confidence;
-  m_results.count = count;
-  m_results.time = time;
-  m_results.clocktime = clocktime;
-  m_results.n_samples = n_samples;
+  // for efficiency, only update clocktime after a new sample is taken
+  TimeType clocktime = m_last_clocktime;
+  if (n_samples != m_last_n_samples) {
+    clocktime = log.time_s();
+    m_last_n_samples = n_samples;
+    m_last_clocktime = clocktime;
+  }
+
+  m_results.reset(count, time, n_samples);
+
   m_results.has_all_minimums_met = all_minimums_met(
       m_params.cutoff_params, count, time, n_samples, clocktime);
 
@@ -161,8 +195,19 @@ inline bool CompletionCheck::_is_complete(
   }
 
   // check equilibration and convergence
-  if (n_samples >= m_params.check_begin &&
-      n_samples % m_params.check_frequency == 0) {
+  double check_at;
+  if (m_params.log_spacing) {
+    check_at =
+        m_params.check_begin +
+        std::pow(m_params.check_period, (m_n_checks + m_params.check_shift) /
+                                            m_params.checks_per_period);
+  } else {
+    check_at =
+        m_params.check_begin +
+        (m_params.check_period / m_params.checks_per_period) * m_n_checks;
+  }
+  if (n_samples == static_cast<CountType>(std::round(check_at))) {
+    m_n_checks += 1.0;
     _check(samplers, count, time, n_samples);
   }
 

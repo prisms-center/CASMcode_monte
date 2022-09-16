@@ -91,8 +91,7 @@ void parse(InputParser<SamplingParams> &parser,
     sampling_params.sample_method = SAMPLE_METHOD::LOG;
   } else {
     parser.insert_error(
-        "sample_method",
-        "Error: \"sample_method\" must be one of \"linear\", \"log\".");
+        "spacing", "Error: \"spacing\" must be one of \"linear\", \"log\".");
   }
 
   // "begin"
@@ -115,6 +114,10 @@ void parse(InputParser<SamplingParams> &parser,
   // "samples_per_period"
   sampling_params.samples_per_period = 1.0;
   parser.optional(sampling_params.samples_per_period, "samples_per_period");
+
+  // "shift"
+  sampling_params.shift = 0.0;
+  parser.optional(sampling_params.shift, "shift");
 
   // "quantities"
   parser.optional(sampling_params.sampler_names, "quantities");

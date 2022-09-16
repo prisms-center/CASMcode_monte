@@ -1,6 +1,7 @@
 #ifndef CASM_monte_StateSampler
 #define CASM_monte_StateSampler
 
+#include "casm/casm_io/Log.hh"
 #include "casm/monte/definitions.hh"
 #include "casm/monte/sampling/Sampler.hh"
 #include "casm/monte/sampling/SamplingParams.hh"
@@ -317,20 +318,28 @@ struct StateSampler {
 
   /// \brief Sample data, if due (count based sampling)
   ///
+  /// \param state, The state to sample
+  /// \param log, A Log, from which the clocktime is obtained when a
+  ///     sample is taken
+  ///
   /// Note:
   /// - Call `reset(double _steps_per_pass)` before sampling begins.
   /// - Apply chosen event before this
   /// - Call `increment_step()` before this
-  void sample_data_if_due(monte::State<ConfigType> const &state,
-                          TimeType clocktime) {
+  void sample_data_if_due(monte::State<ConfigType> const &state, Log &log) {
     if (!sample_is_due()) {
       return;
     }
     // Sample is due...
-    sample(state, clocktime);
+    sample(state, log.time_s());
   }
 
   /// \brief Sample data, if due (time based sampling)
+  ///
+  /// \param state, The state to sample
+  /// \param time_increment, The next time increment to be added
+  /// \param log, A Log, from which the clocktime is obtained when a
+  ///     sample is taken
   ///
   /// Note:
   /// - Call `reset(double _steps_per_pass)` before sampling begins.
@@ -338,12 +347,12 @@ struct StateSampler {
   /// - Call `increment_step()` after this
   /// - Call `increment_time(double time_increment)` after this
   void sample_data_if_due(monte::State<ConfigType> const &state,
-                          double time_increment, TimeType clocktime) {
+                          double time_increment, Log &log) {
     if (!sample_is_due(time_increment)) {
       // Sample is not due
       return;
     }
-    sample(state, clocktime);
+    sample(state, log.time_s());
     sample_time.push_back(time_increment);
   }
 

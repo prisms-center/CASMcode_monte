@@ -86,7 +86,7 @@ Results<ConfigType> occupation_metropolis(
 ///
 /// Required interface for `State<ConfigType>`:
 /// - `Eigen::VectorXi &get_occupation(State<ConfigType> const &configuration)`
-/// - `Eigen::Matrix3l const &get_transformation_matrix_to_super(
+/// - `Eigen::Matrix3l const &get_transformation_matrix_to_supercell(
 ///        State<ConfigType> const &state)`
 ///
 /// Required interface for `CalculatorType potential`:
@@ -124,7 +124,8 @@ Results<ConfigType> occupation_metropolis(
   State<ConfigType> initial_state = state;
 
   CountType steps_per_pass = occ_location.mol_size();
-  double n_unitcells = get_transformation_matrix_to_super(state).determinant();
+  double n_unitcells =
+      get_transformation_matrix_to_supercell(state).determinant();
 
   // Prepare properties
   state.properties.scalar_values["potential_energy"] = 0.;
@@ -150,23 +151,28 @@ Results<ConfigType> occupation_metropolis(
   log.begin_lap();
 
   // Sample initial state, if requested by sampling_params
-  state_sampler.sample_data_if_due(state, log.time_s());
+  state_sampler.sample_data_if_due(state, log);
+  Index n_samples = get_n_samples(state_sampler.samplers);
 
   // Main loop
   while (!completion_check.is_complete(state_sampler.samplers,
-                                       state_sampler.count, log.time_s())) {
-    // Log method status
-    if (log_frequency.has_value() && log.lap_time() > *log_frequency) {
-      method_log.reset();
-      jsonParser json;
-      json["status"] = "incomplete";
-      json["time"] = log.time_s();
-      to_json(completion_check.results(), json["convergence_check_results"]);
-      // for (auto const &pair : state_sampler.samplers) {
-      //   json[pair.first] = pair.second->values();
-      // }
-      log << json << std::endl;
-      log.begin_lap();
+                                       state_sampler.count, log)) {
+    // Log method status - for efficiency, only check after a new sample is
+    // taken
+    if (n_samples != get_n_samples(state_sampler.samplers)) {
+      n_samples = get_n_samples(state_sampler.samplers);
+      if (log_frequency.has_value() && log.lap_time() > *log_frequency) {
+        method_log.reset();
+        jsonParser json;
+        json["status"] = "incomplete";
+        json["time"] = log.time_s();
+        to_json(completion_check.results(), json["convergence_check_results"]);
+        // for (auto const &pair : state_sampler.samplers) {
+        //   json[pair.first] = pair.second->values();
+        // }
+        log << json << std::endl;
+        log.begin_lap();
+      }
     }
 
     // Propose an event
@@ -197,7 +203,7 @@ Results<ConfigType> occupation_metropolis(
     state_sampler.increment_step();
 
     // Sample data, if a sample is due
-    state_sampler.sample_data_if_due(state, log.time_s());
+    state_sampler.sample_data_if_due(state, log);
   }
 
   // Log method status
