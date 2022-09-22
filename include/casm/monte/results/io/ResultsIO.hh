@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "casm/global/definitions.hh"
+#include "casm/misc/cloneable_ptr.hh"
 
 namespace CASM {
 namespace monte {
@@ -19,13 +20,12 @@ template <typename _ConfigType>
 struct State;
 
 template <typename _ConfigType>
-class ResultsIO {
+class ResultsIO : public notstd::Cloneable {
+  ABSTRACT_CLONEABLE(ResultsIO)
  public:
   typedef _ConfigType config_type;
   typedef monte::State<config_type> state_type;
   typedef monte::Results<config_type> results_type;
-
-  virtual ~ResultsIO() {}
 
   virtual std::vector<state_type> read_final_states() = 0;
 

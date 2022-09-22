@@ -1,6 +1,7 @@
 #ifndef CASM_monte_results_io_jsonResultsIO
 #define CASM_monte_results_io_jsonResultsIO
 
+#include "casm/misc/cloneable_ptr.hh"
 #include "casm/monte/results/ResultsAnalysisFunction.hh"
 #include "casm/monte/results/io/ResultsIO.hh"
 #include "casm/monte/state/State.hh"
@@ -13,6 +14,7 @@ namespace monte {
 ///
 template <typename _ConfigType>
 class jsonResultsIO : public ResultsIO<_ConfigType> {
+  CLONEABLE(jsonResultsIO)
  public:
   typedef _ConfigType config_type;
   typedef State<config_type> state_type;

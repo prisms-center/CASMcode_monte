@@ -5,9 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "casm/casm_io/Log.hh"
 #include "casm/monte/Conversions.hh"
-#include "casm/monte/MethodLog.hh"
 #include "casm/monte/checks/CompletionCheck.hh"
 #include "casm/monte/events/OccCandidate.hh"
 #include "casm/monte/events/OccEventProposal.hh"
@@ -19,38 +17,17 @@
 #include "casm/monte/sampling/SamplingParams.hh"
 #include "casm/monte/state/StateSampler.hh"
 
-// debug
-#include "casm/casm_io/json/jsonParser.hh"
-#include "casm/monte/checks/io/json/CompletionCheck_json_io.hh"
-
 namespace CASM {
 namespace monte {
 
-struct CompletionCheckParams;
-class Conversions;
-class OccLocation;
-class OccSwap;
-template <typename ConfigType>
-struct Results;
-struct SamplingParams;
-template <typename ConfigType>
-struct State;
-template <typename ConfigType>
-struct StateSamplingFunction;
-template <typename ConfigType>
-using StateSamplingFunctionMap =
-    std::map<std::string, StateSamplingFunction<ConfigType>>;
-
 template <typename ConfigType, typename CalculatorType,
           typename ProposeOccEventFuntionType, typename GeneratorType>
-Results<ConfigType> occupation_metropolis(
-    State<ConfigType> &state, OccLocation &occ_location,
-    CalculatorType &potential, std::vector<OccSwap> const &possible_swaps,
-    ProposeOccEventFuntionType propose_event_f,
-    GeneratorType &random_number_generator,
-    StateSampler<ConfigType> &state_sampler, CompletionCheck &completion_check,
-    ResultsAnalysisFunctionMap<ConfigType> const &analysis_functions,
-    MethodLog method_log = MethodLog());
+void occupation_metropolis(State<ConfigType> &state, OccLocation &occ_location,
+                           CalculatorType &potential,
+                           std::vector<OccSwap> const &possible_swaps,
+                           ProposeOccEventFuntionType propose_event_f,
+                           GeneratorType &random_number_generator,
+                           RunManager<ConfigType> &run_manager);
 
 // --- Implementation ---
 
@@ -76,13 +53,9 @@ Results<ConfigType> occupation_metropolis(
 ///     proposes an event (of type `OccEvent`) based on the current occupation,
 ///     possible_swaps, and random_number_generator.
 /// \param random_number_generator A random number generator
-/// \param state_sampler A StateSampler<ConfigType>, determines what is sampled
-///     and when, and holds sampled data until returned by results
-/// \param completion_check A CompletionCheck method
-/// \param analysis_functions Functions to evaluate after a run completes
-/// \param method_log A MethedLog
+/// \param run_manager Contains sampling fixtures and after completion holds
+///     final results
 ///
-/// \returns A Results<ConfigType> instance with run results.
 ///
 /// Required interface for `State<ConfigType>`:
 /// - `Eigen::VectorXi &get_occupation(State<ConfigType> const &configuration)`
@@ -107,73 +80,35 @@ Results<ConfigType> occupation_metropolis(
 ///
 template <typename ConfigType, typename CalculatorType,
           typename ProposeOccEventFuntionType, typename GeneratorType>
-Results<ConfigType> occupation_metropolis(
-    State<ConfigType> &state, OccLocation &occ_location,
-    CalculatorType &potential, std::vector<OccSwap> const &possible_swaps,
-    ProposeOccEventFuntionType propose_event_f,
-    GeneratorType &random_number_generator,
-    StateSampler<ConfigType> &state_sampler, CompletionCheck &completion_check,
-    ResultsAnalysisFunctionMap<ConfigType> const &analysis_functions,
-    MethodLog method_log) {
-  if (potential.get() != &state) {
+void occupation_metropolis(State<ConfigType> &state, OccLocation &occ_location,
+                           CalculatorType &potential,
+                           std::vector<OccSwap> const &possible_swaps,
+                           ProposeOccEventFuntionType propose_event_f,
+                           GeneratorType &random_number_generator,
+                           RunManager<ConfigType> &run_manager) {
+  // --- Track potential energy in state properties ---
+  if (potential.state() != &state) {
     throw std::runtime_error(
         "Error in monte::occupation_metropolis: potential not set to correct "
         "state");
   }
-
-  State<ConfigType> initial_state = state;
-
-  CountType steps_per_pass = occ_location.mol_size();
   double n_unitcells =
       get_transformation_matrix_to_supercell(state).determinant();
-
-  // Prepare properties
   state.properties.scalar_values["potential_energy"] = 0.;
   double &potential_energy_intensive =
       state.properties.scalar_values["potential_energy"];
-
-  // Set formation energy calculator (so it evaluates state)
-  // and calculate initial potential energy
   potential_energy_intensive = potential.extensive_value() / n_unitcells;
-
-  // Reset state_sampler
-  state_sampler.reset(steps_per_pass);
 
   // Used within the main loop:
   OccEvent event;
   double beta =
       1.0 / (CASM::KB * state.conditions.scalar_values.at("temperature"));
 
-  // Log method status
-  Log &log = method_log.log;
-  std::optional<double> &log_frequency = method_log.log_frequency;
-  log.restart_clock();
-  log.begin_lap();
-
-  // Sample initial state, if requested by sampling_params
-  state_sampler.sample_data_if_due(state, log);
-  Index n_samples = get_n_samples(state_sampler.samplers);
-
   // Main loop
-  while (!completion_check.is_complete(state_sampler.samplers,
-                                       state_sampler.count, log)) {
-    // Log method status - for efficiency, only check after a new sample is
-    // taken
-    if (n_samples != get_n_samples(state_sampler.samplers)) {
-      n_samples = get_n_samples(state_sampler.samplers);
-      if (log_frequency.has_value() && log.lap_time() > *log_frequency) {
-        method_log.reset();
-        jsonParser json;
-        json["status"] = "incomplete";
-        json["time"] = log.time_s();
-        to_json(completion_check.results(), json["convergence_check_results"]);
-        // for (auto const &pair : state_sampler.samplers) {
-        //   json[pair.first] = pair.second->values();
-        // }
-        log << json << std::endl;
-        log.begin_lap();
-      }
-    }
+  run_manager.initialize(state, occ_location.mol_size());
+  run_manager.sample_data_by_count_if_due(state);
+  while (!run_manager.is_complete()) {
+    run_manager.write_status_if_due();
 
     // Propose an event
     try {
@@ -200,33 +135,13 @@ Results<ConfigType> occupation_metropolis(
     }
 
     // Increment count
-    state_sampler.increment_step();
+    run_manager.increment_step();
 
-    // Sample data, if a sample is due
-    state_sampler.sample_data_if_due(state, log);
+    // Sample data, if a sample is due by count
+    run_manager.sample_data_by_count_if_due(state);
   }
 
-  // Log method status
-  if (log_frequency.has_value()) {
-    method_log.reset();
-    jsonParser json;
-    json["status"] = "complete";
-    json["time"] = log.time_s();
-    to_json(completion_check.results(), json["convergence_check_results"]);
-    log << json << std::endl;
-  }
-
-  Results<ConfigType> results;
-  results.initial_state = initial_state;
-  results.final_state = state;
-  results.elapsed_clocktime = log.time_s();
-  results.samplers = std::move(state_sampler.samplers);
-  results.sample_count = std::move(state_sampler.sample_count);
-  results.sample_clocktime = std::move(state_sampler.sample_clocktime);
-  results.sample_trajectory = std::move(state_sampler.sample_trajectory);
-  results.completion_check_results = completion_check.results();
-  results.analysis = make_analysis(results, analysis_functions);
-  return results;
+  run_manager.finalize(state);
 }
 
 }  // namespace monte

@@ -71,6 +71,13 @@ struct OccEvent;
 class OccLocation;
 class OccSwap;
 
+template <typename ConfigType>
+struct SamplingFixtureParams;
+template <typename ConfigType>
+class SamplingFixture;
+template <typename _ConfigType>
+struct RunManager;
+
 }  // namespace monte
 }  // namespace CASM
 

@@ -138,6 +138,11 @@ struct StateSampler {
   /// Default=false
   bool do_sample_trajectory;
 
+  /// \brief If true, save current time when taking a sample
+  ///
+  /// Default=false
+  bool do_sample_time;
+
   /// --- Step / pass / time tracking ---
 
   /// \brief Tracks the number of Monte Carlo steps
@@ -196,7 +201,8 @@ struct StateSampler {
             {},  // functions populated in constructor body
             _sampling_params.sample_method, _sampling_params.begin,
             _sampling_params.period, _sampling_params.samples_per_period,
-            _sampling_params.shift, _sampling_params.do_sample_trajectory) {
+            _sampling_params.shift, _sampling_params.do_sample_trajectory,
+            _sampling_params.do_sample_time) {
     // populate functions, samplers
     for (std::string name : _sampling_params.sampler_names) {
       auto const &function = sampling_functions.at(name);
@@ -232,7 +238,7 @@ struct StateSampler {
                double _sample_begin = 0.0, double _sampling_period = 1.0,
                double _samples_per_period = 1.0,
                double _log_sampling_shift = 0.0,
-               bool _do_sample_trajectory = false)
+               bool _do_sample_trajectory = false, bool _do_sample_time = false)
       : sample_mode(_sample_mode),
         sample_method(_sample_method),
         begin(_sample_begin),
@@ -240,7 +246,8 @@ struct StateSampler {
         samples_per_period(_samples_per_period),
         shift(_log_sampling_shift),
         functions(_functions),
-        do_sample_trajectory(_do_sample_trajectory) {
+        do_sample_trajectory(_do_sample_trajectory),
+        do_sample_time(_do_sample_time) {
     reset(1.0);
   }
 
@@ -266,28 +273,6 @@ struct StateSampler {
     sample_time.clear();
     sample_clocktime.clear();
     sample_trajectory.clear();
-  }
-
-  /// \brief Add samples
-  ///
-  /// Note: Call `reset(double _steps_per_pass)` before sampling begins.
-  void sample(State<ConfigType> const &state, TimeType clocktime) {
-    // - Record count
-    sample_count.push_back(count);
-
-    // - Record clocktime
-    sample_clocktime.push_back(clocktime);
-
-    // - Record configuration
-    if (do_sample_trajectory) {
-      sample_trajectory.push_back(state.configuration);
-    }
-
-    // - Record data
-    for (auto const &function : functions) {
-      auto const &shared_sampler = samplers.at(function.name);
-      shared_sampler->push_back(function(state));
-    }
   }
 
   /// \brief Return the count / time when the sample_index-th sample should be
@@ -326,12 +311,34 @@ struct StateSampler {
   /// - Call `reset(double _steps_per_pass)` before sampling begins.
   /// - Apply chosen event before this
   /// - Call `increment_step()` before this
-  void sample_data_if_due(monte::State<ConfigType> const &state, Log &log) {
+  void sample_data_by_count_if_due(monte::State<ConfigType> const &state,
+                                   Log &log) {
     if (!sample_is_due()) {
+      // Sample is not due
       return;
     }
-    // Sample is due...
-    sample(state, log.time_s());
+
+    // - Record count
+    sample_count.push_back(count);
+
+    // - Record simulated time
+    if (do_sample_time) {
+      sample_time.push_back(time);
+    }
+
+    // - Record clocktime
+    sample_clocktime.push_back(log.time_s());
+
+    // - Record configuration
+    if (do_sample_trajectory) {
+      sample_trajectory.push_back(state.configuration);
+    }
+
+    // - Record data
+    for (auto const &function : functions) {
+      auto const &shared_sampler = samplers.at(function.name);
+      shared_sampler->push_back(function(state));
+    }
   }
 
   /// \brief Sample data, if due (time based sampling)
@@ -346,14 +353,33 @@ struct StateSampler {
   /// - Apply chosen event after this
   /// - Call `increment_step()` after this
   /// - Call `increment_time(double time_increment)` after this
-  void sample_data_if_due(monte::State<ConfigType> const &state,
-                          double time_increment, Log &log) {
-    if (!sample_is_due(time_increment)) {
+  void sample_data_by_time_if_due(monte::State<ConfigType> const &state,
+                                  double time_increment, Log &log) {
+    double _sample_at = sample_at(sample_time.size());
+    if (time + time_increment < _sample_at) {
       // Sample is not due
       return;
     }
-    sample(state, log.time_s());
-    sample_time.push_back(time_increment);
+    // Sample is due
+    // - Record count
+    sample_count.push_back(count);
+
+    // - Record simulated time
+    sample_time.push_back(_sample_at);
+
+    // - Record clocktime
+    sample_clocktime.push_back(log.time_s());
+
+    // - Record configuration
+    if (do_sample_trajectory) {
+      sample_trajectory.push_back(state.configuration);
+    }
+
+    // - Record data
+    for (auto const &function : functions) {
+      auto const &shared_sampler = samplers.at(function.name);
+      shared_sampler->push_back(function(state));
+    }
   }
 
   /// \brief Increment by one step (updating pass, count as appropriate)

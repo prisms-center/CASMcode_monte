@@ -505,6 +505,7 @@ void jsonResultsIO<_ConfigType>::write_summary(results_type const &results) {
 
   // write summary file
   fs::path summary_path = output_dir / "summary.json";
+  fs::create_directories(output_dir);
   SafeOfstream file;
   file.open(summary_path);
   json.print(file.ofstream(), -1);

@@ -53,6 +53,11 @@ struct SamplingParams {
   ///
   /// Default=false
   bool do_sample_trajectory;
+
+  /// \brief If true, save current time when taking a sample
+  ///
+  /// Default=false
+  bool do_sample_time;
 };
 
 // /// The pass/step/time when a particular sample should be taken
@@ -85,7 +90,8 @@ namespace monte {
 /// - samples_per_period=1.0
 /// - shift=0.0
 /// - sampler_names={}
-/// - sample_trajectory=false
+/// - do_sample_trajectory=false
+/// - do_sample_time=false
 inline SamplingParams::SamplingParams()
     : sample_mode(SAMPLE_MODE::BY_PASS),
       sample_method(SAMPLE_METHOD::LINEAR),
@@ -94,7 +100,8 @@ inline SamplingParams::SamplingParams()
       samples_per_period(1.0),
       shift(0.0),
       sampler_names({}),
-      do_sample_trajectory(false) {}
+      do_sample_trajectory(false),
+      do_sample_time(false) {}
 
 // /// The pass/step/time when a particular sample should be taken
 // inline double sample_at(SamplingParams const &sampling_params,

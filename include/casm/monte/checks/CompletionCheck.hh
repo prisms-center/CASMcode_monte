@@ -84,8 +84,9 @@ struct CompletionCheckResults {
   /// True if calculation is complete, either due to convergence or cutoff
   bool is_complete = false;
 
-  void reset(std::optional<CountType> _count, std::optional<TimeType> _time,
-             CountType _n_samples) {
+  void reset(std::optional<CountType> _count = std::nullopt,
+             std::optional<TimeType> _time = std::nullopt,
+             CountType _n_samples = 0) {
     // params: do not reset
     // confidence: do not reset
     count = _count;
@@ -107,6 +108,8 @@ struct CompletionCheckResults {
 class CompletionCheck {
  public:
   CompletionCheck(CompletionCheckParams params);
+
+  void reset();
 
   bool is_complete(
       std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
@@ -147,6 +150,13 @@ class CompletionCheck {
 };
 
 // --- Inline definitions ---
+
+inline void CompletionCheck::reset() {
+  m_results.reset();
+  m_n_checks = 0.0;
+  m_last_n_samples = 0.0;
+  m_last_clocktime = 0.0;
+}
 
 inline bool CompletionCheck::is_complete(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers, Log &log) {
