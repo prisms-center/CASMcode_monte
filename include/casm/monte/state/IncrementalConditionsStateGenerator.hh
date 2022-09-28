@@ -8,6 +8,7 @@
 #include "casm/monte/state/ConfigGenerator.hh"
 #include "casm/monte/state/State.hh"
 #include "casm/monte/state/StateGenerator.hh"
+#include "casm/monte/state/StateModifyingFunction.hh"
 
 namespace CASM {
 namespace monte {
@@ -34,10 +35,10 @@ namespace monte {
 ///    \code
 ///    State<ConfigType> state(configuration, conditions)
 ///    \endcode
-/// 4) Set dependent conditions, using:
+/// 4) Apply custom state modifiers, using:
 ///    \code
-///    for (auto const &pair : m_dependent_conditions) {
-///      state.conditions.vector_values[pair.first] = pair.second(state);
+///    for (auto const &f : m_modifiers) {
+///      f(state);
 ///    }
 ///    \endcode
 /// 5) Return `state`.
@@ -64,25 +65,23 @@ class IncrementalConditionsStateGenerator
   /// \param _dependent_runs If true, use the last configuration as the starting
   ///     point for the next state. If false, always use the configuration of
   ///     the initial state.
-  /// \param _dependent_conditions State sampling functions
-  ///     which are used to set conditions using values calculated from the
-  ///     generated configuration. For example, a composition sampling function
-  ///     could be provided to set the composition for a canonical Monte Carlo
-  ///     calculation directly from the initial configuration proposed by
-  ///     `_config_generator`. Currently restricted to setting vector valued
-  ///     conditions.
+  /// \param _modifiers Functions that modify the generated state,
+  ///     for instance to set the composition condition for canonical
+  ///     calculations based on the composition of the generated or input
+  ///     configuration so that it doesn't have to be pre-determined by
+  ///     the user.
   IncrementalConditionsStateGenerator(
       std::unique_ptr<ConfigGeneratorType> _config_generator,
       ValueMap const &_initial_conditions,
       ValueMap const &_conditions_increment, Index _n_states,
       bool _dependent_runs,
-      StateSamplingFunctionMap<ConfigType> const &_dependent_conditions = {})
+      std::vector<StateModifyingFunction<ConfigType>> const &_modifiers = {})
       : m_config_generator(std::move(_config_generator)),
         m_initial_conditions(_initial_conditions),
         m_conditions_increment(_conditions_increment),
         m_n_states(_n_states),
         m_dependent_runs(_dependent_runs),
-        m_dependent_conditions(_dependent_conditions) {
+        m_modifiers(_modifiers) {
     std::stringstream msg;
     msg << "Error constructing IncrementalConditionsStateGenerator: "
         << "Mismatch between initial conditions and conditions increment.";
@@ -113,9 +112,9 @@ class IncrementalConditionsStateGenerator
     // Make state
     State<ConfigType> state(configuration, conditions);
 
-    // Set dependent conditions
-    for (auto const &pair : m_dependent_conditions) {
-      state.conditions.vector_values[pair.first] = pair.second(state);
+    // Apply custom modifiers
+    for (auto const &f : m_modifiers) {
+      f(state);
     }
 
     // Finished
@@ -128,7 +127,7 @@ class IncrementalConditionsStateGenerator
   ValueMap m_conditions_increment;
   Index m_n_states;
   bool m_dependent_runs;
-  StateSamplingFunctionMap<ConfigType> m_dependent_conditions;
+  std::vector<StateModifyingFunction<ConfigType>> m_modifiers;
 };
 
 }  // namespace monte

@@ -85,6 +85,34 @@ class OccLocation {
   /// Access Atom by id
   Atom const &atom(Index atom_id) const;
 
+  /// \brief Return current atom positions in cartesian coordinates, shape=(3,
+  /// n_atoms)
+  Eigen::MatrixXd atom_positions_cart() const;
+
+  /// \brief Return current atom positions in cartesian coordinates, shape=(3,
+  /// n_atoms)
+  Eigen::MatrixXd atom_positions_cart_within() const;
+
+  /// Holds *initial* species index for each atom in atom position matrices
+  std::vector<Index> const &initial_atom_species_index() const;
+
+  /// Holds *initial* atom position index for each atom in atom position
+  /// matrices
+  std::vector<Index> const &initial_atom_position_index() const;
+
+  /// Return *current* name for each atom in atom position matrices
+  std::vector<std::string> current_atom_names() const;
+
+  /// \brief Return current species index for atoms in atom position matricess
+  std::vector<Index> current_atom_species_index() const;
+
+  /// \brief Return current atom position index for atoms in atom position
+  /// matricess
+  std::vector<Index> current_atom_position_index() const;
+
+  /// \brief Return number of jumps made by each atom
+  std::vector<Index> current_atom_n_jumps() const;
+
   /// Access the OccCandidateList
   OccCandidateList const &candidate_list() const;
 
@@ -117,6 +145,12 @@ class OccLocation {
 
   /// Holds Monte::Atom objects
   std::vector<Atom> m_atoms;
+
+  /// Holds *initial* species index for each atom in m_atoms
+  std::vector<Index> m_initial_atom_species_index;
+
+  /// Holds *initial* atom position index for each atom in m_atoms
+  std::vector<Index> m_initial_atom_position_index;
 
   /// Holds Mol objects, one for each mutating site in the configuration
   std::vector<Mol> m_mol;
@@ -168,6 +202,18 @@ inline Atom &OccLocation::atom(Index atom_id) { return m_atoms[atom_id]; }
 /// Access Atom by id
 inline Atom const &OccLocation::atom(Index atom_id) const {
   return m_atoms[atom_id];
+}
+
+/// Holds *initial* species index for each atom in atom position matrices
+inline std::vector<Index> const &OccLocation::initial_atom_species_index()
+    const {
+  return m_initial_atom_species_index;
+}
+
+/// Holds *initial* atom position index for each atom in atom position matrices
+inline std::vector<Index> const &OccLocation::initial_atom_position_index()
+    const {
+  return m_initial_atom_position_index;
 }
 
 /// Access the OccCandidateList

@@ -36,6 +36,9 @@ namespace monte {
 ///
 /// Notes:
 /// - There is a distinct species_index for each orientation of a Molecule
+/// - When using with CASMcode_configuration, species_index should be made
+///   to match orientation_index by using `molecule_list_all_orientations`
+///    for `species_list` constructor arg
 class Conversions {
  public:
   /// \brief Constructor (uses asymmetric unit determined from prim factor
@@ -56,12 +59,16 @@ class Conversions {
               Eigen::Matrix3l const &unit_transformation_matrix_to_super,
               std::vector<Index> const &unitl_to_asym);
 
+  Eigen::Matrix3d lat_column_mat() const;
+
   Index l_size() const;
   Index l_to_b(Index l) const;
   xtal::UnitCell l_to_ijk(Index l) const;
   xtal::UnitCellCoord l_to_bijk(Index l) const;
   Index l_to_unitl(Index l) const;
   Index l_to_asym(Index l) const;
+  Eigen::Vector3d l_to_cart(Index l) const;
+  Eigen::Vector3d l_to_frac(Index l) const;
 
   Index bijk_to_l(xtal::UnitCellCoord const &bijk) const;
   Index bijk_to_unitl(xtal::UnitCellCoord const &bijk) const;
@@ -96,6 +103,10 @@ class Conversions {
   Index components_size(Index species_index) const;
 
  private:
+  Eigen::Matrix3d m_lat_column_mat;
+  std::vector<Eigen::Vector3d> m_basis_cart;
+  std::vector<Eigen::Vector3d> m_basis_frac;
+
   xtal::UnitCellIndexConverter m_unitcell_index_converter;
 
   Eigen::Matrix3l m_unit_transformation_matrix_to_super;

@@ -72,7 +72,16 @@ class SamplingFixture {
         m_state_sampler(m_params.sampling_params, m_params.sampling_functions),
         m_completion_check(m_params.completion_check_params) {}
 
+  /// \brief Label, to distinguish multiple sampling fixtures
+  std::string label() const { return m_params.label; }
+
+  /// \brief Sampling fixture parameters
   SamplingFixtureParams<config_type> const &params() const { return m_params; }
+
+  /// \brief State sampler
+  StateSampler<config_type> const &state_sampler() const {
+    return m_state_sampler;
+  }
 
   void initialize(state_type const &state, Index steps_per_pass) {
     m_n_samples = 0;
@@ -125,8 +134,11 @@ class SamplingFixture {
 
   void increment_step() { m_state_sampler.increment_step(); }
 
-  void increment_time(double time_increment) {
-    m_state_sampler.increment_time(time_increment);
+  void set_time(double event_time) { m_state_sampler.set_time(event_time); }
+
+  void sample_data(state_type const &state) {
+    Log &log = m_params.method_log.log;
+    m_state_sampler.sample_data(state, log);
   }
 
   void sample_data_by_count_if_due(state_type const &state) {
@@ -134,10 +146,10 @@ class SamplingFixture {
     m_state_sampler.sample_data_by_count_if_due(state, log);
   }
 
-  void sample_data_by_time_if_due(state_type const &state,
-                                  double time_increment) {
+  // Note: Not sure if this is useful in practice
+  void sample_data_by_time_if_due(state_type const &state, double event_time) {
     Log &log = m_params.method_log.log;
-    m_state_sampler.sample_data_by_time_if_due(state, time_increment, log);
+    m_state_sampler.sample_data_by_time_if_due(state, event_time, log);
   }
 
   void finalize(state_type const &state, Index run_index) {
@@ -160,6 +172,7 @@ class SamplingFixture {
  private:
   SamplingFixtureParams<config_type> m_params;
 
+  /// \brief This is for write_status_if_due only
   Index m_n_samples = 0;
 
   bool m_is_complete = false;

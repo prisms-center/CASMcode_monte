@@ -99,6 +99,12 @@ Conversions::Conversions(
       m_struc_mol(species_list),
       m_struc_molname(make_orientation_name_list(m_struc_mol, prim)),
       m_unitl_to_asym(unitl_to_asym) {
+  m_lat_column_mat = prim.lattice().lat_column_mat();
+  for (Index b = 0; b < prim.basis().size(); ++b) {
+    m_basis_cart.push_back(prim.basis()[b].const_cart());
+    m_basis_cart.push_back(prim.basis()[b].const_frac());
+  }
+
   // find m_Nasym
   m_Nasym =
       *std::max_element(m_unitl_to_asym.begin(), m_unitl_to_asym.end()) + 1;
@@ -141,6 +147,8 @@ Conversions::Conversions(
   }
 }
 
+Eigen::Matrix3d Conversions::lat_column_mat() const { return m_lat_column_mat; }
+
 Index Conversions::l_size() const {
   return m_l_and_bijk_converter.total_sites();
 }
@@ -163,6 +171,17 @@ Index Conversions::l_to_unitl(Index l) const {
 
 Index Conversions::l_to_asym(Index l) const {
   return m_unitl_to_asym[l_to_unitl(l)];
+}
+
+Eigen::Vector3d Conversions::l_to_cart(Index l) const {
+  xtal::UnitCellCoord bijk = l_to_bijk(l);
+  return m_basis_cart[bijk.sublattice()] +
+         lat_column_mat() * bijk.unitcell().cast<double>();
+}
+
+Eigen::Vector3d Conversions::l_to_frac(Index l) const {
+  xtal::UnitCellCoord bijk = l_to_bijk(l);
+  return m_basis_frac[bijk.sublattice()] + bijk.unitcell().cast<double>();
 }
 
 Index Conversions::bijk_to_l(xtal::UnitCellCoord const &bijk) const {

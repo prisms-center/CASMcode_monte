@@ -72,12 +72,17 @@ void OccLocation::initialize(Eigen::VectorXi const &occupation) {
       mol.loc = m_loc[cand_index].size();
 
       if (m_update_atoms) {
-        int n_atoms = m_convert.species_to_mol(species_index).atoms().size();
+        xtal::Molecule const &molecule =
+            m_convert.species_to_mol(species_index);
+        int n_atoms = molecule.atoms().size();
         for (Index atom_index = 0; atom_index < n_atoms; ++atom_index) {
-          Atom atom;
           mol.component.push_back(m_atoms.size());
+          Atom atom;
           atom.translation = xtal::UnitCell(0, 0, 0);
+          atom.n_jumps = 0;
           m_atoms.push_back(atom);
+          m_initial_atom_species_index.push_back(species_index);
+          m_initial_atom_position_index.push_back(atom_index);
         }
       }
 
@@ -105,10 +110,16 @@ void OccLocation::apply(const OccEvent &e, Eigen::VectorXi &occupation) {
         // move from resevoir -- create a new atom
         Atom atom;
         atom.translation = xtal::UnitCell(0, 0, 0);
-        m_resevoir_mol[traj.from.mol_id].component[traj.from.mol_comp] =
+        atom.n_jumps = 0;
+        Index species_index = traj.from.mol_id;
+        xtal::Molecule molecule = m_convert.species_to_mol(species_index);
+        Index atom_position_index = traj.from.mol_comp;
+        m_resevoir_mol[species_index].component[atom_position_index] =
             m_atoms.size();
         updating_atoms[i_updating_atom] = m_atoms.size();
         m_atoms.push_back(atom);
+        m_initial_atom_species_index.push_back(species_index);
+        m_initial_atom_position_index.push_back(atom_position_index);
       } else {  // move from within supercell
         updating_atoms[i_updating_atom] =
             m_mol[traj.from.mol_id].component[traj.from.mol_comp];
@@ -121,7 +132,10 @@ void OccLocation::apply(const OccEvent &e, Eigen::VectorXi &occupation) {
   for (const auto &occ : e.occ_transform) {
     auto &mol = m_mol[occ.mol_id];
 
-    // set config occupation
+    if (mol.species_index != occ.from_species) {
+      throw std::runtime_error("Error in OccLocation::apply: species mismatch");
+    }
+
     occupation[mol.l] = m_convert.occ_index(mol.asym, occ.to_species);
 
     // remove from m_loc
@@ -148,7 +162,7 @@ void OccLocation::apply(const OccEvent &e, Eigen::VectorXi &occupation) {
     Index i_updating_atom = 0;
     for (const auto &traj : e.atom_traj) {
       if (traj.to.l != -1) {
-        // move to poisition in supercell
+        // move to position in supercell
         Index atom_id = updating_atoms[i_updating_atom];
 
         // update Mol.component
@@ -156,6 +170,9 @@ void OccLocation::apply(const OccEvent &e, Eigen::VectorXi &occupation) {
 
         // update atom translation
         m_atoms[atom_id].translation += traj.delta_ijk;
+
+        // update number of atom jumps
+        m_atoms[atom_id].n_jumps += 1;
       }
       // else {
       //   // move to resevoir
@@ -166,6 +183,129 @@ void OccLocation::apply(const OccEvent &e, Eigen::VectorXi &occupation) {
       ++i_updating_atom;
     }
   }
+}
+
+/// \brief Return current atom positions in cartesian coordinates, shape=(3,
+/// n_atoms)
+///
+/// Notes:
+/// - Positions are returned with translations included as if no periodic
+/// boundaries
+Eigen::MatrixXd OccLocation::atom_positions_cart() const {
+  Eigen::MatrixXd R(3, this->atom_size());
+
+  auto const &convert = this->convert();
+  Eigen::Matrix3d const &L = convert.lat_column_mat();
+
+  // collect atom name indices
+  for (Index i = 0; i < this->mol_size(); ++i) {
+    monte::Mol const &mol = this->mol(i);
+    xtal::Molecule const &molecule = convert.species_to_mol(mol.species_index);
+    Eigen::Vector3d site_cart = convert.l_to_cart(mol.l);
+    Index atom_position_index = 0;
+    for (Index atom_id : mol.component) {
+      R.col(atom_id) = site_cart + molecule.atom(atom_position_index).cart() +
+                       L * this->atom(atom_id).translation.cast<double>();
+      ++atom_position_index;
+    }
+  }
+  return R;
+}
+
+/// \brief Return current atom positions in cartesian coordinates, shape=(3,
+/// n_atoms)
+///
+/// Notes:
+/// - Positions are returned within periodic boundaries
+Eigen::MatrixXd OccLocation::atom_positions_cart_within() const {
+  Eigen::MatrixXd R(3, this->atom_size());
+
+  auto const &convert = this->convert();
+
+  // collect atom name indices
+  for (Index i = 0; i < this->mol_size(); ++i) {
+    monte::Mol const &mol = this->mol(i);
+    xtal::Molecule const &molecule = convert.species_to_mol(mol.species_index);
+    Eigen::Vector3d site_cart = convert.l_to_cart(mol.l);
+    Index atom_position_index = 0;
+    for (Index atom_id : mol.component) {
+      R.col(atom_id) = site_cart + molecule.atom(atom_position_index).cart();
+      ++atom_position_index;
+    }
+  }
+  return R;
+}
+
+/// \brief Return current atom names, in order corresponding to columns
+///     of atom_positions_cart matrices
+///
+/// Notes:
+/// - Values are set to "UK" if atom is no longer in supercell
+std::vector<std::string> OccLocation::current_atom_names() const {
+  std::vector<std::string> _atom_names(this->atom_size(), "UK");
+
+  // collect atom name indices
+  for (Index i = 0; i < this->mol_size(); ++i) {
+    monte::Mol const &mol = this->mol(i);
+    xtal::Molecule const &molecule =
+        m_convert.species_to_mol(mol.species_index);
+    Index atom_position_index = 0;
+    for (Index atom_id : mol.component) {
+      _atom_names[atom_id] = molecule.atom(atom_position_index).name();
+      ++atom_position_index;
+    }
+  }
+  return _atom_names;
+}
+
+/// \brief Return current species index for atoms in atom position matricess
+///
+/// Notes:
+/// - Values are set to -1 if atom is no longer in supercell
+std::vector<Index> OccLocation::current_atom_species_index() const {
+  std::vector<Index> _atom_species_index(this->atom_size(), -1);
+
+  // collect atom name indices
+  for (Index i = 0; i < this->mol_size(); ++i) {
+    monte::Mol const &mol = this->mol(i);
+    for (Index atom_id : mol.component) {
+      _atom_species_index[atom_id] = mol.species_index;
+    }
+  }
+  return _atom_species_index;
+}
+
+/// \brief Return current atom position index for atoms in atom position
+/// matricess
+///
+/// Notes:
+/// - The atom position index is the index into atoms in the Molecule in which
+///   the atom is contained
+/// - Values are set to -1 if atom is no longer in supercell
+std::vector<Index> OccLocation::current_atom_position_index() const {
+  std::vector<Index> _atom_position_index(this->atom_size(), -1);
+
+  // collect atom name indices
+  for (Index i = 0; i < this->mol_size(); ++i) {
+    monte::Mol const &mol = this->mol(i);
+    Index atom_position_index = 0;
+    for (Index atom_id : mol.component) {
+      _atom_position_index[atom_id] = atom_position_index;
+      ++atom_position_index;
+    }
+  }
+  return _atom_position_index;
+}
+
+/// \brief Return number of jumps made by each atom
+std::vector<Index> OccLocation::current_atom_n_jumps() const {
+  std::vector<Index> _atom_n_jumps(this->atom_size(), 0);
+
+  // collect atom n_jumps
+  for (Index i = 0; i < this->atom_size(); ++i) {
+    _atom_n_jumps[i] = this->atom(i).n_jumps;
+  }
+  return _atom_n_jumps;
 }
 
 }  // namespace monte

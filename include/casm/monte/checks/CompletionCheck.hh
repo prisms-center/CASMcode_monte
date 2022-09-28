@@ -216,7 +216,7 @@ inline bool CompletionCheck::_is_complete(
         m_params.check_begin +
         (m_params.check_period / m_params.checks_per_period) * m_n_checks;
   }
-  if (n_samples == static_cast<CountType>(std::round(check_at))) {
+  if (n_samples >= static_cast<CountType>(std::round(check_at))) {
     m_n_checks += 1.0;
     _check(samplers, count, time, n_samples);
   }

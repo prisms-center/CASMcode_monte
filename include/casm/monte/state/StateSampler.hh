@@ -26,16 +26,15 @@ struct StateSamplingFunction {
   typedef _ConfigType ConfigType;
 
   /// \brief Constructor - default component names
-  StateSamplingFunction(
-      std::string _name, std::string _description, std::vector<Index> _shape,
-      std::function<Eigen::VectorXd(State<ConfigType> const &)> _function);
+  StateSamplingFunction(std::string _name, std::string _description,
+                        std::vector<Index> _shape,
+                        std::function<Eigen::VectorXd()> _function);
 
   /// \brief Constructor - custom component names
-  StateSamplingFunction(
-      std::string _name, std::string _description,
-      std::vector<std::string> const &_component_names,
-      std::vector<Index> _shape,
-      std::function<Eigen::VectorXd(State<ConfigType> const &)> _function);
+  StateSamplingFunction(std::string _name, std::string _description,
+                        std::vector<std::string> const &_component_names,
+                        std::vector<Index> _shape,
+                        std::function<Eigen::VectorXd()> _function);
 
   /// \brief Function name (and quantity to be sampled)
   std::string name;
@@ -55,10 +54,10 @@ struct StateSamplingFunction {
   std::vector<std::string> component_names;
 
   /// \brief The function to be evaluated
-  std::function<Eigen::VectorXd(State<ConfigType> const &)> function;
+  std::function<Eigen::VectorXd()> function;
 
   /// \brief Evaluates `function`
-  Eigen::VectorXd operator()(State<ConfigType> const &state) const;
+  Eigen::VectorXd operator()() const;
 };
 
 template <typename ConfigType, typename ValueType>
@@ -163,6 +162,12 @@ struct StateSampler {
 
   /// \brief Monte Carlo time, if applicable
   TimeType time;
+
+  /// \brief Next count at which to take a sample, if applicable
+  CountType next_sample_count;
+
+  /// \brief Next time at which to take a sample, if applicable
+  TimeType next_sample_time;
 
   // --- Sampled data ---
 
@@ -273,6 +278,15 @@ struct StateSampler {
     sample_time.clear();
     sample_clocktime.clear();
     sample_trajectory.clear();
+
+    if (sample_mode == SAMPLE_MODE::BY_TIME) {
+      next_sample_count = 0;
+      next_sample_time = sample_at(sample_time.size());
+    } else {
+      next_sample_time = 0.0;
+      next_sample_count =
+          static_cast<CountType>(std::round(sample_at(sample_count.size())));
+    }
   }
 
   /// \brief Return the count / time when the sample_index-th sample should be
@@ -286,20 +300,13 @@ struct StateSampler {
     }
   }
 
-  /// \brief Return true if sample is due (count based sampling)
-  ///
-  /// \returns True if `count == count when sample is due`
-  bool sample_is_due() const {
-    double value = sample_at(sample_count.size());
-    return count == static_cast<CountType>(std::round(value));
-  }
-
-  /// \brief Return true if sample is due (time based sampling)
-  ///
-  /// \returns True if `time + time_increment >= time when sample is due`
-  bool sample_is_due(double time_increment) const {
-    return (time + time_increment) >= sample_at(sample_time.size());
-  }
+  // /// \brief Return true if sample is due (count based sampling)
+  // ///
+  // /// \returns True if `count == count when sample is due`
+  // bool sample_is_due() const {
+  //   double value = sample_at(sample_count.size());
+  //   return count == static_cast<CountType>(std::round(value));
+  // }
 
   /// \brief Sample data, if due (count based sampling)
   ///
@@ -311,13 +318,7 @@ struct StateSampler {
   /// - Call `reset(double _steps_per_pass)` before sampling begins.
   /// - Apply chosen event before this
   /// - Call `increment_step()` before this
-  void sample_data_by_count_if_due(monte::State<ConfigType> const &state,
-                                   Log &log) {
-    if (!sample_is_due()) {
-      // Sample is not due
-      return;
-    }
-
+  void sample_data(monte::State<ConfigType> const &state, Log &log) {
     // - Record count
     sample_count.push_back(count);
 
@@ -334,51 +335,32 @@ struct StateSampler {
       sample_trajectory.push_back(state.configuration);
     }
 
-    // - Record data
+    // - Evaluate functions and record data
     for (auto const &function : functions) {
-      auto const &shared_sampler = samplers.at(function.name);
-      shared_sampler->push_back(function(state));
+      samplers.at(function.name)->push_back(function());
+    }
+
+    // - Set next sample count
+    if (sample_mode == SAMPLE_MODE::BY_TIME) {
+      next_sample_time = sample_at(sample_time.size());
+    } else {
+      next_sample_count =
+          static_cast<CountType>(std::round(sample_at(sample_count.size())));
     }
   }
 
-  /// \brief Sample data, if due (time based sampling)
-  ///
-  /// \param state, The state to sample
-  /// \param time_increment, The next time increment to be added
-  /// \param log, A Log, from which the clocktime is obtained when a
-  ///     sample is taken
-  ///
-  /// Note:
-  /// - Call `reset(double _steps_per_pass)` before sampling begins.
-  /// - Apply chosen event after this
-  /// - Call `increment_step()` after this
-  /// - Call `increment_time(double time_increment)` after this
+  void sample_data_by_count_if_due(monte::State<ConfigType> const &state,
+                                   Log &log) {
+    if (sample_mode != SAMPLE_MODE::BY_TIME && count == next_sample_count) {
+      sample_data(state, log);
+    }
+  }
+
+  // Note: Not sure if this is useful in practice
   void sample_data_by_time_if_due(monte::State<ConfigType> const &state,
-                                  double time_increment, Log &log) {
-    double _sample_at = sample_at(sample_time.size());
-    if (time + time_increment < _sample_at) {
-      // Sample is not due
-      return;
-    }
-    // Sample is due
-    // - Record count
-    sample_count.push_back(count);
-
-    // - Record simulated time
-    sample_time.push_back(_sample_at);
-
-    // - Record clocktime
-    sample_clocktime.push_back(log.time_s());
-
-    // - Record configuration
-    if (do_sample_trajectory) {
-      sample_trajectory.push_back(state.configuration);
-    }
-
-    // - Record data
-    for (auto const &function : functions) {
-      auto const &shared_sampler = samplers.at(function.name);
-      shared_sampler->push_back(function(state));
+                                  double event_time, Log &log) {
+    if (sample_mode != SAMPLE_MODE::BY_TIME && event_time >= next_sample_time) {
+      sample_data(state, log);
     }
   }
 
@@ -394,8 +376,8 @@ struct StateSampler {
     count = (sample_mode == SAMPLE_MODE::BY_STEP) ? step : pass;
   }
 
-  /// \brief Increment time
-  void increment_time(double time_increment) { time += time_increment; }
+  /// \brief Set time
+  void set_time(double event_time) { time = event_time; }
 };
 
 /// \brief Get component names for a particular function, else use defaults
@@ -428,7 +410,7 @@ namespace monte {
 template <typename _ConfigType>
 StateSamplingFunction<_ConfigType>::StateSamplingFunction(
     std::string _name, std::string _description, std::vector<Index> _shape,
-    std::function<Eigen::VectorXd(State<ConfigType> const &)> _function)
+    std::function<Eigen::VectorXd()> _function)
     : name(_name),
       description(_description),
       shape(_shape),
@@ -440,7 +422,7 @@ template <typename _ConfigType>
 StateSamplingFunction<_ConfigType>::StateSamplingFunction(
     std::string _name, std::string _description,
     std::vector<std::string> const &_component_names, std::vector<Index> _shape,
-    std::function<Eigen::VectorXd(State<ConfigType> const &)> _function)
+    std::function<Eigen::VectorXd()> _function)
     : name(_name),
       description(_description),
       shape(_shape),
@@ -449,9 +431,8 @@ StateSamplingFunction<_ConfigType>::StateSamplingFunction(
 
 /// \brief Take a sample
 template <typename _ConfigType>
-Eigen::VectorXd StateSamplingFunction<_ConfigType>::operator()(
-    State<ConfigType> const &state) const {
-  return function(state);
+Eigen::VectorXd StateSamplingFunction<_ConfigType>::operator()() const {
+  return function();
 }
 
 /// \brief Adds values in a map of SamplerComponent -> ValueType

@@ -9,9 +9,11 @@
 namespace CASM {
 namespace monte {
 
-/// \brief Track the location of individual atoms
+/// \brief Track the position of individual atoms, as if no periodic boundaries
 struct Atom {
-  xtal::UnitCell translation;  ///< Current position
+  xtal::UnitCell
+      translation;  ///< Current translation, as if no periodic boundary
+  Index n_jumps;
 };
 
 /// \brief Represents the occupant on a site

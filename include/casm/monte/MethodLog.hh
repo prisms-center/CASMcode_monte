@@ -25,6 +25,7 @@ struct MethodLog {
 
   void reset() {
     if (!logfile_path.empty()) {
+      fs::create_directories(logfile_path.parent_path());
       fout = std::make_shared<std::ofstream>(logfile_path);
       log.reset(*fout);
     }

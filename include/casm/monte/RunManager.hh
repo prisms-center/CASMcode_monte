@@ -25,8 +25,15 @@ struct RunManager {
   /// Final states
   std::vector<state_type> final_states;
 
+  /// Next time-based sampling fixture, or nullptr if none
+  SamplingFixture<config_type> *next_sampling_fixture;
+
+  /// Next time-based sampling sample time
+  double next_sample_time;
+
   RunManager(std::vector<SamplingFixtureParams<config_type>> const
-                 &sampling_fixture_params) {
+                 &sampling_fixture_params)
+      : next_sampling_fixture(nullptr), next_sample_time(0.0) {
     for (auto const &params : sampling_fixture_params) {
       sampling_fixtures.emplace_back(params);
     }
@@ -58,12 +65,13 @@ struct RunManager {
   }
 
   bool is_complete() {
+    // do not quit early so that status files can be printed with
+    // the latest completion check results
+    bool result = true;
     for (auto &fixture : sampling_fixtures) {
-      if (!fixture.is_complete()) {
-        return false;
-      }
+      result &= fixture.is_complete();
     }
-    return true;
+    return result;
   }
 
   void write_status_if_due() {
@@ -78,22 +86,35 @@ struct RunManager {
     }
   }
 
-  void increment_time(double time_increment) {
+  void set_time(double event_time) {
     for (auto &fixture : sampling_fixtures) {
-      fixture.increment_time(time_increment);
+      fixture.set_time(event_time);
     }
   }
 
   void sample_data_by_count_if_due(state_type const &state) {
     for (auto &fixture : sampling_fixtures) {
-      fixture.sample_data_by_count_if_due(state);
+      auto const &ss = fixture.state_sampler();
+      if (ss.sample_mode != SAMPLE_MODE::BY_TIME) {
+        if (ss.count == ss.next_sample_count) {
+          fixture.sample_data(state);
+        }
+      }
     }
   }
 
-  void sample_data_by_time_if_due(state_type const &state,
-                                  double time_increment) {
+  void update_next_sampling_fixture() {
+    // update next_sample_time and next_sampling_fixture
+    next_sampling_fixture = nullptr;
     for (auto &fixture : sampling_fixtures) {
-      fixture.sample_data_by_time_if_due(state, time_increment);
+      auto const &ss = fixture.state_sampler();
+      if (ss.sample_mode == SAMPLE_MODE::BY_TIME) {
+        if (next_sampling_fixture == nullptr ||
+            ss.next_sample_time < next_sample_time) {
+          next_sample_time = ss.next_sample_time;
+          next_sampling_fixture = &fixture;
+        }
+      }
     }
   }
 

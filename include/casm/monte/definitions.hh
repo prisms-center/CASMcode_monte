@@ -45,6 +45,11 @@ template <typename _ConfigType, typename _RunInfoType>
 class StateGenerator;
 template <typename _ConfigType>
 class IncrementalConditionsStateGenerator;
+template <typename ConfigType>
+struct StateModifyingFunction;
+template <typename _ConfigType>
+using StateModifyingFunctionMap =
+    std::map<std::string, StateModifyingFunction<_ConfigType>>;
 
 template <typename _ConfigType>
 struct StateSampler;
