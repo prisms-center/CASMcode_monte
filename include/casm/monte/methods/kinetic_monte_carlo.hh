@@ -67,7 +67,7 @@ void kinetic_monte_carlo(
 ///
 /// Required interface for `State<ConfigType>`:
 /// - `Eigen::VectorXi &get_occupation(State<ConfigType> const &state)`
-/// - `Eigen::Matrix3l const &get_transformation_matrix_to_supercell(
+/// - `Eigen::Matrix3l const &get_transformation_matrix_to_super(
 ///        State<ConfigType> const &state)`
 ///
 /// State properties that are set:

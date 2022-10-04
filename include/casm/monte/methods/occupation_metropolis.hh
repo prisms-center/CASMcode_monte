@@ -59,7 +59,7 @@ void occupation_metropolis(State<ConfigType> &state, OccLocation &occ_location,
 ///
 /// Required interface for `State<ConfigType>`:
 /// - `Eigen::VectorXi &get_occupation(State<ConfigType> const &configuration)`
-/// - `Eigen::Matrix3l const &get_transformation_matrix_to_supercell(
+/// - `Eigen::Matrix3l const &get_transformation_matrix_to_super(
 ///        State<ConfigType> const &state)`
 ///
 /// Required interface for `CalculatorType potential`:
@@ -93,7 +93,7 @@ void occupation_metropolis(State<ConfigType> &state, OccLocation &occ_location,
         "state");
   }
   double n_unitcells =
-      get_transformation_matrix_to_supercell(state).determinant();
+      get_transformation_matrix_to_super(state).determinant();
   state.properties.scalar_values["potential_energy"] = 0.;
   double &potential_energy_intensive =
       state.properties.scalar_values["potential_energy"];

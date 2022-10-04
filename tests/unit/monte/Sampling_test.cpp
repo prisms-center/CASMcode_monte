@@ -25,7 +25,7 @@ struct CalculationTest {
   monte::State<test::Configuration> const *state;
 
   /// Current supercell
-  Eigen::Matrix3l transformation_matrix_to_supercell;
+  Eigen::Matrix3l transformation_matrix_to_super;
 
   CalculationTest(std::shared_ptr<xtal::BasicStructure const> _shared_prim,
                   std::shared_ptr<std::mt19937_64> _random_number_engine =
@@ -48,7 +48,7 @@ struct CalculationTest {
     Eigen::VectorXi &occupation = state.configuration.occupation;
 
     // set pointers
-    this->transformation_matrix_to_supercell = T;
+    this->transformation_matrix_to_super = T;
     this->state = &state;
 
     // construct OccCandidateList
