@@ -814,8 +814,9 @@ def main():
             "directory": "tests/unit/monte",
             "ldadd": [
                 "libcasm_monte.la",
-                "-lcasm_clexulator",
-                "-lcasm_composition"
+                "-lcasm_global",
+                "-lcasm_crystallography",
+                "-lcasm_composition",
             ],
         }
     ])

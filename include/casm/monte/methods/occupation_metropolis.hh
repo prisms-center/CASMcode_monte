@@ -92,8 +92,7 @@ void occupation_metropolis(State<ConfigType> &state, OccLocation &occ_location,
         "Error in monte::occupation_metropolis: potential not set to correct "
         "state");
   }
-  double n_unitcells =
-      get_transformation_matrix_to_super(state).determinant();
+  double n_unitcells = get_transformation_matrix_to_super(state).determinant();
   state.properties.scalar_values["potential_energy"] = 0.;
   double &potential_energy_intensive =
       state.properties.scalar_values["potential_energy"];
