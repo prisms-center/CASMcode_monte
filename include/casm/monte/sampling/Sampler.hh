@@ -2,6 +2,7 @@
 #define CASM_monte_Sampler
 
 #include <map>
+#include <memory>
 #include <vector>
 
 #include "casm/global/eigen.hh"

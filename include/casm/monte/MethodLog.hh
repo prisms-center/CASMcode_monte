@@ -2,6 +2,7 @@
 #define CASM_monte_MethodLog
 
 #include <fstream>
+#include <optional>
 
 #include "casm/casm_io/Log.hh"
 #include "casm/global/definitions.hh"
