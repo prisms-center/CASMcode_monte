@@ -127,11 +127,6 @@ struct StateSampler {
   /// \brief See `sample_method`
   double shift;
 
-  /// \brief State sampling functions to be used when taking a sample
-  ///
-  /// Each function takes a State<ConfigType> and returns an Eigen::VectorXd
-  std::vector<StateSamplingFunction<ConfigType>> functions;
-
   /// \brief If true, save the configuration when a sample is taken
   ///
   /// Default=false
@@ -141,6 +136,11 @@ struct StateSampler {
   ///
   /// Default=false
   bool do_sample_time;
+
+  /// \brief State sampling functions to be used when taking a sample
+  ///
+  /// Each function takes a State<ConfigType> and returns an Eigen::VectorXd
+  std::vector<StateSamplingFunction<ConfigType>> functions;
 
   /// --- Step / pass / time tracking ---
 
@@ -162,6 +162,12 @@ struct StateSampler {
 
   /// \brief Monte Carlo time, if applicable
   TimeType time;
+
+  /// \brief Number of steps with an accepted event
+  long long n_accept;
+
+  /// \brief Number of steps with a rejected event
+  long long n_reject;
 
   /// \brief Next count at which to take a sample, if applicable
   CountType next_sample_count;
@@ -187,6 +193,9 @@ struct StateSampler {
 
   /// \brief The time when a sample was taken, if applicable
   std::vector<TimeType> sample_time;
+
+  /// \brief The weight to give a sample, if applicable
+  std::vector<TimeType> sample_weight;
 
   /// \brief The clocktime when a sample was taken, if applicable
   std::vector<TimeType> sample_clocktime;
@@ -250,9 +259,9 @@ struct StateSampler {
         period(_sampling_period),
         samples_per_period(_samples_per_period),
         shift(_log_sampling_shift),
-        functions(_functions),
         do_sample_trajectory(_do_sample_trajectory),
-        do_sample_time(_do_sample_time) {
+        do_sample_time(_do_sample_time),
+        functions(_functions) {
     reset(1.0);
   }
 
@@ -268,6 +277,8 @@ struct StateSampler {
     pass = 0;
     count = 0;
     time = 0.0;
+    n_accept = 0;
+    n_reject = 0;
     samplers.clear();
     for (auto const &function : functions) {
       auto shared_sampler =
@@ -276,6 +287,7 @@ struct StateSampler {
     }
     sample_count.clear();
     sample_time.clear();
+    sample_weight.clear();
     sample_clocktime.clear();
     sample_trajectory.clear();
 
@@ -307,6 +319,11 @@ struct StateSampler {
   //   double value = sample_at(sample_count.size());
   //   return count == static_cast<CountType>(std::round(value));
   // }
+
+  // \brief Set weight given to next sample
+  void push_back_sample_weight(double weight) {
+    sample_weight.push_back(weight);
+  }
 
   /// \brief Sample data, if due (count based sampling)
   ///
@@ -364,16 +381,28 @@ struct StateSampler {
     }
   }
 
+  /// \brief Increment by one acceptance
+  void increment_n_accept() { ++n_accept; }
+
+  /// \brief Increment by one rejection
+  void increment_n_reject() { ++n_reject; }
+
   /// \brief Increment by one step (updating pass, count as appropriate)
   void increment_step() {
     ++step;
+    if (sample_mode == SAMPLE_MODE::BY_STEP) {
+      ++count;
+    }
     if (step == steps_per_pass) {
       ++pass;
+      if (sample_mode == SAMPLE_MODE::BY_PASS) {
+        ++count;
+      }
       step = 0;
     }
 
-    // If sampling by step, set count to step. Otherwise, set count to pass.
-    count = (sample_mode == SAMPLE_MODE::BY_STEP) ? step : pass;
+    // // If sampling by step, set count to step. Otherwise, set count to pass.
+    // count = (sample_mode == SAMPLE_MODE::BY_STEP) ? step : pass;
   }
 
   /// \brief Set time

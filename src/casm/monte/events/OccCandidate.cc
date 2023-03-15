@@ -1,5 +1,7 @@
 #include "casm/monte/events/OccCandidate.hh"
 
+#include <map>
+
 #include "casm/crystallography/UnitCellCoord.hh"
 #include "casm/monte/Conversions.hh"
 
@@ -108,6 +110,29 @@ std::vector<OccSwap> make_grand_canonical_swaps(
     }
   }
   return grand_canonical_swaps;
+}
+
+/// \brief For grand canonical swaps, get the number of possible events
+///     that can be chosen from at any one time
+Index get_n_allowed_per_unitcell(
+    Conversions const &convert,
+    std::vector<OccSwap> const &grand_canonical_swaps) {
+  std::map<Index, Index> asym_to_n_swaps;
+  for (Index asym = 0; asym < convert.asym_size(); ++asym) {
+    asym_to_n_swaps.emplace(asym, 0);
+  }
+  for (OccSwap const &swap : grand_canonical_swaps) {
+    asym_to_n_swaps[swap.cand_a.asym]++;
+  }
+
+  Index n_allowed_per_unitcell = 0.0;
+  for (auto const &pair : asym_to_n_swaps) {
+    if (pair.second > 0) {
+      n_allowed_per_unitcell +=
+          (pair.second - 1) * convert.asym_to_b(pair.first).size();
+    }
+  }
+  return n_allowed_per_unitcell;
 }
 
 }  // namespace monte

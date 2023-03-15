@@ -6,6 +6,7 @@
 
 #include "casm/monte/definitions.hh"
 #include "casm/monte/state/ConfigGenerator.hh"
+#include "casm/monte/state/RunData.hh"
 #include "casm/monte/state/State.hh"
 #include "casm/monte/state/StateGenerator.hh"
 #include "casm/monte/state/StateModifyingFunction.hh"
@@ -16,20 +17,20 @@ namespace monte {
 /// \brief Generates a series of states by constant conditions increments
 ///
 /// The run information needed to check completion and generate subsequent
-/// states is the vector of final states from the previous runs.
+/// states is the vector of data from the previous runs.
 ///
 /// This method generates states using the following steps:
 /// 1) Set indepedently determined conditions, using:
 ///    \code
 ///    ValueMap conditions = make_incremented_values(
-///        initial_conditions, conditions_increment, final_states.size());
+///        initial_conditions, conditions_increment, completed_runs.size());
 ///    \endcode
 /// 2) Generate an initial configuration, using:
 ///    \code
 ///    ConfigType configuration =
-///        (dependent_runs && final_states.size()) ?
-///            ? final_states.back().configuration
-///            : config_generator(conditions, final_states);
+///        (dependent_runs && completed_runs.size()) ?
+///            ? completed_runs.back().final_state->configuration
+///            : config_generator(conditions, completed_runs);
 ///    \endcode
 /// 3) Make a state, using:
 ///    \code
@@ -44,17 +45,17 @@ namespace monte {
 /// 5) Return `state`.
 template <typename _ConfigType>
 class IncrementalConditionsStateGenerator
-    : public StateGenerator<_ConfigType, State<_ConfigType>> {
+    : public StateGenerator<_ConfigType, RunData<_ConfigType>> {
  public:
   typedef _ConfigType ConfigType;
-  typedef State<ConfigType> RunInfoType;
+  typedef RunData<ConfigType> RunInfoType;
   typedef ConfigGenerator<ConfigType, RunInfoType> ConfigGeneratorType;
 
   /// \brief Constructor
   ///
   /// \param _config_generator Function to generate configurations for the
   ///     initial state from the indepedently determined conditions and the
-  ///     final states of previous runs.
+  ///     data from previous runs.
   /// \param _initial_conditions The "indepedently determined conditions" for
   ///     the initial state.
   /// \param _conditions_increment The conditions to be changed between states,
@@ -90,24 +91,32 @@ class IncrementalConditionsStateGenerator
     }
   }
 
-  /// \brief Check if all requested states have been run
+  /// \brief Check if all requested runs have been completed
   bool is_complete(
-      std::vector<State<ConfigType>> const &final_states) override {
-    return final_states.size() >= m_n_states;
+      std::vector<RunData<ConfigType>> const &completed_runs) override {
+    return completed_runs.size() >= m_n_states;
   }
 
   /// \brief Return the next state
   State<ConfigType> next_state(
-      std::vector<State<ConfigType>> const &final_states) override {
+      std::vector<RunData<ConfigType>> const &completed_runs) override {
+    if (m_dependent_runs && completed_runs.size() &&
+        !completed_runs.back().final_state.has_value()) {
+      throw std::runtime_error(
+          "Error in IncrementalConditionsStateGenerator: when "
+          "dependent_runs==true, must save the final state of the last "
+          "completed run");
+    }
+
     // Make conditions
     ValueMap conditions = make_incremented_values(
-        m_initial_conditions, m_conditions_increment, final_states.size());
+        m_initial_conditions, m_conditions_increment, completed_runs.size());
 
     // Make configuration
     ConfigType configuration =
-        (m_dependent_runs && final_states.size())
-            ? final_states.back().configuration
-            : (*m_config_generator)(conditions, final_states);
+        (m_dependent_runs && completed_runs.size())
+            ? completed_runs.back().final_state->configuration
+            : (*m_config_generator)(conditions, completed_runs);
 
     // Make state
     State<ConfigType> state(configuration, conditions);

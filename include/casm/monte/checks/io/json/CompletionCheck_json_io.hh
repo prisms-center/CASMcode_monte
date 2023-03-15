@@ -3,34 +3,41 @@
 
 #include "casm/casm_io/container/json_io.hh"
 #include "casm/casm_io/json/InputParser_impl.hh"
+#include "casm/casm_io/json/optional.hh"
 #include "casm/monte/checks/CompletionCheck.hh"
+#include "casm/monte/checks/io/json/ConvergenceCheck_json_io.hh"
 #include "casm/monte/checks/io/json/CutoffCheck_json_io.hh"
+#include "casm/monte/checks/io/json/EquilibrationCheck_json_io.hh"
 #include "casm/monte/state/StateSampler.hh"
 
 namespace CASM {
 namespace monte {
+
+template <typename StatisticsType>
 struct CompletionCheckParams;
 
 /// \brief Construct CompletionCheckParams from JSON
-template <typename ConfigType>
-void parse(InputParser<CompletionCheckParams> &parser,
+template <typename ConfigType, typename StatisticsType>
+void parse(InputParser<CompletionCheckParams<StatisticsType>> &parser,
            StateSamplingFunctionMap<ConfigType> const &sampling_functions);
 
 /// \brief CompletionCheckResults to JSON
-jsonParser &to_json(CompletionCheckResults const &value, jsonParser &json);
+template <typename StatisticsType>
+jsonParser &to_json(CompletionCheckResults<StatisticsType> const &value,
+                    jsonParser &json);
 
 // --- Inline definitions ---
 
 namespace CompletionCheck_json_io_impl {
 
 /// \brief If successfully parsed, result is not empty
-template <typename ConfigType>
+template <typename ConfigType, typename StatisticsType>
 std::unique_ptr<StateSamplingFunction<ConfigType>> _parse_quantity(
-    InputParser<CompletionCheckParams> &parser,
+    InputParser<CompletionCheckParams<StatisticsType>> &parser,
     StateSamplingFunctionMap<ConfigType> const &sampling_functions,
     fs::path const &option) {
   std::unique_ptr<std::string> quantity =
-      parser.require<std::string>(option / "quantity");
+      parser.template require<std::string>(option / "quantity");
   if (quantity == nullptr) {
     return std::unique_ptr<StateSamplingFunction<ConfigType>>();
   }
@@ -46,11 +53,11 @@ std::unique_ptr<StateSamplingFunction<ConfigType>> _parse_quantity(
 }
 
 /// \brief If successfully parsed, adds elements to requested_precision
-template <typename ConfigType>
+template <typename ConfigType, typename StatisticsType>
 void _parse_component_index(
-    InputParser<CompletionCheckParams> &parser, fs::path const &option,
-    StateSamplingFunction<ConfigType> const &function, double precision,
-    std::map<SamplerComponent, double> &requested_precision) {
+    InputParser<CompletionCheckParams<StatisticsType>> &parser,
+    fs::path const &option, StateSamplingFunction<ConfigType> const &function,
+    double precision, std::map<SamplerComponent, double> &requested_precision) {
   // converge components specified by index
   std::vector<Index> component_index;
   parser.optional(component_index, option / "component_index");
@@ -71,11 +78,11 @@ void _parse_component_index(
 }
 
 /// \brief If successfully parsed, adds elements to requested_precision
-template <typename ConfigType>
+template <typename ConfigType, typename StatisticsType>
 void _parse_component_name(
-    InputParser<CompletionCheckParams> &parser, fs::path const &option,
-    StateSamplingFunction<ConfigType> const &function, double precision,
-    std::map<SamplerComponent, double> &requested_precision) {
+    InputParser<CompletionCheckParams<StatisticsType>> &parser,
+    fs::path const &option, StateSamplingFunction<ConfigType> const &function,
+    double precision, std::map<SamplerComponent, double> &requested_precision) {
   // converge components specified by name
   std::vector<std::string> component_name;
   parser.optional(component_name, option / "component_name");
@@ -98,11 +105,11 @@ void _parse_component_name(
 }
 
 /// \brief If successfully parsed, adds elements to requested_precision
-template <typename ConfigType>
+template <typename ConfigType, typename StatisticsType>
 void _parse_components(
-    InputParser<CompletionCheckParams> &parser, fs::path const &option,
-    StateSamplingFunction<ConfigType> const &function, double precision,
-    std::map<SamplerComponent, double> &requested_precision) {
+    InputParser<CompletionCheckParams<StatisticsType>> &parser,
+    fs::path const &option, StateSamplingFunction<ConfigType> const &function,
+    double precision, std::map<SamplerComponent, double> &requested_precision) {
   bool has_index =
       (parser.self.find_at(option / "component_index") != parser.self.end());
   bool has_name =
@@ -129,9 +136,9 @@ void _parse_components(
 }
 
 /// \brief If successfully parsed, adds elements to requested_precision
-template <typename ConfigType>
+template <typename ConfigType, typename StatisticsType>
 void _parse_convergence_criteria(
-    InputParser<CompletionCheckParams> &parser,
+    InputParser<CompletionCheckParams<StatisticsType>> &parser,
     StateSamplingFunctionMap<ConfigType> const &sampling_functions,
     std::map<SamplerComponent, double> &requested_precision) {
   auto it = parser.self.find("convergence");
@@ -262,15 +269,20 @@ void _parse_convergence_criteria(
 ///             "component_name": ["Va", "O"]
 ///           }
 ///
-template <typename ConfigType>
-void parse(InputParser<CompletionCheckParams> &parser,
+template <typename ConfigType, typename StatisticsType>
+void parse(InputParser<CompletionCheckParams<StatisticsType>> &parser,
            StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
   using namespace CompletionCheck_json_io_impl;
-  CompletionCheckParams completion_check_params;
+  CompletionCheckParams<StatisticsType> completion_check_params;
+
+  completion_check_params.equilibration_check_f = monte::equilibration_check;
+  completion_check_params.calc_statistics_f =
+      default_calc_statistics_f<StatisticsType>();
 
   // parse "cutoff"
   auto cutoff_params_subparser =
-      parser.subparse_else<CutoffCheckParams>("cutoff", CutoffCheckParams());
+      parser.template subparse_else<CutoffCheckParams>("cutoff",
+                                                       CutoffCheckParams());
   if (cutoff_params_subparser->valid()) {
     completion_check_params.cutoff_params =
         std::move(*cutoff_params_subparser->value);
@@ -322,9 +334,28 @@ void parse(InputParser<CompletionCheckParams> &parser,
   parser.optional(completion_check_params.check_shift, "shift");
 
   if (parser.valid()) {
-    parser.value =
-        std::make_unique<CompletionCheckParams>(completion_check_params);
+    parser.value = std::make_unique<CompletionCheckParams<StatisticsType>>(
+        completion_check_params);
   }
+}
+
+/// \brief CompletionCheckResults to JSON
+template <typename StatisticsType>
+jsonParser &to_json(CompletionCheckResults<StatisticsType> const &value,
+                    jsonParser &json) {
+  json.put_obj();
+  json["has_all_minimums_met"] = value.has_all_minimums_met;
+  json["has_any_maximum_met"] = value.has_any_maximum_met;
+  json["count"] = value.count;
+  json["time"] = value.time;
+  json["clocktime"] = value.clocktime;
+  json["n_samples"] = value.n_samples;
+  json["convergence_check_performed"] = value.convergence_check_performed;
+  json["is_complete"] = value.is_complete;
+  json["confidence"] = value.confidence;
+  json["equilibration_check_results"] = value.equilibration_check_results;
+  json["convergence_check_results"] = value.convergence_check_results;
+  return json;
 }
 
 }  // namespace monte

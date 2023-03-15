@@ -9,27 +9,16 @@
 namespace CASM {
 namespace monte {
 
-struct CompletionCheckResults;
+struct ValueMap;
 
-template <typename _ConfigType>
-struct Results;
-
-struct SampledData;
-
-template <typename _ConfigType>
-struct State;
-
-template <typename _ConfigType>
+template <typename _ResultsType>
 class ResultsIO : public notstd::Cloneable {
   ABSTRACT_CLONEABLE(ResultsIO)
  public:
-  typedef _ConfigType config_type;
-  typedef monte::State<config_type> state_type;
-  typedef monte::Results<config_type> results_type;
+  typedef _ResultsType results_type;
 
-  virtual std::vector<state_type> read_final_states() = 0;
-
-  virtual void write(results_type const &results, Index run_index) = 0;
+  virtual void write(results_type const &results, ValueMap const &conditions,
+                     Index run_index) = 0;
 };
 
 }  // namespace monte

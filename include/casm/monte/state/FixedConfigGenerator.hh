@@ -5,6 +5,7 @@
 
 #include "casm/monte/definitions.hh"
 #include "casm/monte/state/ConfigGenerator.hh"
+#include "casm/monte/state/RunData.hh"
 #include "casm/monte/state/State.hh"
 
 namespace CASM {
@@ -17,16 +18,16 @@ namespace monte {
 ///   conditions and previous runs are.
 template <typename _ConfigType>
 class FixedConfigGenerator
-    : public ConfigGenerator<_ConfigType, State<_ConfigType>> {
+    : public ConfigGenerator<_ConfigType, RunData<_ConfigType>> {
  public:
   typedef _ConfigType ConfigType;
-  typedef State<ConfigType> RunInfoType;
+  typedef RunData<ConfigType> RunInfoType;
   FixedConfigGenerator(ConfigType const &configuration)
       : m_configuration(configuration) {}
 
   ConfigType operator()(
       ValueMap const &conditions,
-      std::vector<State<ConfigType>> const &finished_states) override {
+      std::vector<RunData<ConfigType>> const &completed_runs) override {
     return m_configuration;
   }
 

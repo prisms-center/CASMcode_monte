@@ -12,28 +12,27 @@ namespace monte {
 /// \brief Write Monte Carlo results to JSON output files
 ///
 ///
-template <typename _ConfigType>
-class jsonResultsIO : public ResultsIO<_ConfigType> {
+template <typename _ResultsType>
+class jsonResultsIO : public ResultsIO<_ResultsType> {
   CLONEABLE(jsonResultsIO)
  public:
-  typedef _ConfigType config_type;
-  typedef State<config_type> state_type;
-  typedef Results<config_type> results_type;
+  typedef _ResultsType results_type;
+  typedef typename results_type::config_type config_type;
+  typedef typename results_type::stats_type stats_type;
 
-  jsonResultsIO(fs::path _output_dir,
-                StateSamplingFunctionMap<config_type> _sampling_functions,
-                ResultsAnalysisFunctionMap<config_type> _analysis_functions,
-                bool _write_trajectory, bool _write_observations);
-
-  /// \brief Read a vector of final states of completed runs
-  std::vector<state_type> read_final_states() override;
+  jsonResultsIO(
+      fs::path _output_dir,
+      StateSamplingFunctionMap<config_type> _sampling_functions,
+      ResultsAnalysisFunctionMap<config_type, stats_type> _analysis_functions,
+      bool _write_trajectory, bool _write_observations);
 
   /// \brief Write results
-  void write(results_type const &results, Index run_index) override;
+  void write(results_type const &results, ValueMap const &conditions,
+             Index run_index) override;
 
  protected:
   /// \brief Write summary.json with results from each individual run
-  void write_summary(results_type const &results);
+  void write_summary(results_type const &results, ValueMap const &conditions);
 
   /// \brief Write run.<index>/trajectory.json
   void write_trajectory(results_type const &results, Index run_index);
@@ -48,9 +47,12 @@ class jsonResultsIO : public ResultsIO<_ConfigType> {
  private:
   fs::path m_output_dir;
   StateSamplingFunctionMap<config_type> m_sampling_functions;
-  ResultsAnalysisFunctionMap<config_type> m_analysis_functions;
+  ResultsAnalysisFunctionMap<config_type, stats_type> m_analysis_functions;
   bool m_write_trajectory;
   bool m_write_observations;
+  bool m_write_conditions;
+  bool m_write_initial_states;
+  bool m_write_final_states;
 };
 
 }  // namespace monte

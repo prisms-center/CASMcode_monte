@@ -19,27 +19,19 @@ enum class SAMPLE_METHOD { LINEAR, LOG };
 typedef long CountType;
 typedef double TimeType;
 
-struct CompletionCheckParams;
-class CompletionCheck;
-
 template <typename _ConfigType, typename _RunInfoType>
 class ConfigGenerator;
 template <typename _ConfigType>
 class FixedConfigGenerator;
-
-template <typename _ConfigType>
-struct Results;
-
-template <typename _ConfigType>
-class ResultsIO;
-template <typename _ConfigType>
-class jsonResultsIO;
 
 struct SamplingParams;
 template <typename _ConfigType>
 struct State;
 
 struct ValueMap;
+
+template <typename _ConfigType>
+struct RunData;
 
 template <typename _ConfigType, typename _RunInfoType>
 class StateGenerator;
@@ -61,12 +53,33 @@ template <typename _ConfigType>
 using StateSamplingFunctionMap =
     std::map<std::string, StateSamplingFunction<_ConfigType>>;
 
-template <typename _ConfigType>
+struct BasicStatistics;
+template <typename StatisticsType>
+using CalcStatisticsFunction = std::function<StatisticsType(
+    Eigen::VectorXd const &observations, double confidence)>;
+
+template <typename StatisticsType>
+CalcStatisticsFunction<BasicStatistics> default_calc_statistics_f();
+
+template <typename _ConfigType, typename _StatisticsType>
+struct Results;
+
+template <typename _StatisticsType>
+struct CompletionCheckParams;
+template <typename _StatisticsType>
+class CompletionCheck;
+
+template <typename _ResultsType>
+class ResultsIO;
+template <typename _ResultsType>
+class jsonResultsIO;
+
+template <typename _ConfigType, typename _StatisticsType>
 struct ResultsAnalysisFunction;
 
-template <typename ConfigType>
+template <typename ConfigType, typename StatisticsType>
 using ResultsAnalysisFunctionMap =
-    std::map<std::string, ResultsAnalysisFunction<ConfigType>>;
+    std::map<std::string, ResultsAnalysisFunction<ConfigType, StatisticsType>>;
 
 class Conversions;
 
@@ -76,11 +89,11 @@ struct OccEvent;
 class OccLocation;
 class OccSwap;
 
-template <typename ConfigType>
+template <typename ConfigType, typename StatisticsType>
 struct SamplingFixtureParams;
-template <typename ConfigType>
+template <typename ConfigType, typename StatisticsType>
 class SamplingFixture;
-template <typename _ConfigType>
+template <typename _ConfigType, typename StatisticsType>
 struct RunManager;
 
 }  // namespace monte

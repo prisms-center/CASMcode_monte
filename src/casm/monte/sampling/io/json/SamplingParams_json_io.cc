@@ -49,6 +49,12 @@ namespace monte {
 ///     type of Monte Carlo calculation and should be keys in the
 ///     sampling_functions map.
 ///
+///   save_initial_state: bool (optional, default=false)
+///     If true, request that the initial configuration is saved.
+///
+///   save_final_state: bool (optional, default=false)
+///     If true, request that the final configuration is saved.
+///
 ///   sample_trajectory: bool (optional, default=false)
 ///     If true, request that the entire configuration is saved each time
 ///     samples are taken.

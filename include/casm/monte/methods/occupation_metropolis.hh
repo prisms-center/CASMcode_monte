@@ -21,13 +21,14 @@ namespace CASM {
 namespace monte {
 
 template <typename ConfigType, typename CalculatorType,
-          typename ProposeOccEventFuntionType, typename GeneratorType>
+          typename ProposeOccEventFuntionType, typename GeneratorType,
+          typename StatisticsType>
 void occupation_metropolis(State<ConfigType> &state, OccLocation &occ_location,
                            CalculatorType &potential,
                            std::vector<OccSwap> const &possible_swaps,
                            ProposeOccEventFuntionType propose_event_f,
                            GeneratorType &random_number_generator,
-                           RunManager<ConfigType> &run_manager);
+                           RunManager<ConfigType, StatisticsType> &run_manager);
 
 // --- Implementation ---
 
@@ -79,13 +80,14 @@ void occupation_metropolis(State<ConfigType> &state, OccLocation &occ_location,
 ///   The intensive potential energy (eV / unit cell).
 ///
 template <typename ConfigType, typename CalculatorType,
-          typename ProposeOccEventFuntionType, typename GeneratorType>
-void occupation_metropolis(State<ConfigType> &state, OccLocation &occ_location,
-                           CalculatorType &potential,
-                           std::vector<OccSwap> const &possible_swaps,
-                           ProposeOccEventFuntionType propose_event_f,
-                           GeneratorType &random_number_generator,
-                           RunManager<ConfigType> &run_manager) {
+          typename ProposeOccEventFuntionType, typename GeneratorType,
+          typename StatisticsType>
+void occupation_metropolis(
+    State<ConfigType> &state, OccLocation &occ_location,
+    CalculatorType &potential, std::vector<OccSwap> const &possible_swaps,
+    ProposeOccEventFuntionType propose_event_f,
+    GeneratorType &random_number_generator,
+    RunManager<ConfigType, StatisticsType> &run_manager) {
   // --- Track potential energy in state properties ---
   if (potential.state() != &state) {
     throw std::runtime_error(
@@ -129,8 +131,11 @@ void occupation_metropolis(State<ConfigType> &state, OccLocation &occ_location,
 
     // Apply accepted event
     if (accept) {
+      run_manager.increment_n_accept();
       occ_location.apply(event, get_occupation(state));
       potential_energy_intensive += (delta_potential_energy / n_unitcells);
+    } else {
+      run_manager.increment_n_reject();
     }
 
     // Increment count

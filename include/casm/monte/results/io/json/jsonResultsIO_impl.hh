@@ -125,6 +125,119 @@ jsonParser &append_matrix_condition_to_json(
       json);
 }
 
+// /// \brief Append sampled data quantity to summary JSON
+// ///
+// /// \code
+// /// <quantity>: {
+// ///   "shape": [...],   // Scalar: [], Vector: [rows], Matrix: [rows, cols]
+// ///   "component_names": ["0", "1", "2", "3", ...],
+// ///   <component_name>: {
+// ///     "mean": [...], <-- appends to
+// ///     "calculated_precision": [...]  <-- appends to
+// ///     "is_converged": [...] <-- appends to, only if requested to converge
+// ///   }
+// /// }
+// /// \endcode
+// template <typename ResultsType>
+// jsonParser &append_statistics_to_json(
+//     std::pair<std::string, std::shared_ptr<Sampler>> quantity, jsonParser
+//     &json, ResultsType const &results) {
+//   std::string const &quantity_name = quantity.first;
+//   Sampler const &sampler = *quantity.second;
+//   ensure_initialized_objects(json, {quantity_name});
+//   auto &quantity_json = json[quantity_name];
+//
+//   std::vector<std::string> component_names =
+//   quantity.second->component_names(); bool is_scalar =
+//   (quantity.second->shape().size() == 0);
+//
+//   // write shape
+//   quantity_json["shape"] = quantity.second->shape();
+//
+//   // write component names - if not scalar
+//   if (!is_scalar) {
+//     quantity_json["component_names"] = component_names;
+//   }
+//
+//   CompletionCheckResults const &completion_r =
+//   results.completion_check_results; EquilibrationCheckResults const
+//   &equilibration_r =
+//       completion_r.equilibration_check_results;
+//   ConvergenceCheckResults const &convergence_r =
+//       completion_r.convergence_check_results;
+//   auto const &requested_precision = completion_r.params.requested_precision;
+//
+//   bool auto_converge_mode = (requested_precision.size() != 0);
+//
+//   // for each component calculate or get existing convergence check results
+//   Index i = 0;
+//   for (auto const &component_name : component_names) {
+//     SamplerComponent key(quantity_name, i, component_name);
+//
+//     bool is_requested_to_converge =
+//         (requested_precision.find(key) != requested_precision.end());
+//
+//     jsonParser *_tjson;
+//     if (is_scalar) {
+//       _tjson = &quantity_json;
+//     } else {
+//       ensure_initialized_objects(quantity_json, {component_name});
+//       _tjson = &(quantity_json[component_name]);
+//     }
+//
+//     jsonParser &tjson = *_tjson;
+//     ensure_initialized_arrays(tjson, {"mean", "calculated_precision"});
+//     if (is_requested_to_converge) {
+//       ensure_initialized_arrays(tjson, {"is_converged"});
+//     }
+//
+//     if (auto_converge_mode && (!equilibration_r.all_equilibrated ||
+//         convergence_r.N_samples_for_statistics == 0)) {
+//       tjson["mean"].push_back("did_not_equilibrate");
+//       tjson["calculated_precision"].push_back("did_not_equilibrate");
+//       if (is_requested_to_converge) {
+//         tjson["is_converged"].push_back(false);
+//       }
+//     } else {
+//       auto result_it = convergence_r.individual_results.find(key);
+//       if (result_it != convergence_r.individual_results.end()) {
+//         // if is a quantity specifically asked to be converged,
+//         //     use existing results
+//         auto const &result = result_it->second;
+//
+//         tjson["mean"].push_back(result.mean);
+//         tjson["calculated_precision"].push_back(result.calculated_precision);
+//         tjson["is_converged"].push_back(result.is_converged);
+//       } else {
+//         // if not a quantity specifically asked to be converged,
+//         //     do convergence check
+//         Index N_samples_for_statistics;
+//         if (auto_converge_mode) {
+//           N_samples_for_statistics = convergence_r.N_samples_for_statistics;
+//         }
+//         else {
+//           N_samples_for_statistics = sampler.n_samples();
+//         }
+//         double _precision = 0.0;
+//         if (is_requested_to_converge) {
+//           _precision = requested_precision.at(key);
+//         }
+//         auto result = convergence_check(
+//             sampler.component(i).tail(N_samples_for_statistics),
+//             _precision, completion_r.confidence);
+//         tjson["mean"].push_back(result.mean);
+//         tjson["calculated_precision"].push_back(result.calculated_precision);
+//         if (is_requested_to_converge) {
+//           tjson["is_converged"].push_back(result.is_converged);
+//         }
+//       }
+//     }
+//
+//     ++i;
+//   }
+//   return json;
+// }
+
 /// \brief Append sampled data quantity to summary JSON
 ///
 /// \code
@@ -138,93 +251,40 @@ jsonParser &append_matrix_condition_to_json(
 ///   }
 /// }
 /// \endcode
-template <typename ConfigType>
-jsonParser &append_sampled_data_to_json(
+template <typename ResultsType>
+jsonParser &append_statistics_to_json(
     std::pair<std::string, std::shared_ptr<Sampler>> quantity, jsonParser &json,
-    Results<ConfigType> const &results) {
+    ResultsType const &results) {
   std::string const &quantity_name = quantity.first;
-  Sampler const &sampler = *quantity.second;
+  QuantityStats<ResultsType> qstats(quantity_name, *quantity.second, results);
+
   ensure_initialized_objects(json, {quantity_name});
   auto &quantity_json = json[quantity_name];
 
-  std::vector<std::string> component_names = quantity.second->component_names();
-  bool is_scalar = (quantity.second->shape().size() == 0);
-
   // write shape
-  quantity_json["shape"] = quantity.second->shape();
+  quantity_json["shape"] = qstats.shape;
 
-  // write component names - if not scalar
-  if (!is_scalar) {
-    quantity_json["component_names"] = component_names;
-  }
-
-  CompletionCheckResults const &completion_r = results.completion_check_results;
-  EquilibrationCheckResults const &equilibration_r =
-      completion_r.equilibration_check_results;
-  ConvergenceCheckResults const &convergence_r =
-      completion_r.convergence_check_results;
-
-  // for each component calculate or get existing convergence check results
-  Index i = 0;
-  for (auto const &component_name : component_names) {
-    SamplerComponent key(quantity_name, i, component_name);
-
-    auto const &requested_precision = completion_r.params.requested_precision;
-    bool is_requested_to_converge =
-        (requested_precision.find(key) != requested_precision.end());
-
-    jsonParser *_tjson;
-    if (is_scalar) {
-      _tjson = &quantity_json;
-    } else {
-      ensure_initialized_objects(quantity_json, {component_name});
-      _tjson = &(quantity_json[component_name]);
-    }
-
-    jsonParser &tjson = *_tjson;
-    ensure_initialized_arrays(tjson, {"mean", "calculated_precision"});
-    if (is_requested_to_converge) {
+  // append statistics
+  auto append = [&](jsonParser &tjson, Index i) {
+    append_statistics_to_json_arrays(qstats.component_stats[i], tjson);
+    if (qstats.is_converged[i].has_value()) {
       ensure_initialized_arrays(tjson, {"is_converged"});
+      tjson["is_converged"].append(qstats.is_converged[i].value());
     }
+  };
 
-    if (!equilibration_r.all_equilibrated ||
-        convergence_r.N_samples_for_statistics == 0) {
-      tjson["mean"].push_back("did_not_equilibrate");
-      tjson["calculated_precision"].push_back("did_not_equilibrate");
-      if (is_requested_to_converge) {
-        tjson["is_converged"].push_back(false);
-      }
-    } else {
-      auto result_it = convergence_r.individual_results.find(key);
-      if (result_it != convergence_r.individual_results.end()) {
-        // if is a quantity specifically asked to be converged,
-        //     use existing results
-        auto const &result = result_it->second;
-
-        tjson["mean"].push_back(result.mean);
-        tjson["calculated_precision"].push_back(result.calculated_precision);
-        tjson["is_converged"].push_back(result.is_converged);
-      } else {
-        // if not a quantity specifically asked to be converged,
-        //     do convergence check
-        double _precision = 0.0;
-        if (is_requested_to_converge) {
-          _precision = requested_precision.at(key);
-        }
-        auto result = convergence_check(
-            sampler.component(i).tail(convergence_r.N_samples_for_statistics),
-            _precision, completion_r.confidence);
-        tjson["mean"].push_back(result.mean);
-        tjson["calculated_precision"].push_back(result.calculated_precision);
-        if (is_requested_to_converge) {
-          tjson["is_converged"].push_back(result.is_converged);
-        }
-      }
+  if (qstats.is_scalar) {
+    append(quantity_json, 0);
+  } else {
+    // write component names - if not scalar
+    quantity_json["component_names"] = qstats.component_names;
+    Index i = 0;
+    for (auto const &component_name : qstats.component_names) {
+      ensure_initialized_objects(quantity_json, {component_name});
+      append(quantity_json[component_name], i);
+      ++i;
     }
-
-    ++i;
   }
-  return json;
 }
 
 /// \brief Append completion check results to summary JSON
@@ -246,30 +306,43 @@ jsonParser &append_completion_check_results_to_json(
   auto const &equilibration_r = completion_r.equilibration_check_results;
   auto const &convergence_r = completion_r.convergence_check_results;
 
-  ensure_initialized_arrays(
-      json, {"elapsed_clocktime", "all_equilibrated",
-             "N_samples_for_all_to_equilibrate", "all_converged",
-             "N_samples_for_statistics", "N_samples"});
+  bool auto_converge_mode = is_auto_converge_mode(results);
 
-  json["elapsed_clocktime"].push_back(results.elapsed_clocktime);
+  if (auto_converge_mode) {
+    ensure_initialized_arrays(
+        json, {"acceptance_rate", "elapsed_clocktime", "all_equilibrated",
+               "N_samples_for_all_to_equilibrate", "all_converged",
+               "N_samples_for_statistics", "N_samples"});
 
-  json["all_equilibrated"].push_back(equilibration_r.all_equilibrated);
+    json["acceptance_rate"].push_back(acceptance_rate(results));
 
-  json["all_converged"].push_back(convergence_r.all_converged);
+    json["elapsed_clocktime"].push_back(elapsed_clocktime(results));
 
-  if (equilibration_r.all_equilibrated) {
-    json["N_samples_for_all_to_equilibrate"].push_back(
-        equilibration_r.N_samples_for_all_to_equilibrate);
+    json["all_equilibrated"].push_back(all_equilibrated(results));
 
-    json["N_samples_for_statistics"].push_back(
-        convergence_r.N_samples_for_statistics);
+    json["all_converged"].push_back(all_converged(results));
+
+    if (all_equilibrated(results)) {
+      json["N_samples_for_all_to_equilibrate"].push_back(
+          N_samples_for_all_to_equilibrate(results));
+
+      json["N_samples_for_statistics"].push_back(
+          N_samples_for_statistics(results));
+    } else {
+      json["N_samples_for_all_to_equilibrate"].push_back("did_not_equilibrate");
+
+      json["N_samples_for_statistics"].push_back("did_not_equilibrate");
+    }
+
+    json["N_samples"].push_back(N_samples(results));
   } else {
-    json["N_samples_for_all_to_equilibrate"].push_back("did_not_equilibrate");
+    ensure_initialized_arrays(
+        json, {"acceptance_rate", "elapsed_clocktime", "N_samples"});
 
-    json["N_samples_for_statistics"].push_back("did_not_equilibrate");
+    json["acceptance_rate"].push_back(acceptance_rate(results));
+    json["elapsed_clocktime"].push_back(elapsed_clocktime(results));
+    json["N_samples"].push_back(N_samples(results));
   }
-
-  json["N_samples"].push_back(get_n_samples(results.samplers));
 
   return json;
 }
@@ -283,14 +356,11 @@ jsonParser &append_completion_check_results_to_json(
 ///   <component_name>: [...] <-- appends to
 /// }
 /// \endcode
-template <typename ConfigType>
+template <typename ConfigType, typename StatisticsType>
 jsonParser &append_results_analysis_to_json(
-    Results<ConfigType> const &results, jsonParser &json,
-    ResultsAnalysisFunctionMap<ConfigType> const &analysis_functions) {
-  CompletionCheckResults const &completion_r = results.completion_check_results;
-  EquilibrationCheckResults const &equilibration_r =
-      completion_r.equilibration_check_results;
-
+    Results<ConfigType, StatisticsType> const &results, jsonParser &json,
+    ResultsAnalysisFunctionMap<ConfigType, StatisticsType> const
+        &analysis_functions) {
   // for each analysis value
   for (auto const &pair : results.analysis) {
     std::string const &name = pair.first;
@@ -314,11 +384,12 @@ jsonParser &append_results_analysis_to_json(
 
     if (is_scalar) {
       ensure_initialized_arrays(value_json, {"value"});
-      if (!equilibration_r.all_equilibrated) {
+      if (!all_equilibrated(results)) {
         value_json["value"].push_back("did_not_equilibrate");
       } else {
         value_json["value"].push_back(value(0));
       }
+
     } else {
       std::vector<std::string> component_names =
           function_it->second.component_names;
@@ -330,7 +401,7 @@ jsonParser &append_results_analysis_to_json(
       Index i = 0;
       for (auto const &component_name : component_names) {
         ensure_initialized_arrays(value_json, {component_name});
-        if (!equilibration_r.all_equilibrated) {
+        if (!all_equilibrated(results)) {
           value_json[component_name].push_back("did_not_equilibrate");
         } else {
           value_json[component_name].push_back(value(i));
@@ -342,53 +413,19 @@ jsonParser &append_results_analysis_to_json(
   return json;
 }
 
-/// \brief Append trajectory results to summary JSON
-///
-/// \code
-/// {
-///   "initial_states": [...], <-- appends to
-///   "final_states": [...] <-- appends to
-/// }
-/// \endcode
-template <typename ConfigType>
-jsonParser &append_trajectory_results_to_json(
-    Results<ConfigType> const &results, jsonParser &json) {
-  ensure_initialized_arrays(json, {"initial_states", "final_states"});
-  if (results.initial_state.has_value()) {
-    json["initial_states"].push_back(*results.initial_state);
-  } else {
-    json["initial_states"].push_back(jsonParser::null());
-  }
-
-  if (results.final_state.has_value()) {
-    json["final_states"].push_back(*results.final_state);
-  } else {
-    json["final_states"].push_back(jsonParser::null());
-  }
-  return json;
-}
-
 }  // namespace jsonResultsIO_impl
 
-template <typename _ConfigType>
-jsonResultsIO<_ConfigType>::jsonResultsIO(
+template <typename _ResultsType>
+jsonResultsIO<_ResultsType>::jsonResultsIO(
     fs::path _output_dir,
     StateSamplingFunctionMap<config_type> _sampling_functions,
-    ResultsAnalysisFunctionMap<config_type> _analysis_functions,
+    ResultsAnalysisFunctionMap<config_type, stats_type> _analysis_functions,
     bool _write_trajectory, bool _write_observations)
     : m_output_dir(_output_dir),
       m_sampling_functions(_sampling_functions),
       m_analysis_functions(_analysis_functions),
       m_write_trajectory(_write_trajectory),
       m_write_observations(_write_observations) {}
-
-/// \brief Read a vector of final states of completed runs
-template <typename _ConfigType>
-std::vector<typename jsonResultsIO<_ConfigType>::state_type>
-jsonResultsIO<_ConfigType>::read_final_states() {
-  jsonParser json = this->read_summary();
-  return json["trajectory"]["final_states"].get<std::vector<state_type>>();
-}
 
 /// \brief Write results
 ///
@@ -399,10 +436,11 @@ jsonResultsIO<_ConfigType>::read_final_states() {
 ///   - Only written if constructed with `write_trajectory == true`
 /// - See `write_observations` for run.<index>/observations.json output format
 ///   - Only written if constructed with `write_observations == true`
-template <typename _ConfigType>
-void jsonResultsIO<_ConfigType>::write(results_type const &results,
-                                       Index run_index) {
-  this->write_summary(results);
+template <typename _ResultsType>
+void jsonResultsIO<_ResultsType>::write(results_type const &results,
+                                        ValueMap const &conditions,
+                                        Index run_index) {
+  this->write_summary(results, conditions);
   if (m_write_trajectory) {
     this->write_trajectory(results, run_index);
   }
@@ -427,7 +465,7 @@ void jsonResultsIO<_ConfigType>::write(results_type const &results,
 ///       "component_names": ["0", "1", "2", "3", ...],
 ///       <component_name>: [...]
 ///   },
-///   "sampled_data": {
+///   "statistics": {
 ///     <quantity>: {
 ///       "shape": [...],
 ///       "component_names": ["0", "1", "2", "3", ...],
@@ -447,49 +485,43 @@ void jsonResultsIO<_ConfigType>::write(results_type const &results,
 ///     "all_converged": [...],
 ///     "N_samples_for_statistics": [...],
 ///     "N_samples": [...],
-///   },
-///   "trajectory": {
-///     "initial_states": [...],
-///     "final_states": [...]
 ///   }
 /// }
 /// \endcode
 ///
-template <typename _ConfigType>
-void jsonResultsIO<_ConfigType>::write_summary(results_type const &results) {
+template <typename _ResultsType>
+void jsonResultsIO<_ResultsType>::write_summary(results_type const &results,
+                                                ValueMap const &conditions) {
   using namespace jsonResultsIO_impl;
 
-  StateSamplingFunctionMap<_ConfigType> const &sampling_functions =
+  StateSamplingFunctionMap<config_type> const &sampling_functions =
       m_sampling_functions;
-  ResultsAnalysisFunctionMap<_ConfigType> const &analysis_functions =
-      m_analysis_functions;
+  ResultsAnalysisFunctionMap<config_type, stats_type> const
+      &analysis_functions = m_analysis_functions;
   fs::path const &output_dir = m_output_dir;
 
   // read existing summary file (create if not existing)
   jsonParser json = this->read_summary();
 
-  ensure_initialized_objects(
-      json, {"conditions", "sampled_data", "completion_check_results",
-             "analysis", "trajectory"});
+  ensure_initialized_objects(json, {"conditions", "statistics",
+                                    "completion_check_results", "analysis"});
+  ensure_initialized_arrays(json, {"completed_runs"});
 
-  for (auto const &condition :
-       results.initial_state->conditions.scalar_values) {
+  for (auto const &condition : conditions.scalar_values) {
     append_scalar_condition_to_json(condition, json["conditions"],
                                     sampling_functions);
   }
-  for (auto const &condition :
-       results.initial_state->conditions.vector_values) {
+  for (auto const &condition : conditions.vector_values) {
     append_vector_condition_to_json(condition, json["conditions"],
                                     sampling_functions);
   }
-  for (auto const &condition :
-       results.initial_state->conditions.matrix_values) {
+  for (auto const &condition : conditions.matrix_values) {
     append_matrix_condition_to_json(condition, json["conditions"],
                                     sampling_functions);
   }
 
   for (auto const &quantity : results.samplers) {
-    append_sampled_data_to_json(quantity, json["sampled_data"], results);
+    append_statistics_to_json(quantity, json["statistics"], results);
   }
 
   // append completion check results
@@ -499,9 +531,6 @@ void jsonResultsIO<_ConfigType>::write_summary(results_type const &results) {
   // append results analysis
   append_results_analysis_to_json(results, json["analysis"],
                                   analysis_functions);
-
-  // append trajectory results (initial and final states)
-  append_trajectory_results_to_json(results, json["trajectory"]);
 
   // write summary file
   fs::path summary_path = output_dir / "summary.json";
@@ -516,9 +545,9 @@ void jsonResultsIO<_ConfigType>::write_summary(results_type const &results) {
 ///
 /// Output file is a JSON array of the configuration at the time a sample was
 /// taken.
-template <typename _ConfigType>
-void jsonResultsIO<_ConfigType>::write_trajectory(results_type const &results,
-                                                  Index run_index) {
+template <typename _ResultsType>
+void jsonResultsIO<_ResultsType>::write_trajectory(results_type const &results,
+                                                   Index run_index) {
   jsonParser json(results.sample_trajectory);
   json.write(this->run_dir(run_index) / "trajectory.json", -1);
 }
@@ -530,6 +559,7 @@ void jsonResultsIO<_ConfigType>::write_trajectory(results_type const &results,
 /// {
 ///   "count": [...], // count (i.e. pass/step) at the time sample was taken
 ///   "time": [...], // time when sampled was taken (if exists)
+///   "weight": [...], // weight given to sample (if exists, not normalized)
 ///   "clocktime": [...], // clocktime when sampled was taken (if exists)
 ///   <quantity>: {
 ///     "shape": [...], // Scalar: [], Vector: [rows], Matrix: [rows, cols]
@@ -543,15 +573,18 @@ void jsonResultsIO<_ConfigType>::write_trajectory(results_type const &results,
 ///   }
 /// }
 /// \endcode
-template <typename _ConfigType>
-void jsonResultsIO<_ConfigType>::write_observations(results_type const &results,
-                                                    Index run_index) {
+template <typename _ResultsType>
+void jsonResultsIO<_ResultsType>::write_observations(
+    results_type const &results, Index run_index) {
   jsonParser json = jsonParser::object();
   if (results.sample_count.size()) {
     json["count"] = results.sample_count;
   }
   if (results.sample_time.size()) {
     json["time"] = results.sample_time;
+  }
+  if (results.sample_weight.size()) {
+    json["weight"] = results.sample_weight;
   }
   if (results.sample_clocktime.size()) {
     json["clocktime"] = results.sample_clocktime;
@@ -571,22 +604,21 @@ void jsonResultsIO<_ConfigType>::write_observations(results_type const &results,
 }
 
 /// \brief Read existing summary.json file, if exists, else provided default
-template <typename _ConfigType>
-jsonParser jsonResultsIO<_ConfigType>::read_summary() {
+template <typename _ResultsType>
+jsonParser jsonResultsIO<_ResultsType>::read_summary() {
   fs::path summary_path = m_output_dir / "summary.json";
   if (!fs::exists(summary_path)) {
     jsonParser json;
     json["conditions"].put_obj();
-    json["sampled_data"].put_obj();
+    json["statistics"].put_obj();
     json["completion_check_results"].put_obj();
-    json["trajectory"].put_obj();
     return json;
   }
   return jsonParser(summary_path);
 }
 
-template <typename _ConfigType>
-fs::path jsonResultsIO<_ConfigType>::run_dir(Index run_index) {
+template <typename _ResultsType>
+fs::path jsonResultsIO<_ResultsType>::run_dir(Index run_index) {
   std::string _run_dir = "run." + std::to_string(run_index);
   fs::path result = m_output_dir / _run_dir;
   if (!fs::exists(result)) {

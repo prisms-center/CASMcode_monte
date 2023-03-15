@@ -23,8 +23,12 @@ struct IndividualEquilibrationCheckResult {
   CountType N_samples_for_equilibration = 0;
 };
 
+typedef std::function<IndividualEquilibrationCheckResult(
+    Eigen::VectorXd const &observations, double precision)>
+    EquilibrationCheckFunction;
+
 /// \brief Check if a range of observations have equilibrated
-IndividualEquilibrationCheckResult equilibration_check(
+IndividualEquilibrationCheckResult default_equilibration_check(
     Eigen::VectorXd const &observations, double precision);
 
 /// \brief Equilibration check results data structure (all requested components)
@@ -48,9 +52,10 @@ struct EquilibrationCheckResults {
 };
 
 EquilibrationCheckResults equilibration_check(
+    EquilibrationCheckFunction equilibration_check_f,
     std::map<SamplerComponent, double> const &requested_precision,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    bool check_all);
+    std::vector<double> const &sample_weight, bool check_all);
 
 }  // namespace monte
 }  // namespace CASM

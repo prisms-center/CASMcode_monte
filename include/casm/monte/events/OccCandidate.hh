@@ -148,6 +148,12 @@ bool allowed_grand_canonical_swap(Conversions const &convert,
 std::vector<OccSwap> make_grand_canonical_swaps(
     const Conversions &convert, OccCandidateList const &occ_candidate_list);
 
+/// \brief For grand canonical swaps, get the number of possible events
+///     that can be chosen from at any one time
+Index get_n_allowed_per_unitcell(
+    Conversions const &convert,
+    std::vector<OccSwap> const &grand_canonical_swaps);
+
 }  // namespace monte
 }  // namespace CASM
 

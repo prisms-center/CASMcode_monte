@@ -37,9 +37,16 @@ struct SamplingParams {
 
   // --- Parameters for determining when samples are taken ---
 
+  /// \brief See `sample_method`
   double begin;
+
+  /// \brief See `sample_method`
   double period;
+
+  /// \brief See `sample_method`
   double samples_per_period;
+
+  /// \brief See `sample_method`
   double shift;
 
   /// \brief What quantities to sample

@@ -1,5 +1,7 @@
 #include "casm/monte/checks/EquilibrationCheck.hh"
 
+#include <iostream>
+
 namespace CASM {
 namespace monte {
 
@@ -45,7 +47,7 @@ namespace monte {
 /// equilibrated is encountered.
 /// \returns An IndividualEquilibrationCheckResult instance
 ///
-IndividualEquilibrationCheckResult equilibration_check(
+IndividualEquilibrationCheckResult default_equilibration_check(
     Eigen::VectorXd const &observations, double prec) {
   if (observations.size() == 0) {
     throw std::runtime_error(
@@ -118,9 +120,12 @@ IndividualEquilibrationCheckResult equilibration_check(
 ///
 /// \param requested_precision Sampler components to check, with requested
 ///     precision
-/// \param N_samples_for_equilibration Number of samples to exclude from
-///     statistics because the system is out of equilibrium
 /// \param samplers All samplers
+/// \param sample_weight If size != 0, weight to give to each observation.
+///     Weights are normalized to sum to N, the number of observations,
+///     then applied to the properties.
+/// \param check_all If true, check convergence of all requested properties.
+///     Otherwise, break if one is found to not be equilibrated.
 ///
 /// \returns A ConvergenceCheckResults instance. Note that
 ///     N_samples_for_statistics is set to the total number of samples
@@ -128,9 +133,10 @@ IndividualEquilibrationCheckResult equilibration_check(
 ///     `convergence_check_params.size() == 0`), otherwise it will be equal to
 ///     `get_n_samples(samplers) - N_samples_for_equilibration`.
 EquilibrationCheckResults equilibration_check(
+    EquilibrationCheckFunction equilibration_check_f,
     std::map<SamplerComponent, double> const &requested_precision,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    bool check_all) {
+    std::vector<double> const &sample_weight, bool check_all) {
   EquilibrationCheckResults results;
 
   if (!requested_precision.size()) {
@@ -140,18 +146,47 @@ EquilibrationCheckResults equilibration_check(
   // will set to false if any requested sampler components are not equilibrated
   results.all_equilibrated = true;
 
+  // if weighting, use weighted_observation(i) = sample_weight[i] *
+  // observation(i) * N / W where W = sum_i sample_weight[i]; same weight_factor
+  // N/W applies for all properties
+  double weight_factor;
+  if (sample_weight.size()) {
+    Index N = sample_weight.size();
+    double W = 0.0;
+    for (Index i = 0; i < sample_weight.size(); ++i) {
+      W += sample_weight[i];
+    }
+    weight_factor = N / W;
+  }
+
   // check requested sampler components for equilibration
   for (auto const &p : requested_precision) {
     SamplerComponent const &key = p.first;
     double const &precision = p.second;
 
     // find and validate sampler name && component index
-    auto sampler_it = find_or_throw(samplers, key);
+    Sampler const &sampler = *find_or_throw(samplers, key)->second;
 
     // do equilibration check
-    IndividualEquilibrationCheckResult current = equilibration_check(
-        sampler_it->second->component(key.component_index),  // observations
-        precision);
+    IndividualEquilibrationCheckResult current;
+    if (sample_weight.size() == 0) {
+      current = equilibration_check_f(
+          sampler.component(key.component_index),  // observations
+          precision);
+    } else {
+      // weighted observations
+      if (sample_weight.size() != sampler.n_samples()) {
+        throw std::runtime_error(
+            "Error in equilibration_check: sample_weight.size() != "
+            "observations.size()");
+      }
+      Eigen::VectorXd weighted_observations =
+          sampler.component(key.component_index);
+      for (Index i = 0; i < weighted_observations.size(); ++i) {
+        weighted_observations(i) *= weight_factor * sample_weight[i];
+      }
+      current = equilibration_check_f(weighted_observations, precision);
+    }
 
     // combine results
     results.N_samples_for_all_to_equilibrate =

@@ -9,6 +9,7 @@
 #include "casm/monte/results/io/ResultsIO.hh"
 #include "casm/monte/sampling/Sampler.hh"
 #include "casm/monte/sampling/SamplingParams.hh"
+#include "casm/monte/state/RunData.hh"
 
 // logging
 #include "casm/casm_io/Log.hh"
@@ -19,15 +20,21 @@
 namespace CASM {
 namespace monte {
 
-template <typename ConfigType>
+template <typename ConfigType, typename StatisticsType>
 struct SamplingFixtureParams {
+  typedef ConfigType config_type;
+  typedef StatisticsType stats_type;
+  typedef Results<config_type, stats_type> results_type;
+  typedef ResultsIO<results_type> results_io_type;
+
   SamplingFixtureParams(
       std::string _label,
       StateSamplingFunctionMap<ConfigType> _sampling_functions,
-      ResultsAnalysisFunctionMap<ConfigType> _analysis_functions,
+      ResultsAnalysisFunctionMap<ConfigType, StatisticsType>
+          _analysis_functions,
       monte::SamplingParams _sampling_params,
-      monte::CompletionCheckParams _completion_check_params,
-      std::unique_ptr<ResultsIO<ConfigType>> _results_io,
+      monte::CompletionCheckParams<StatisticsType> _completion_check_params,
+      std::unique_ptr<results_io_type> _results_io,
       monte::MethodLog _method_log = monte::MethodLog())
       : label(_label),
         sampling_functions(_sampling_functions),
@@ -44,28 +51,29 @@ struct SamplingFixtureParams {
   StateSamplingFunctionMap<ConfigType> sampling_functions;
 
   /// Results analysis functions
-  ResultsAnalysisFunctionMap<ConfigType> analysis_functions;
+  ResultsAnalysisFunctionMap<ConfigType, StatisticsType> analysis_functions;
 
   /// Sampling parameters
   monte::SamplingParams sampling_params;
 
   /// Completion check params
-  monte::CompletionCheckParams completion_check_params;
+  monte::CompletionCheckParams<StatisticsType> completion_check_params;
 
   /// Results I/O implementation -- May be empty
-  notstd::cloneable_ptr<ResultsIO<ConfigType>> results_io;
+  notstd::cloneable_ptr<results_io_type> results_io;
 
   /// Logging
   monte::MethodLog method_log;
 };
 
-template <typename _ConfigType>
+template <typename _ConfigType, typename _StatisticsType>
 class SamplingFixture {
  public:
   typedef _ConfigType config_type;
+  typedef _StatisticsType stats_type;
   typedef State<config_type> state_type;
 
-  SamplingFixture(SamplingFixtureParams<config_type> const &_params)
+  SamplingFixture(SamplingFixtureParams<config_type, stats_type> const &_params)
       : m_params(_params),
         m_n_samples(0),
         m_is_complete(false),
@@ -76,7 +84,9 @@ class SamplingFixture {
   std::string label() const { return m_params.label; }
 
   /// \brief Sampling fixture parameters
-  SamplingFixtureParams<config_type> const &params() const { return m_params; }
+  SamplingFixtureParams<config_type, stats_type> const &params() const {
+    return m_params;
+  }
 
   /// \brief State sampler
   StateSampler<config_type> const &state_sampler() const {
@@ -89,7 +99,6 @@ class SamplingFixture {
     m_state_sampler.reset(steps_per_pass);
     m_completion_check.reset();
 
-    m_results.initial_state = state;
     Log &log = m_params.method_log.log;
     log.restart_clock();
     log.begin_lap();
@@ -101,13 +110,14 @@ class SamplingFixture {
     }
     Log &log = m_params.method_log.log;
     if (m_state_sampler.do_sample_time) {
-      m_is_complete = m_completion_check.is_complete(m_state_sampler.samplers,
-                                                     m_state_sampler.count,
-                                                     m_state_sampler.time, log);
+      m_is_complete = m_completion_check.is_complete(
+          m_state_sampler.samplers, m_state_sampler.sample_weight,
+          m_state_sampler.count, m_state_sampler.time, log);
 
     } else {
       m_is_complete = m_completion_check.is_complete(
-          m_state_sampler.samplers, m_state_sampler.count, log);
+          m_state_sampler.samplers, m_state_sampler.sample_weight,
+          m_state_sampler.count, log);
     }
     return m_is_complete;
   }
@@ -124,17 +134,24 @@ class SamplingFixture {
         jsonParser json;
         json["status"] = "incomplete";
         json["time"] = log.time_s();
-        to_json(m_completion_check.results(),
-                json["convergence_check_results"]);
+        to_json(m_completion_check.results(), json["completion_check_results"]);
         log << json << std::endl;
         log.begin_lap();
       }
     }
   }
 
+  void increment_n_accept() { m_state_sampler.increment_n_accept(); }
+
+  void increment_n_reject() { m_state_sampler.increment_n_reject(); }
+
   void increment_step() { m_state_sampler.increment_step(); }
 
   void set_time(double event_time) { m_state_sampler.set_time(event_time); }
+
+  void push_back_sample_weight(double weight) {
+    m_state_sampler.push_back_sample_weight(weight);
+  }
 
   void sample_data(state_type const &state) {
     Log &log = m_params.method_log.log;
@@ -152,25 +169,35 @@ class SamplingFixture {
     m_state_sampler.sample_data_by_time_if_due(state, event_time, log);
   }
 
-  void finalize(state_type const &state, Index run_index) {
+  void finalize(state_type const &state, Index run_index,
+                RunData<config_type> const &run_data) {
+    std::cout << "begin finalize " << m_params.label << std::endl;
     Log &log = m_params.method_log.log;
-    m_results.final_state = state;
     m_results.elapsed_clocktime = log.time_s();
     m_results.samplers = std::move(m_state_sampler.samplers);
     m_results.sample_count = std::move(m_state_sampler.sample_count);
     m_results.sample_time = std::move(m_state_sampler.sample_time);
+    m_results.sample_weight = std::move(m_state_sampler.sample_weight);
     m_results.sample_clocktime = std::move(m_state_sampler.sample_clocktime);
     m_results.sample_trajectory = std::move(m_state_sampler.sample_trajectory);
     m_results.completion_check_results = m_completion_check.results();
-    m_results.analysis = make_analysis(m_results, m_params.analysis_functions);
+    std::cout << "begin make_analysis" << std::endl;
+    m_results.analysis =
+        make_analysis(run_data, m_results, m_params.analysis_functions);
+    std::cout << "end make_analysis" << std::endl;
+    m_results.n_accept = m_state_sampler.n_accept;
+    m_results.n_reject = m_state_sampler.n_reject;
 
     if (m_params.results_io) {
-      m_params.results_io->write(m_results, run_index);
+      std::cout << "begin results_io::write" << std::endl;
+      m_params.results_io->write(m_results, run_data.conditions, run_index);
+      std::cout << "end results_io::write" << std::endl;
     }
+    std::cout << "end finalize " << m_params.label << std::endl;
   }
 
  private:
-  SamplingFixtureParams<config_type> m_params;
+  SamplingFixtureParams<config_type, stats_type> m_params;
 
   /// \brief This is for write_status_if_due only
   Index m_n_samples = 0;
@@ -179,9 +206,9 @@ class SamplingFixture {
 
   StateSampler<config_type> m_state_sampler;
 
-  CompletionCheck m_completion_check;
+  CompletionCheck<stats_type> m_completion_check;
 
-  Results<config_type> m_results;
+  Results<config_type, stats_type> m_results;
 };
 
 }  // namespace monte
