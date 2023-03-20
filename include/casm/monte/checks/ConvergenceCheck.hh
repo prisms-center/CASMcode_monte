@@ -2,6 +2,7 @@
 #define CASM_monte_ConvergenceCheck
 
 #include <cmath>
+#include <iostream>
 
 #include "casm/monte/definitions.hh"
 #include "casm/monte/sampling/Sampler.hh"
@@ -21,10 +22,26 @@ struct IndividualConvergenceCheckResult {
   StatisticsType stats;
 };
 
+/// \brief Make statistics object
+template <typename StatisticsType>
+StatisticsType make_statistics(
+    CalcStatisticsFunction<StatisticsType> calc_statistics_f,
+    SamplerComponent const &key, double confidence,
+    CountType N_samples_for_statistics, Sampler const &sampler,
+    Sampler const &sample_weight);
+
 /// \brief Check convergence of a range of observations
 template <typename StatisticsType>
 IndividualConvergenceCheckResult<StatisticsType> convergence_check(
     StatisticsType const &stats, double requested_precision);
+
+/// \brief Check convergence of a range of observations
+template <typename StatisticsType>
+IndividualConvergenceCheckResult<StatisticsType> convergence_check(
+    CalcStatisticsFunction<StatisticsType> calc_statistics_f,
+    SamplerComponent const &key, double requested_precision, double confidence,
+    CountType N_samples_for_statistics, Sampler const &sampler,
+    Sampler const &sample_weight);
 
 /// \brief Convergence check results data structure (all requested components)
 template <typename StatisticsType>
@@ -56,10 +73,30 @@ ConvergenceCheckResults<StatisticsType> convergence_check(
     std::map<SamplerComponent, double> const &requested_precision,
     double confidence, CountType N_samples_for_equilibration,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    std::vector<double> const &sample_weight);
+    Sampler const &sample_weight);
 
 /// --- template implementations ---
 
+/// \brief Make statistics object
+template <typename StatisticsType>
+StatisticsType make_statistics(
+    CalcStatisticsFunction<StatisticsType> calc_statistics_f,
+    SamplerComponent const &key, double confidence,
+    CountType N_samples_for_statistics, Sampler const &sampler,
+    Sampler const &sample_weight) {
+  if (sample_weight.n_samples() == 0) {
+    static Eigen::VectorXd empty_vec;
+    return calc_statistics_f(
+        sampler.component(key.component_index).tail(N_samples_for_statistics),
+        empty_vec, confidence);
+  } else {
+    return calc_statistics_f(
+        sampler.component(key.component_index).tail(N_samples_for_statistics),
+        sample_weight.component(0).tail(N_samples_for_statistics), confidence);
+  }
+}
+
+/// \brief Check convergence of a range of observations
 template <typename StatisticsType>
 IndividualConvergenceCheckResult<StatisticsType> convergence_check(
     StatisticsType const &stats, double requested_precision) {
@@ -68,6 +105,19 @@ IndividualConvergenceCheckResult<StatisticsType> convergence_check(
   result.requested_precision = requested_precision;
   result.is_converged = get_calculated_precision(stats) < requested_precision;
   return result;
+}
+
+/// \brief Check convergence of a range of observations
+template <typename StatisticsType>
+IndividualConvergenceCheckResult<StatisticsType> convergence_check(
+    CalcStatisticsFunction<StatisticsType> calc_statistics_f,
+    SamplerComponent const &key, double requested_precision, double confidence,
+    CountType N_samples_for_statistics, Sampler const &sampler,
+    Sampler const &sample_weight) {
+  return convergence_check(
+      make_statistics(calc_statistics_f, key, confidence,
+                      N_samples_for_statistics, sampler, sample_weight),
+      requested_precision);
 }
 
 /// \brief Check convergence of all requested properties
@@ -94,7 +144,7 @@ ConvergenceCheckResults<StatisticsType> convergence_check(
     std::map<SamplerComponent, double> const &requested_precision,
     double confidence, CountType N_samples_for_equilibration,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    std::vector<double> const &sample_weight) {
+    Sampler const &sample_weight) {
   ConvergenceCheckResults<StatisticsType> results;
   CountType N_samples = get_n_samples(samplers);
 
@@ -115,19 +165,6 @@ ConvergenceCheckResults<StatisticsType> convergence_check(
   // will set to false if any requested sampler components are not converged
   results.all_converged = true;
 
-  // if weighting, use weighted_observation(i) = sample_weight[i] *
-  // observation(i) * N / W where W = sum_i sample_weight[i]; same weight_factor
-  // N/W applies for all properties
-  double weight_factor;
-  if (sample_weight.size()) {
-    Index N = sample_weight.size();
-    double W = 0.0;
-    for (Index i = 0; i < sample_weight.size(); ++i) {
-      W += sample_weight[i];
-    }
-    weight_factor = N / W;
-  }
-
   // check requested sampler components for equilibration
   for (auto const &p : requested_precision) {
     SamplerComponent const &key = p.first;
@@ -137,30 +174,10 @@ ConvergenceCheckResults<StatisticsType> convergence_check(
     Sampler const &sampler = *find_or_throw(samplers, key)->second;
 
     // do convergence check
-    IndividualConvergenceCheckResult<StatisticsType> current;
-    if (sample_weight.size() == 0) {
-      current = convergence_check(
-          calc_statistics_f(sampler.component(key.component_index)
-                                .tail(results.N_samples_for_statistics),
-                            confidence),
-          precision);
-    } else {
-      // weighted observations
-      if (sample_weight.size() != sampler.n_samples()) {
-        throw std::runtime_error(
-            "Error in convergence_check: sample_weight.size() != "
-            "sampler.n_samples()");
-      }
-      Eigen::VectorXd weighted_observations =
-          sampler.component(key.component_index)
-              .tail(results.N_samples_for_statistics);
-      Index i_weight = sampler.n_samples() - results.N_samples_for_statistics;
-      for (Index i = 0; i < weighted_observations.size(); ++i, ++i_weight) {
-        weighted_observations(i) *= weight_factor * sample_weight[i_weight];
-      }
-      current = convergence_check(
-          calc_statistics_f(weighted_observations, confidence), precision);
-    }
+    IndividualConvergenceCheckResult<StatisticsType> current =
+        convergence_check(calc_statistics_f, key, precision, confidence,
+                          results.N_samples_for_statistics, sampler,
+                          sample_weight);
 
     // combine results
     results.all_converged &= current.is_converged;

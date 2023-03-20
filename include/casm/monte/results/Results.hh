@@ -17,6 +17,8 @@ struct Results {
   typedef ConfigType config_type;
   typedef StatisticsType stats_type;
 
+  Results() : sample_weight({}) {}
+
   /// Elapsed clocktime
   std::optional<TimeType> elapsed_clocktime;
 
@@ -40,7 +42,7 @@ struct Results {
   std::vector<TimeType> sample_time;
 
   /// Vector of weights given to sample (not normalized)
-  std::vector<double> sample_weight;
+  Sampler sample_weight;
 
   /// Vector of clocktimes when a sample occurred
   std::vector<TimeType> sample_clocktime;
@@ -60,11 +62,11 @@ struct Results {
 
 template <typename ConfigType, typename StatisticsType>
 double confidence(Results<ConfigType, StatisticsType> const &results) {
-  return results.completion_check_results.confidence;
+  return results.completion_check_results.params.confidence;
 }
 
 template <typename ConfigType, typename StatisticsType>
-CalcStatisticsFunction<StatisticsType> calc_statistics_f(
+CalcStatisticsFunction<StatisticsType> get_calc_statistics_f(
     Results<ConfigType, StatisticsType> const &results) {
   return results.completion_check_results.params.calc_statistics_f;
 }
@@ -95,7 +97,7 @@ double requested_precision(SamplerComponent const &key,
 template <typename ConfigType, typename StatisticsType>
 Index N_samples_for_all_to_equilibrate(
     Results<ConfigType, StatisticsType> const &results) {
-  return results.completion_check_results.equilibriation_check_results
+  return results.completion_check_results.equilibration_check_results
       .N_samples_for_all_to_equilibrate;
 }
 
@@ -113,14 +115,8 @@ Index N_samples(Results<ConfigType, StatisticsType> const &results) {
 
 template <typename ConfigType, typename StatisticsType>
 bool all_equilibrated(Results<ConfigType, StatisticsType> const &results) {
-  if (!results.completion_check_results.equilibration_check_results
-           .all_equilibrated) {
-    return false;
-  }
-  if (N_samples_for_statistics(results) == 0) {
-    return false;
-  }
-  return true;
+  return results.completion_check_results.equilibration_check_results
+      .all_equilibrated;
 }
 
 template <typename ConfigType, typename StatisticsType>
@@ -136,7 +132,8 @@ double acceptance_rate(Results<ConfigType, StatisticsType> const &results) {
 }
 
 template <typename ConfigType, typename StatisticsType>
-double elapsed_clocktime(Results<ConfigType, StatisticsType> const &results) {
+std::optional<double> elapsed_clocktime(
+    Results<ConfigType, StatisticsType> const &results) {
   return results.elapsed_clocktime;
 }
 
@@ -145,7 +142,8 @@ IndividualEquilibrationCheckResult equilibration_result(
     SamplerComponent const &key,
     Results<ConfigType, StatisticsType> const &results) {
   return results.completion_check_results.equilibration_check_results
-      .individual_results[key];
+      .individual_results.find(key)
+      ->second;
 }
 
 template <typename ConfigType, typename StatisticsType>
@@ -153,7 +151,8 @@ IndividualConvergenceCheckResult<StatisticsType> convergence_result(
     SamplerComponent const &key,
     Results<ConfigType, StatisticsType> const &results) {
   return results.completion_check_results.convergence_check_results
-      .individual_results[key];
+      .individual_results.find(key)
+      ->second;
 }
 
 template <typename ConfigType, typename StatisticsType>
@@ -163,14 +162,14 @@ struct QuantityStats {
       : shape(sampler.shape()),
         is_scalar((shape.size() == 0)),
         component_names(sampler.component_names()) {
-    auto stats_f = calc_statistics_f(results);
+    auto calc_statistics_f = get_calc_statistics_f(results);
 
     Index i = 0;
     for (auto const &component_name : component_names) {
       SamplerComponent key(quantity_name, i, component_name);
 
       if (is_auto_converge_mode(results)) {
-        if (!all_equilibrated(results)) {
+        if (N_samples_for_statistics(results) == 0) {
           if (is_requested_to_converge(key, results)) {
             is_converged.push_back(false);
             component_stats.push_back(std::nullopt);
@@ -185,17 +184,20 @@ struct QuantityStats {
             component_stats.push_back(convergence_r.stats);
           } else {
             is_converged.push_back(std::nullopt);
-            component_stats.push_back(stats_f(
-                sampler.component(i).tail(N_samples_for_statistics(results)),
-                confidence(results)));
+            component_stats.push_back(
+                make_statistics(calc_statistics_f, key, confidence(results),
+                                N_samples_for_statistics(results), sampler,
+                                results.sample_weight));
           }
         }
       } else {
         is_converged.push_back(std::nullopt);
-        component_stats.push_back(
-            stats_f(sampler.component(i).tail(sampler.n_samples()),
-                    confidence(results)));
+        component_stats.push_back(make_statistics(
+            calc_statistics_f, key, confidence(results), sampler.n_samples(),
+            sampler, results.sample_weight));
       }
+
+      ++i;
     }
   }
 
@@ -215,6 +217,16 @@ struct QuantityStats {
   /// otherwise statistics
   std::vector<std::optional<StatisticsType>> component_stats;
 };
+
+template <typename ResultsType>
+QuantityStats<typename ResultsType::config_type,
+              typename ResultsType::stats_type>
+make_quantity_stats(std::string quantity_name, Sampler const &sampler,
+                    ResultsType const &results) {
+  return QuantityStats<typename ResultsType::config_type,
+                       typename ResultsType::stats_type>(quantity_name, sampler,
+                                                         results);
+}
 
 }  // namespace monte
 }  // namespace CASM

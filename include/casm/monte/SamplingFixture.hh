@@ -6,6 +6,7 @@
 #include "casm/monte/checks/CutoffCheck.hh"
 #include "casm/monte/checks/EquilibrationCheck.hh"
 #include "casm/monte/definitions.hh"
+#include "casm/monte/results/Results.hh"
 #include "casm/monte/results/io/ResultsIO.hh"
 #include "casm/monte/sampling/Sampler.hh"
 #include "casm/monte/sampling/SamplingParams.hh"
@@ -24,7 +25,7 @@ template <typename ConfigType, typename StatisticsType>
 struct SamplingFixtureParams {
   typedef ConfigType config_type;
   typedef StatisticsType stats_type;
-  typedef Results<config_type, stats_type> results_type;
+  typedef ::CASM::monte::Results<config_type, stats_type> results_type;
   typedef ResultsIO<results_type> results_io_type;
 
   SamplingFixtureParams(
@@ -66,18 +67,22 @@ struct SamplingFixtureParams {
   monte::MethodLog method_log;
 };
 
-template <typename _ConfigType, typename _StatisticsType>
+template <typename _ConfigType, typename _StatisticsType, typename _EngineType>
 class SamplingFixture {
  public:
   typedef _ConfigType config_type;
   typedef _StatisticsType stats_type;
+  typedef _EngineType engine_type;
   typedef State<config_type> state_type;
 
-  SamplingFixture(SamplingFixtureParams<config_type, stats_type> const &_params)
+  SamplingFixture(SamplingFixtureParams<config_type, stats_type> const &_params,
+                  std::shared_ptr<engine_type> _engine)
       : m_params(_params),
+        m_engine(_engine),
         m_n_samples(0),
         m_is_complete(false),
-        m_state_sampler(m_params.sampling_params, m_params.sampling_functions),
+        m_state_sampler(m_engine, m_params.sampling_params,
+                        m_params.sampling_functions),
         m_completion_check(m_params.completion_check_params) {}
 
   /// \brief Label, to distinguish multiple sampling fixtures
@@ -89,7 +94,7 @@ class SamplingFixture {
   }
 
   /// \brief State sampler
-  StateSampler<config_type> const &state_sampler() const {
+  StateSampler<config_type, engine_type> const &state_sampler() const {
     return m_state_sampler;
   }
 
@@ -122,21 +127,30 @@ class SamplingFixture {
     return m_is_complete;
   }
 
-  void write_status_if_due() {
+  void write_status(Index run_index) {
+    if (m_params.method_log.logfile_path.empty()) {
+      return;
+    }
+    Log &log = m_params.method_log.log;
+    m_params.method_log.reset();
+    jsonParser json;
+    json["run_index"] = run_index;
+    json["time"] = log.time_s();
+    to_json(m_completion_check.results(), json["completion_check_results"]);
+    log << json << std::endl;
+    log.begin_lap();
+  }
+
+  void write_status_if_due(Index run_index) {
     // Log method status - for efficiency, only check after a new sample is
     // taken
     if (m_n_samples != get_n_samples(m_state_sampler.samplers)) {
       m_n_samples = get_n_samples(m_state_sampler.samplers);
+
       Log &log = m_params.method_log.log;
       std::optional<double> &log_frequency = m_params.method_log.log_frequency;
       if (log_frequency.has_value() && log.lap_time() > *log_frequency) {
-        m_params.method_log.reset();
-        jsonParser json;
-        json["status"] = "incomplete";
-        json["time"] = log.time_s();
-        to_json(m_completion_check.results(), json["completion_check_results"]);
-        log << json << std::endl;
-        log.begin_lap();
+        write_status(run_index);
       }
     }
   }
@@ -171,7 +185,6 @@ class SamplingFixture {
 
   void finalize(state_type const &state, Index run_index,
                 RunData<config_type> const &run_data) {
-    std::cout << "begin finalize " << m_params.label << std::endl;
     Log &log = m_params.method_log.log;
     m_results.elapsed_clocktime = log.time_s();
     m_results.samplers = std::move(m_state_sampler.samplers);
@@ -181,30 +194,30 @@ class SamplingFixture {
     m_results.sample_clocktime = std::move(m_state_sampler.sample_clocktime);
     m_results.sample_trajectory = std::move(m_state_sampler.sample_trajectory);
     m_results.completion_check_results = m_completion_check.results();
-    std::cout << "begin make_analysis" << std::endl;
     m_results.analysis =
         make_analysis(run_data, m_results, m_params.analysis_functions);
-    std::cout << "end make_analysis" << std::endl;
     m_results.n_accept = m_state_sampler.n_accept;
     m_results.n_reject = m_state_sampler.n_reject;
 
     if (m_params.results_io) {
-      std::cout << "begin results_io::write" << std::endl;
       m_params.results_io->write(m_results, run_data.conditions, run_index);
-      std::cout << "end results_io::write" << std::endl;
     }
-    std::cout << "end finalize " << m_params.label << std::endl;
+
+    write_status(run_index);
   }
 
  private:
   SamplingFixtureParams<config_type, stats_type> m_params;
+
+  /// Random number generator engine
+  std::shared_ptr<engine_type> m_engine;
 
   /// \brief This is for write_status_if_due only
   Index m_n_samples = 0;
 
   bool m_is_complete = false;
 
-  StateSampler<config_type> m_state_sampler;
+  StateSampler<config_type, engine_type> m_state_sampler;
 
   CompletionCheck<stats_type> m_completion_check;
 

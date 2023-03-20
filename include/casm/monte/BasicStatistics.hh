@@ -15,8 +15,8 @@ namespace monte {
 /// - double get_calculated_precision(StatisticsType const &stats);
 /// - template<> CalcStatisticsFunction<StatisticsType>
 /// default_calc_statistics_f();
-/// - void append_statistics_to_json_arrays(Statistics const &stats, jsonParser
-/// &json);
+/// - void append_statistics_to_json_arrays(std::optional<StatisticsType> const
+/// &stats, jsonParser &json);
 /// - void to_json(StatisticsType const &stats, jsonParser &json);
 ///
 struct BasicStatistics {
@@ -30,22 +30,21 @@ struct BasicStatistics {
   double calculated_precision;
 };
 
-double get_calculated_precision(BasicStatistics const &stats) {
+inline double get_calculated_precision(BasicStatistics const &stats) {
   return stats.calculated_precision;
 }
 
 /// \brief Calculated statistics for a range of observations
 BasicStatistics calc_basic_statistics(Eigen::VectorXd const &observations,
+                                      Eigen::VectorXd const &sample_weight,
                                       double confidence);
 
 template <>
 CalcStatisticsFunction<BasicStatistics>
-default_calc_statistics_f<BasicStatistics>() {
-  return calc_basic_statistics;
-}
+default_calc_statistics_f<BasicStatistics>();
 
-void append_statistics_to_json_arrays(BasicStatistics const &stats,
-                                      jsonParser &json);
+void append_statistics_to_json_arrays(
+    std::optional<BasicStatistics> const &stats, jsonParser &json);
 
 void to_json(BasicStatistics const &stats, jsonParser &json);
 

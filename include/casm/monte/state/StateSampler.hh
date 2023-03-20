@@ -2,6 +2,7 @@
 #define CASM_monte_StateSampler
 
 #include "casm/casm_io/Log.hh"
+#include "casm/monte/RandomNumberGenerator.hh"
 #include "casm/monte/definitions.hh"
 #include "casm/monte/sampling/Sampler.hh"
 #include "casm/monte/sampling/SamplingParams.hh"
@@ -87,11 +88,17 @@ void set_value_by_component_name(
 /// - Holds the data that is sampled, and when it was sampled
 /// - Includes methods for incrementing the step/pass/time, and checking if a
 ///   sample is due and taking the sample
-template <typename _ConfigType>
+template <typename _ConfigType, typename _EngineType>
 struct StateSampler {
   typedef _ConfigType ConfigType;
+  typedef _EngineType EngineType;
+  typedef _ConfigType config_type;
+  typedef _EngineType engine_type;
 
   // --- Parameters for determining when samples are taken, what is sampled ---
+
+  /// Random number generator
+  monte::RandomNumberGenerator<engine_type> random_number_generator;
 
   /// \brief Sample by step, pass, or time
   ///
@@ -113,6 +120,10 @@ struct StateSampler {
   ///                      samples_per_period ) )
   ///           time = begin + period ^ ( (n + shift) / samples_per_period )
   ///
+  /// If stochastic_sample_period == true, then instead of setting the sample
+  /// time / count deterministally, use the sampling period to determine the
+  /// sampling rate and determine the next sample time / count stochastically.
+  ///
   SAMPLE_METHOD sample_method;
 
   /// \brief See `sample_method`
@@ -126,6 +137,9 @@ struct StateSampler {
 
   /// \brief See `sample_method`
   double shift;
+
+  /// \brief See `sample_method`
+  bool stochastic_sample_period;
 
   /// \brief If true, save the configuration when a sample is taken
   ///
@@ -195,7 +209,7 @@ struct StateSampler {
   std::vector<TimeType> sample_time;
 
   /// \brief The weight to give a sample, if applicable
-  std::vector<TimeType> sample_weight;
+  Sampler sample_weight;
 
   /// \brief The clocktime when a sample was taken, if applicable
   std::vector<TimeType> sample_clocktime;
@@ -208,14 +222,16 @@ struct StateSampler {
   /// \brief Constructor
   ///
   /// Note: Call `reset(double _steps_per_pass)` before sampling begins.
-  StateSampler(SamplingParams const &_sampling_params,
+  StateSampler(std::shared_ptr<EngineType> _engine,
+               SamplingParams const &_sampling_params,
                StateSamplingFunctionMap<ConfigType> const &sampling_functions)
       : StateSampler(
-            _sampling_params.sample_mode,
+            _engine, _sampling_params.sample_mode,
             {},  // functions populated in constructor body
             _sampling_params.sample_method, _sampling_params.begin,
             _sampling_params.period, _sampling_params.samples_per_period,
-            _sampling_params.shift, _sampling_params.do_sample_trajectory,
+            _sampling_params.shift, _sampling_params.stochastic_sample_period,
+            _sampling_params.do_sample_trajectory,
             _sampling_params.do_sample_time) {
     // populate functions, samplers
     for (std::string name : _sampling_params.sampler_names) {
@@ -242,26 +258,36 @@ struct StateSampler {
   ///     period. See `sample_method`.
   /// \param _log_sampling_shift Controls logarithmically sampling spacing. See
   ///     `sample_method`.
+  /// \param _stochastic_sample_period If true, then instead of setting the
+  /// sample
+  ///      time / count deterministally, use the sampling period to determine
+  ///      the sampling rate and determine the next sample time / count
+  ///      stochastically.
+
   /// \param _do_sample_trajectory If true, save the configuration when a sample
   ///     is taken
   ///
   /// Note: Call `reset(double _steps_per_pass)` before sampling begins.
-  StateSampler(SAMPLE_MODE _sample_mode,
+  StateSampler(std::shared_ptr<EngineType> _engine, SAMPLE_MODE _sample_mode,
                std::vector<StateSamplingFunction<ConfigType>> const &_functions,
                SAMPLE_METHOD _sample_method = SAMPLE_METHOD::LINEAR,
                double _sample_begin = 0.0, double _sampling_period = 1.0,
                double _samples_per_period = 1.0,
                double _log_sampling_shift = 0.0,
+               bool _stochastic_sample_period = false,
                bool _do_sample_trajectory = false, bool _do_sample_time = false)
-      : sample_mode(_sample_mode),
+      : random_number_generator(_engine),
+        sample_mode(_sample_mode),
         sample_method(_sample_method),
         begin(_sample_begin),
         period(_sampling_period),
         samples_per_period(_samples_per_period),
         shift(_log_sampling_shift),
+        stochastic_sample_period(_stochastic_sample_period),
         do_sample_trajectory(_do_sample_trajectory),
         do_sample_time(_do_sample_time),
-        functions(_functions) {
+        functions(_functions),
+        sample_weight({}) {
     reset(1.0);
   }
 
@@ -294,21 +320,77 @@ struct StateSampler {
     if (sample_mode == SAMPLE_MODE::BY_TIME) {
       next_sample_count = 0;
       next_sample_time = sample_at(sample_time.size());
+      if (next_sample_time < 0.0) {
+        throw std::runtime_error(
+            "Error: state sampling period parameter error, next_sample_time < "
+            "0.0");
+      }
     } else {
       next_sample_time = 0.0;
       next_sample_count =
           static_cast<CountType>(std::round(sample_at(sample_count.size())));
+      if (next_sample_count < 0) {
+        throw std::runtime_error(
+            "Error: state sampling period parameter error, next_sample_count < "
+            "0");
+      }
     }
+  }
+
+  /// \brief Stochastically determine how many steps or passes
+  ///     until the next sample
+  CountType stochastic_count_step(double sample_rate) {
+    CountType dn = 1;
+    double max = 1.0;
+    while (true) {
+      if (random_number_generator.random_real(max) < sample_rate) {
+        return dn;
+      }
+      ++dn;
+    }
+  }
+
+  /// \brief Stochastically determine much time
+  ///     until the next sample
+  TimeType stochastic_time_step(TimeType sample_rate) {
+    TimeType max = 1.0;
+    return -std::log(random_number_generator.random_real(max)) / sample_rate;
   }
 
   /// \brief Return the count / time when the sample_index-th sample should be
   ///     taken
-  double sample_at(CountType sample_index) const {
-    double n = static_cast<double>(sample_index);
-    if (sample_method == SAMPLE_METHOD::LINEAR) {
-      return begin + (period / samples_per_period) * n;
-    } else /* sample_method == SAMPLE_METHOD::LOG */ {
-      return begin + std::pow(period, (n + shift) / samples_per_period);
+  ///
+  /// Notes:
+  /// - If stochastic_sample_period == true, then the next sample is chosen at
+  ///   a count or time using the input sampling parameters to determine a rate
+  /// - If stochastic_sample_period == true, then sample_index must equal
+  ///   the current sample_count or sample_time size
+  double sample_at(CountType sample_index) {
+    if (stochastic_sample_period) {
+      if (sample_index == 0) {
+        return begin;
+      }
+      double n = static_cast<double>(sample_index);
+      double rate;
+      if (sample_method == SAMPLE_METHOD::LINEAR) {
+        rate = 1.0 / (period / samples_per_period);
+      } else /* sample_method == SAMPLE_METHOD::LOG */ {
+        rate = 1.0 / (std::log(period) *
+                      std::pow(period, (n + shift) / samples_per_period) /
+                      samples_per_period);
+      }
+      if (sample_mode == SAMPLE_MODE::BY_TIME) {
+        return sample_time.back() + stochastic_time_step(rate);
+      } else {
+        return sample_count.back() + stochastic_count_step(rate);
+      }
+    } else {
+      double n = static_cast<double>(sample_index);
+      if (sample_method == SAMPLE_METHOD::LINEAR) {
+        return begin + (period / samples_per_period) * n;
+      } else /* sample_method == SAMPLE_METHOD::LOG */ {
+        return begin + std::pow(period, (n + shift) / samples_per_period);
+      }
     }
   }
 
@@ -360,9 +442,19 @@ struct StateSampler {
     // - Set next sample count
     if (sample_mode == SAMPLE_MODE::BY_TIME) {
       next_sample_time = sample_at(sample_time.size());
+      if (next_sample_time <= time) {
+        throw std::runtime_error(
+            "Error: state sampling period parameter error, next_sample_time <= "
+            "current time");
+      }
     } else {
       next_sample_count =
           static_cast<CountType>(std::round(sample_at(sample_count.size())));
+      if (next_sample_count <= count) {
+        throw std::runtime_error(
+            "Error: state sampling period parameter error, next_sample_count "
+            "<= current count");
+      }
     }
   }
 

@@ -40,7 +40,10 @@ class Sampler {
           std::vector<std::string> const &_component_names,
           CountType _capacity_increment = 1000);
 
-  /// \brief Add a new sample
+  /// \brief Add a scalar sample
+  void push_back(double const &value);
+
+  /// \brief Add a new sample - any shape, unrolled
   void push_back(Eigen::VectorXd const &vector);
 
   /// \brief Set all values directly
@@ -200,7 +203,16 @@ inline Sampler::Sampler(std::vector<Index> _shape,
   clear();
 }
 
-/// \brief Add a new sample
+/// \brief Add a new sample of a scalar quantity
+inline void Sampler::push_back(double const &value) {
+  if (n_samples() == sample_capacity()) {
+    set_sample_capacity(sample_capacity() + m_capacity_increment);
+  }
+  m_values(m_n_samples, 0) = value;
+  ++m_n_samples;
+}
+
+/// \brief Add a new sample - any shape, unrolled
 inline void Sampler::push_back(Eigen::VectorXd const &vector) {
   if (n_samples() == sample_capacity()) {
     set_sample_capacity(sample_capacity() + m_capacity_increment);

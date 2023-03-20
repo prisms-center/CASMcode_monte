@@ -24,12 +24,14 @@ struct IndividualEquilibrationCheckResult {
 };
 
 typedef std::function<IndividualEquilibrationCheckResult(
-    Eigen::VectorXd const &observations, double precision)>
+    Eigen::VectorXd const &observations, Eigen::VectorXd const &sample_weight,
+    double precision)>
     EquilibrationCheckFunction;
 
 /// \brief Check if a range of observations have equilibrated
 IndividualEquilibrationCheckResult default_equilibration_check(
-    Eigen::VectorXd const &observations, double precision);
+    Eigen::VectorXd const &observations, Eigen::VectorXd const &sample_weight,
+    double precision);
 
 /// \brief Equilibration check results data structure (all requested components)
 struct EquilibrationCheckResults {
@@ -55,7 +57,7 @@ EquilibrationCheckResults equilibration_check(
     EquilibrationCheckFunction equilibration_check_f,
     std::map<SamplerComponent, double> const &requested_precision,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    std::vector<double> const &sample_weight, bool check_all);
+    Sampler const &sample_weight, bool check_all);
 
 }  // namespace monte
 }  // namespace CASM

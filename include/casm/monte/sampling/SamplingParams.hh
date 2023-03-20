@@ -33,6 +33,10 @@ struct SamplingParams {
   ///                      samples_per_period ) )
   ///           time = begin + period ^ ( (n + shift) / samples_per_period )
   ///
+  /// If stochastic_sample_period == true, then instead of setting the sample
+  /// time / count deterministally, use the sampling period to determine the
+  /// sampling rate and determine the next sample time / count stochastically.
+  ///
   SAMPLE_METHOD sample_method;
 
   // --- Parameters for determining when samples are taken ---
@@ -48,6 +52,9 @@ struct SamplingParams {
 
   /// \brief See `sample_method`
   double shift;
+
+  /// \brief See `sample_method`
+  bool stochastic_sample_period;
 
   /// \brief What quantities to sample
   ///

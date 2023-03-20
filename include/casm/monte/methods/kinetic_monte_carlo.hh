@@ -13,7 +13,7 @@ namespace CASM {
 namespace monte {
 
 /// \brief Data that can be used by sampling functions
-template <typename ConfigType>
+template <typename ConfigType, typename EngineType>
 struct KMCData {
   /// \brief This will be set to the current sampling
   ///     fixture label before sampling data.
@@ -21,7 +21,7 @@ struct KMCData {
 
   /// \brief This will be set to point to the current state
   ///     sampler sampling data.
-  monte::StateSampler<ConfigType> const *state_sampler;
+  monte::StateSampler<ConfigType, EngineType> const *state_sampler;
 
   /// \brief This will be set to the total event rate at sampling time
   double total_rate;
@@ -71,12 +71,12 @@ struct KMCData {
 };
 
 template <typename EventIDType, typename ConfigType, typename EventSelectorType,
-          typename GetEventType, typename StatisticsType>
-void kinetic_monte_carlo(State<ConfigType> &state, OccLocation &occ_location,
-                         KMCData<ConfigType> &kmc_data,
-                         EventSelectorType &event_selector,
-                         GetEventType get_event_f,
-                         RunManager<ConfigType, StatisticsType> &run_manager);
+          typename GetEventType, typename StatisticsType, typename EngineType>
+void kinetic_monte_carlo(
+    State<ConfigType> &state, OccLocation &occ_location,
+    KMCData<ConfigType, EngineType> &kmc_data,
+    EventSelectorType &event_selector, GetEventType get_event_f,
+    RunManager<ConfigType, StatisticsType, EngineType> &run_manager);
 
 // --- Implementation ---
 
@@ -110,12 +110,12 @@ void kinetic_monte_carlo(State<ConfigType> &state, OccLocation &occ_location,
 /// - None
 ///
 template <typename EventIDType, typename ConfigType, typename EventSelectorType,
-          typename GetEventType, typename StatisticsType>
-void kinetic_monte_carlo(State<ConfigType> &state, OccLocation &occ_location,
-                         KMCData<ConfigType> &kmc_data,
-                         EventSelectorType &event_selector,
-                         GetEventType get_event_f,
-                         RunManager<ConfigType, StatisticsType> &run_manager) {
+          typename GetEventType, typename StatisticsType, typename EngineType>
+void kinetic_monte_carlo(
+    State<ConfigType> &state, OccLocation &occ_location,
+    KMCData<ConfigType, EngineType> &kmc_data,
+    EventSelectorType &event_selector, GetEventType get_event_f,
+    RunManager<ConfigType, StatisticsType, EngineType> &run_manager) {
   // Used within the main loop:
   double total_rate;
   double event_time;
@@ -137,7 +137,7 @@ void kinetic_monte_carlo(State<ConfigType> &state, OccLocation &occ_location,
   // notes: it is important this uses
   // - the total_rate obtained before event selection
   auto pre_sample_action =
-      [&](SamplingFixture<ConfigType, StatisticsType> &fixture,
+      [&](SamplingFixture<ConfigType, StatisticsType, EngineType> &fixture,
           State<ConfigType> const &state) {
         // set data that can be used in sampling functions
         kmc_data.sampling_fixture_label = fixture.label();
@@ -150,7 +150,7 @@ void kinetic_monte_carlo(State<ConfigType> &state, OccLocation &occ_location,
       };
 
   auto post_sample_action =
-      [&](SamplingFixture<ConfigType, StatisticsType> &fixture,
+      [&](SamplingFixture<ConfigType, StatisticsType, EngineType> &fixture,
           State<ConfigType> const &state) {
         // set data that can be used in sampling functions
         kmc_data.prev_time[fixture.label()] = kmc_data.time;

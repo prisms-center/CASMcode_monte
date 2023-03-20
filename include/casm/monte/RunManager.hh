@@ -41,14 +41,23 @@ struct RunManagerParams {
 ///   Reading final states, and using as input to state
 ///   generator is more complicated otherwise.
 ///
-template <typename _ConfigType, typename _StatisticsType>
+template <typename _ConfigType, typename _StatisticsType, typename _EngineType>
 struct RunManager : public RunManagerParams {
   typedef _ConfigType config_type;
   typedef _StatisticsType stats_type;
+  typedef _EngineType engine_type;
   typedef State<config_type> state_type;
 
+  typedef SamplingFixtureParams<config_type, stats_type>
+      sampling_fixture_params_type;
+  typedef SamplingFixture<config_type, stats_type, engine_type>
+      sampling_fixture_type;
+
+  /// Random number generator engine
+  std::shared_ptr<engine_type> engine;
+
   /// Sampling fixtures
-  std::vector<SamplingFixture<config_type, stats_type>> sampling_fixtures;
+  std::vector<sampling_fixture_type> sampling_fixtures;
 
   /// Current run data
   RunData<config_type> current_run;
@@ -57,21 +66,20 @@ struct RunManager : public RunManagerParams {
   std::vector<RunData<config_type>> completed_runs;
 
   /// Next time-based sampling fixture, or nullptr if none
-  SamplingFixture<config_type, stats_type> *next_sampling_fixture;
+  sampling_fixture_type *next_sampling_fixture;
 
   /// Next time-based sampling sample time
   double next_sample_time;
 
   /// Default null action before / after sampling
   struct NullAction {
-    void operator()(SamplingFixture<config_type, stats_type> const &fixture,
+    void operator()(sampling_fixture_type const &fixture,
                     state_type const &state){
         // do nothing
     };
   };
 
-  typedef std::function<bool(SamplingFixture<config_type, stats_type> const &,
-                             state_type const &)>
+  typedef std::function<bool(sampling_fixture_type const &, state_type const &)>
       BreakPointCheck;
 
   /// \brief Break point checks to perform when sampling the fixture with label
@@ -80,15 +88,17 @@ struct RunManager : public RunManagerParams {
 
   bool break_point_set;
 
-  RunManager(RunManagerParams const &run_manager_params,
-             std::vector<SamplingFixtureParams<config_type, stats_type>> const
-                 &sampling_fixture_params)
+  RunManager(
+      RunManagerParams const &run_manager_params,
+      std::shared_ptr<engine_type> _engine,
+      std::vector<sampling_fixture_params_type> const &sampling_fixture_params)
       : RunManagerParams(run_manager_params),
+        engine(_engine),
         next_sampling_fixture(nullptr),
         next_sample_time(0.0),
         break_point_set(false) {
     for (auto const &params : sampling_fixture_params) {
-      sampling_fixtures.emplace_back(params);
+      sampling_fixtures.emplace_back(params, engine);
     }
   }
 
@@ -141,7 +151,7 @@ struct RunManager : public RunManagerParams {
 
   void write_status_if_due() {
     for (auto &fixture : sampling_fixtures) {
-      fixture.write_status_if_due();
+      fixture.write_status_if_due(completed_runs.size());
     }
   }
 
@@ -235,7 +245,6 @@ struct RunManager : public RunManagerParams {
   /// - Writes completed runs to  `output_dir / "completed_runs.json"`
   /// - Calls `finalize` for all sampling fixtures
   void finalize(state_type const &final_state) {
-    std::cout << "begin RunManager::finalize" << std::endl;
     if (this->do_save_last_final_state || this->do_save_all_final_states) {
       current_run.final_state = final_state;
     }
@@ -251,7 +260,6 @@ struct RunManager : public RunManagerParams {
 
     // write completed_runs file
     if (!this->output_dir.empty()) {
-      std::cout << "RunManager::finalize write completed_runs" << std::endl;
       fs::path completed_runs_path = this->output_dir / "completed_runs.json";
       fs::create_directories(this->output_dir);
       SafeOfstream file;
@@ -261,10 +269,7 @@ struct RunManager : public RunManagerParams {
               this->do_write_final_states);
       json.print(file.ofstream(), -1);
       file.close();
-      std::cout << "RunManager::finalize write completed_runs done"
-                << std::endl;
     }
-    std::cout << "end RunManager::finalize" << std::endl;
   }
 };
 

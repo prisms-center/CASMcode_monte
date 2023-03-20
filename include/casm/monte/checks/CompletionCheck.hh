@@ -63,9 +63,6 @@ struct CompletionCheckResults {
   /// Parameters used for the completion check
   CompletionCheckParams<StatisticsType> params;
 
-  /// \brief Confidence level used for calculated precision of mean
-  double confidence = 0.95;
-
   /// Current count (if given)
   std::optional<CountType> count;
 
@@ -84,35 +81,50 @@ struct CompletionCheckResults {
   /// Maximums cutoff check results
   bool has_any_maximum_met = false;
 
-  /// Equilibration and convergence checks are performed if:
-  /// - n_samples >= check_begin && n_samples % check_frequency == 0, and
-  /// - requested_precision.size() > 0
-  bool convergence_check_performed = false;
+  /// Number of samples when equilibration and convergence checks performed
+  std::optional<CountType> n_samples_at_convergence_check;
 
+  /// Equilibration check results, when last performed
   EquilibrationCheckResults equilibration_check_results;
 
+  /// Convergence check results, when last performed
   ConvergenceCheckResults<StatisticsType> convergence_check_results;
 
   /// True if calculation is complete, either due to convergence or cutoff
   bool is_complete = false;
 
-  void reset(std::optional<CountType> _count = std::nullopt,
-             std::optional<TimeType> _time = std::nullopt,
-             CountType _n_samples = 0) {
+  /// \brief Reset for step by step updates
+  ///
+  /// Reset most values, but not:
+  /// - params
+  /// - n_samples_at_convergence_check
+  /// - equilibration_check_results
+  /// - convergence_check_results
+  void partial_reset(std::optional<CountType> _count = std::nullopt,
+                     std::optional<TimeType> _time = std::nullopt,
+                     CountType _n_samples = 0) {
     // params: do not reset
-    // confidence: do not reset
     count = _count;
     time = _time;
     clocktime = std::nullopt;
     n_samples = _n_samples;
     has_all_minimums_met = false;
     has_any_maximum_met = false;
-    if (convergence_check_performed) {
-      convergence_check_performed = false;
-      equilibration_check_results = EquilibrationCheckResults();
-      convergence_check_results = ConvergenceCheckResults<StatisticsType>();
-    }
     is_complete = false;
+  }
+
+  /// \brief Reset for next run
+  ///
+  /// Reset all values, except:
+  /// - params
+  void full_reset(std::optional<CountType> _count = std::nullopt,
+                  std::optional<TimeType> _time = std::nullopt,
+                  CountType _n_samples = 0) {
+    // params: do not reset
+    partial_reset(_count, _time, _n_samples);
+    n_samples_at_convergence_check = std::nullopt;
+    equilibration_check_results = EquilibrationCheckResults();
+    convergence_check_results = ConvergenceCheckResults<StatisticsType>();
   }
 };
 
@@ -126,20 +138,19 @@ class CompletionCheck {
 
   bool is_complete(
       std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-      std::vector<double> const &sample_weight, Log &log);
+      Sampler const &sample_weight, Log &log);
 
   bool is_complete(
       std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-      std::vector<double> const &sample_weight, CountType count, Log &log);
+      Sampler const &sample_weight, CountType count, Log &log);
 
   bool is_complete(
       std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-      std::vector<double> const &sample_weight, TimeType time, Log &log);
+      Sampler const &sample_weight, TimeType time, Log &log);
 
   bool is_complete(
       std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-      std::vector<double> const &sample_weight, CountType count, TimeType time,
-      Log &log);
+      Sampler const &sample_weight, CountType count, TimeType time, Log &log);
 
   CompletionCheckResults<StatisticsType> const &results() const {
     return m_results;
@@ -148,13 +159,12 @@ class CompletionCheck {
  private:
   bool _is_complete(
       std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-      std::vector<double> const &sample_weight, std::optional<CountType> count,
+      Sampler const &sample_weight, std::optional<CountType> count,
       std::optional<TimeType> time, Log &log);
 
-  void _check(std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-              std::vector<double> const &sample_weight,
-              std::optional<CountType> count, std::optional<TimeType> time,
-              CountType n_samples);
+  void _check_convergence(
+      std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
+      Sampler const &sample_weight, CountType n_samples);
 
   CompletionCheckParams<StatisticsType> m_params;
 
@@ -171,7 +181,7 @@ class CompletionCheck {
 
 template <typename StatisticsType>
 void CompletionCheck<StatisticsType>::reset() {
-  m_results.reset();
+  m_results.full_reset();
   m_n_checks = 0.0;
   m_last_n_samples = 0.0;
   m_last_clocktime = 0.0;
@@ -180,36 +190,35 @@ void CompletionCheck<StatisticsType>::reset() {
 template <typename StatisticsType>
 bool CompletionCheck<StatisticsType>::is_complete(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    std::vector<double> const &sample_weight, Log &log) {
+    Sampler const &sample_weight, Log &log) {
   return _is_complete(samplers, sample_weight, std::nullopt, std::nullopt, log);
 }
 
 template <typename StatisticsType>
 bool CompletionCheck<StatisticsType>::is_complete(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    std::vector<double> const &sample_weight, CountType count, Log &log) {
+    Sampler const &sample_weight, CountType count, Log &log) {
   return _is_complete(samplers, sample_weight, count, std::nullopt, log);
 }
 
 template <typename StatisticsType>
 bool CompletionCheck<StatisticsType>::is_complete(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    std::vector<double> const &sample_weight, TimeType time, Log &log) {
+    Sampler const &sample_weight, TimeType time, Log &log) {
   return _is_complete(samplers, sample_weight, std::nullopt, time, log);
 }
 
 template <typename StatisticsType>
 bool CompletionCheck<StatisticsType>::is_complete(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    std::vector<double> const &sample_weight, CountType count, TimeType time,
-    Log &log) {
+    Sampler const &sample_weight, CountType count, TimeType time, Log &log) {
   return _is_complete(samplers, sample_weight, count, time, log);
 }
 
 template <typename StatisticsType>
 bool CompletionCheck<StatisticsType>::_is_complete(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    std::vector<double> const &sample_weight, std::optional<CountType> count,
+    Sampler const &sample_weight, std::optional<CountType> count,
     std::optional<TimeType> time, Log &log) {
   CountType n_samples = get_n_samples(samplers);
 
@@ -221,7 +230,7 @@ bool CompletionCheck<StatisticsType>::_is_complete(
     m_last_clocktime = clocktime;
   }
 
-  m_results.reset(count, time, n_samples);
+  m_results.partial_reset(count, time, n_samples);
 
   m_results.has_all_minimums_met = all_minimums_met(
       m_params.cutoff_params, count, time, n_samples, clocktime);
@@ -231,7 +240,20 @@ bool CompletionCheck<StatisticsType>::_is_complete(
     return false;
   }
 
-  // check equilibration and convergence
+  // if any maximum met, stop even if not converged
+  m_results.has_any_maximum_met = any_maximum_met(m_params.cutoff_params, count,
+                                                  time, n_samples, clocktime);
+
+  if (m_results.has_any_maximum_met) {
+    m_results.is_complete = true;
+    // force convergence check
+    if (n_samples != m_results.n_samples_at_convergence_check) {
+      _check_convergence(samplers, sample_weight, n_samples);
+    }
+    return true;
+  }
+
+  // if maximums not met, check equilibration and convergence if due
   double check_at;
   if (m_params.log_spacing) {
     check_at =
@@ -245,14 +267,11 @@ bool CompletionCheck<StatisticsType>::_is_complete(
   }
   if (n_samples >= static_cast<CountType>(std::round(check_at))) {
     m_n_checks += 1.0;
-    _check(samplers, sample_weight, count, time, n_samples);
+    _check_convergence(samplers, sample_weight, n_samples);
   }
 
-  // if any maximum met, stop even if not converged
-  m_results.has_any_maximum_met = any_maximum_met(m_params.cutoff_params, count,
-                                                  time, n_samples, clocktime);
-
-  if (m_results.has_any_maximum_met) {
+  // if all requested to converge are converged, then complete
+  if (m_results.convergence_check_results.all_converged) {
     m_results.is_complete = true;
   }
 
@@ -264,20 +283,17 @@ CompletionCheck<StatisticsType>::CompletionCheck(
     CompletionCheckParams<StatisticsType> params)
     : m_params(params) {
   m_results.params = m_params;
-  m_results.confidence = m_params.confidence;
   m_results.is_complete = false;
 }
 
 /// \brief Check for equilibration and convergence, then set m_results
 template <typename StatisticsType>
-void CompletionCheck<StatisticsType>::_check(
+void CompletionCheck<StatisticsType>::_check_convergence(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    std::vector<double> const &sample_weight, std::optional<CountType> count,
-    std::optional<TimeType> time, CountType n_samples) {
+    Sampler const &sample_weight, CountType n_samples) {
   // if auto convergence mode:
   if (m_params.requested_precision.size()) {
-    m_results.convergence_check_performed = true;
-    std::cout << "~~~ equilibration and convergence check ~~~" << std::endl;
+    m_results.n_samples_at_convergence_check = n_samples;
 
     // check for equilibration
     bool check_all = false;
@@ -293,12 +309,9 @@ void CompletionCheck<StatisticsType>::_check(
                             m_results.equilibration_check_results
                                 .N_samples_for_all_to_equilibrate,
                             samplers, sample_weight);
-    }
-
-    // if all requested to converge are converged, then complete
-    if (m_results.convergence_check_results.all_converged) {
-      m_results.is_complete = true;
-      return;
+    } else {
+      m_results.convergence_check_results =
+          ConvergenceCheckResults<StatisticsType>();
     }
   }
 }

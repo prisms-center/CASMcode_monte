@@ -47,7 +47,7 @@ namespace monte {
 /// equilibrated is encountered.
 /// \returns An IndividualEquilibrationCheckResult instance
 ///
-IndividualEquilibrationCheckResult default_equilibration_check(
+IndividualEquilibrationCheckResult _default_equilibration_check(
     Eigen::VectorXd const &observations, double prec) {
   if (observations.size() == 0) {
     throw std::runtime_error(
@@ -116,6 +116,39 @@ IndividualEquilibrationCheckResult default_equilibration_check(
   return result;
 }
 
+IndividualEquilibrationCheckResult default_equilibration_check(
+    Eigen::VectorXd const &observations, Eigen::VectorXd const &sample_weight,
+    double prec) {
+  if (sample_weight.size() == 0) {
+    return _default_equilibration_check(observations, prec);
+  } else {
+    // weighted observations
+    if (sample_weight.size() != observations.size()) {
+      throw std::runtime_error(
+          "Error in equilibration_check: sample_weight.size() != "
+          "observations.size()");
+    }
+
+    // if weighting, use weighted_observation(i) = sample_weight[i] *
+    // observation(i) * N / W where W = sum_i sample_weight[i]; same
+    // weight_factor N/W applies for all properties
+    double weight_factor;
+    Index N = sample_weight.size();
+    double W = 0.0;
+    for (Index i = 0; i < sample_weight.size(); ++i) {
+      W += sample_weight[i];
+    }
+    weight_factor = N / W;
+
+    Eigen::VectorXd weighted_observations = observations;
+    for (Index i = 0; i < weighted_observations.size(); ++i) {
+      weighted_observations(i) *= weight_factor * sample_weight[i];
+    }
+
+    return _default_equilibration_check(weighted_observations, prec);
+  }
+}
+
 /// \brief Check convergence of all requested properties
 ///
 /// \param requested_precision Sampler components to check, with requested
@@ -136,7 +169,7 @@ EquilibrationCheckResults equilibration_check(
     EquilibrationCheckFunction equilibration_check_f,
     std::map<SamplerComponent, double> const &requested_precision,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    std::vector<double> const &sample_weight, bool check_all) {
+    Sampler const &sample_weight, bool check_all) {
   EquilibrationCheckResults results;
 
   if (!requested_precision.size()) {
@@ -145,19 +178,6 @@ EquilibrationCheckResults equilibration_check(
 
   // will set to false if any requested sampler components are not equilibrated
   results.all_equilibrated = true;
-
-  // if weighting, use weighted_observation(i) = sample_weight[i] *
-  // observation(i) * N / W where W = sum_i sample_weight[i]; same weight_factor
-  // N/W applies for all properties
-  double weight_factor;
-  if (sample_weight.size()) {
-    Index N = sample_weight.size();
-    double W = 0.0;
-    for (Index i = 0; i < sample_weight.size(); ++i) {
-      W += sample_weight[i];
-    }
-    weight_factor = N / W;
-  }
 
   // check requested sampler components for equilibration
   for (auto const &p : requested_precision) {
@@ -168,25 +188,9 @@ EquilibrationCheckResults equilibration_check(
     Sampler const &sampler = *find_or_throw(samplers, key)->second;
 
     // do equilibration check
-    IndividualEquilibrationCheckResult current;
-    if (sample_weight.size() == 0) {
-      current = equilibration_check_f(
-          sampler.component(key.component_index),  // observations
-          precision);
-    } else {
-      // weighted observations
-      if (sample_weight.size() != sampler.n_samples()) {
-        throw std::runtime_error(
-            "Error in equilibration_check: sample_weight.size() != "
-            "observations.size()");
-      }
-      Eigen::VectorXd weighted_observations =
-          sampler.component(key.component_index);
-      for (Index i = 0; i < weighted_observations.size(); ++i) {
-        weighted_observations(i) *= weight_factor * sample_weight[i];
-      }
-      current = equilibration_check_f(weighted_observations, precision);
-    }
+    IndividualEquilibrationCheckResult current = equilibration_check_f(
+        sampler.component(key.component_index),  // observations
+        sample_weight.component(0), precision);
 
     // combine results
     results.N_samples_for_all_to_equilibrate =

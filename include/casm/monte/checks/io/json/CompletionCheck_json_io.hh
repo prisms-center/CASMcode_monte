@@ -275,7 +275,8 @@ void parse(InputParser<CompletionCheckParams<StatisticsType>> &parser,
   using namespace CompletionCheck_json_io_impl;
   CompletionCheckParams<StatisticsType> completion_check_params;
 
-  completion_check_params.equilibration_check_f = monte::equilibration_check;
+  completion_check_params.equilibration_check_f =
+      monte::default_equilibration_check;
   completion_check_params.calc_statistics_f =
       default_calc_statistics_f<StatisticsType>();
 
@@ -350,11 +351,13 @@ jsonParser &to_json(CompletionCheckResults<StatisticsType> const &value,
   json["time"] = value.time;
   json["clocktime"] = value.clocktime;
   json["n_samples"] = value.n_samples;
-  json["convergence_check_performed"] = value.convergence_check_performed;
   json["is_complete"] = value.is_complete;
-  json["confidence"] = value.confidence;
-  json["equilibration_check_results"] = value.equilibration_check_results;
-  json["convergence_check_results"] = value.convergence_check_results;
+  if (value.n_samples_at_convergence_check.has_value()) {
+    json["n_samples_at_convergence_check"] =
+        value.n_samples_at_convergence_check;
+    json["equilibration_check_results"] = value.equilibration_check_results;
+    json["convergence_check_results"] = value.convergence_check_results;
+  }
   return json;
 }
 

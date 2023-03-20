@@ -22,13 +22,13 @@ namespace monte {
 
 template <typename ConfigType, typename CalculatorType,
           typename ProposeOccEventFuntionType, typename GeneratorType,
-          typename StatisticsType>
-void occupation_metropolis(State<ConfigType> &state, OccLocation &occ_location,
-                           CalculatorType &potential,
-                           std::vector<OccSwap> const &possible_swaps,
-                           ProposeOccEventFuntionType propose_event_f,
-                           GeneratorType &random_number_generator,
-                           RunManager<ConfigType, StatisticsType> &run_manager);
+          typename StatisticsType, typename EngineType>
+void occupation_metropolis(
+    State<ConfigType> &state, OccLocation &occ_location,
+    CalculatorType &potential, std::vector<OccSwap> const &possible_swaps,
+    ProposeOccEventFuntionType propose_event_f,
+    GeneratorType &random_number_generator,
+    RunManager<ConfigType, StatisticsType, EngineType> &run_manager);
 
 // --- Implementation ---
 
@@ -81,13 +81,13 @@ void occupation_metropolis(State<ConfigType> &state, OccLocation &occ_location,
 ///
 template <typename ConfigType, typename CalculatorType,
           typename ProposeOccEventFuntionType, typename GeneratorType,
-          typename StatisticsType>
+          typename StatisticsType, typename EngineType>
 void occupation_metropolis(
     State<ConfigType> &state, OccLocation &occ_location,
     CalculatorType &potential, std::vector<OccSwap> const &possible_swaps,
     ProposeOccEventFuntionType propose_event_f,
     GeneratorType &random_number_generator,
-    RunManager<ConfigType, StatisticsType> &run_manager) {
+    RunManager<ConfigType, StatisticsType, EngineType> &run_manager) {
   // --- Track potential energy in state properties ---
   if (potential.state() != &state) {
     throw std::runtime_error(

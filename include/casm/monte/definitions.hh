@@ -43,7 +43,7 @@ template <typename _ConfigType>
 using StateModifyingFunctionMap =
     std::map<std::string, StateModifyingFunction<_ConfigType>>;
 
-template <typename _ConfigType>
+template <typename _ConfigType, typename _EngineType>
 struct StateSampler;
 
 template <typename _ConfigType>
@@ -56,7 +56,8 @@ using StateSamplingFunctionMap =
 struct BasicStatistics;
 template <typename StatisticsType>
 using CalcStatisticsFunction = std::function<StatisticsType(
-    Eigen::VectorXd const &observations, double confidence)>;
+    Eigen::VectorXd const &observations, Eigen::VectorXd const &sample_weight,
+    double confidence)>;
 
 template <typename StatisticsType>
 CalcStatisticsFunction<BasicStatistics> default_calc_statistics_f();
@@ -91,9 +92,9 @@ class OccSwap;
 
 template <typename ConfigType, typename StatisticsType>
 struct SamplingFixtureParams;
-template <typename ConfigType, typename StatisticsType>
+template <typename ConfigType, typename StatisticsType, typename EngineType>
 class SamplingFixture;
-template <typename _ConfigType, typename StatisticsType>
+template <typename ConfigType, typename StatisticsType, typename EngineType>
 struct RunManager;
 
 }  // namespace monte

@@ -44,6 +44,12 @@ namespace monte {
 ///   shift: number (optional, default=0.0)
 ///     Used with `"spacing": "log"`.
 ///
+///   stochastic_sample_period: bool (optional, default=false)
+///     If true, then instead of setting the sample time / count
+///     deterministally, use the sampling period to determine the
+///     sampling rate and determine the next sample time / count
+///     stochastically with equivalent mean rate.
+///
 ///   quantities: array of string (optional)
 ///     Specifies which quantities will be sampled. Options depend on the
 ///     type of Monte Carlo calculation and should be keys in the
@@ -129,6 +135,11 @@ void parse(InputParser<SamplingParams> &parser,
   // "shift"
   sampling_params.shift = 0.0;
   parser.optional(sampling_params.shift, "shift");
+
+  // "stochastic_sample_period"
+  sampling_params.stochastic_sample_period = false;
+  parser.optional(sampling_params.stochastic_sample_period,
+                  "stochastic_sample_period");
 
   // "quantities"
   parser.optional(sampling_params.sampler_names, "quantities");

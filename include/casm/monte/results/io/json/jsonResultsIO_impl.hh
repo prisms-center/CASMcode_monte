@@ -256,7 +256,7 @@ jsonParser &append_statistics_to_json(
     std::pair<std::string, std::shared_ptr<Sampler>> quantity, jsonParser &json,
     ResultsType const &results) {
   std::string const &quantity_name = quantity.first;
-  QuantityStats<ResultsType> qstats(quantity_name, *quantity.second, results);
+  auto qstats = make_quantity_stats(quantity_name, *quantity.second, results);
 
   ensure_initialized_objects(json, {quantity_name});
   auto &quantity_json = json[quantity_name];
@@ -269,7 +269,7 @@ jsonParser &append_statistics_to_json(
     append_statistics_to_json_arrays(qstats.component_stats[i], tjson);
     if (qstats.is_converged[i].has_value()) {
       ensure_initialized_arrays(tjson, {"is_converged"});
-      tjson["is_converged"].append(qstats.is_converged[i].value());
+      tjson["is_converged"].push_back(qstats.is_converged[i].value());
     }
   };
 
@@ -285,6 +285,7 @@ jsonParser &append_statistics_to_json(
       ++i;
     }
   }
+  return json;
 }
 
 /// \brief Append completion check results to summary JSON
@@ -299,13 +300,9 @@ jsonParser &append_statistics_to_json(
 ///   "N_samples": [...], <-- appends to
 /// }
 /// \endcode
-template <typename ConfigType>
+template <typename ConfigType, typename StatisticsType>
 jsonParser &append_completion_check_results_to_json(
-    Results<ConfigType> const &results, jsonParser &json) {
-  auto const &completion_r = results.completion_check_results;
-  auto const &equilibration_r = completion_r.equilibration_check_results;
-  auto const &convergence_r = completion_r.convergence_check_results;
-
+    Results<ConfigType, StatisticsType> const &results, jsonParser &json) {
   bool auto_converge_mode = is_auto_converge_mode(results);
 
   if (auto_converge_mode) {
@@ -342,6 +339,7 @@ jsonParser &append_completion_check_results_to_json(
     json["acceptance_rate"].push_back(acceptance_rate(results));
     json["elapsed_clocktime"].push_back(elapsed_clocktime(results));
     json["N_samples"].push_back(N_samples(results));
+    json["N_samples_for_statistics"].push_back(N_samples(results));
   }
 
   return json;
@@ -384,7 +382,7 @@ jsonParser &append_results_analysis_to_json(
 
     if (is_scalar) {
       ensure_initialized_arrays(value_json, {"value"});
-      if (!all_equilibrated(results)) {
+      if (is_auto_converge_mode(results) && !all_equilibrated(results)) {
         value_json["value"].push_back("did_not_equilibrate");
       } else {
         value_json["value"].push_back(value(0));
@@ -401,7 +399,7 @@ jsonParser &append_results_analysis_to_json(
       Index i = 0;
       for (auto const &component_name : component_names) {
         ensure_initialized_arrays(value_json, {component_name});
-        if (!all_equilibrated(results)) {
+        if (is_auto_converge_mode(results) && !all_equilibrated(results)) {
           value_json[component_name].push_back("did_not_equilibrate");
         } else {
           value_json[component_name].push_back(value(i));
@@ -583,8 +581,8 @@ void jsonResultsIO<_ResultsType>::write_observations(
   if (results.sample_time.size()) {
     json["time"] = results.sample_time;
   }
-  if (results.sample_weight.size()) {
-    json["weight"] = results.sample_weight;
+  if (results.sample_weight.component(0).size()) {
+    json["weight"] = results.sample_weight.component(0);
   }
   if (results.sample_clocktime.size()) {
     json["clocktime"] = results.sample_clocktime;
