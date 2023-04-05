@@ -333,13 +333,14 @@ jsonParser &append_completion_check_results_to_json(
 
     json["N_samples"].push_back(N_samples(results));
   } else {
-    ensure_initialized_arrays(
-        json, {"acceptance_rate", "elapsed_clocktime", "N_samples"});
+    ensure_initialized_arrays(json, {"acceptance_rate", "elapsed_clocktime",
+                                     "N_samples", "N_samples_for_statistics"});
 
     json["acceptance_rate"].push_back(acceptance_rate(results));
     json["elapsed_clocktime"].push_back(elapsed_clocktime(results));
     json["N_samples"].push_back(N_samples(results));
-    json["N_samples_for_statistics"].push_back(N_samples(results));
+    json["N_samples_for_statistics"].push_back(
+        N_samples_for_statistics(results));
   }
 
   return json;
