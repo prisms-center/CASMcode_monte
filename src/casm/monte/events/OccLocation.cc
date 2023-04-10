@@ -78,7 +78,7 @@ void OccLocation::initialize(Eigen::VectorXi const &occupation) {
         for (Index atom_index = 0; atom_index < n_atoms; ++atom_index) {
           mol.component.push_back(m_atoms.size());
           Atom atom;
-          atom.translation = xtal::UnitCell(0, 0, 0);
+          atom.translation = m_convert.l_to_ijk(mol.l);
           atom.n_jumps = 0;
           m_atoms.push_back(atom);
           m_initial_atom_species_index.push_back(species_index);
@@ -109,7 +109,7 @@ void OccLocation::apply(const OccEvent &e, Eigen::VectorXi &occupation) {
       if (traj.from.l == -1) {
         // move from resevoir -- create a new atom
         Atom atom;
-        atom.translation = xtal::UnitCell(0, 0, 0);
+        atom.translation = m_convert.l_to_ijk(traj.to.l);
         atom.n_jumps = 0;
         Index species_index = traj.from.mol_id;
         xtal::Molecule molecule = m_convert.species_to_mol(species_index);
@@ -201,10 +201,11 @@ Eigen::MatrixXd OccLocation::atom_positions_cart() const {
   for (Index i = 0; i < this->mol_size(); ++i) {
     monte::Mol const &mol = this->mol(i);
     xtal::Molecule const &molecule = convert.species_to_mol(mol.species_index);
-    Eigen::Vector3d site_cart = convert.l_to_cart(mol.l);
+    Eigen::Vector3d site_basis_cart = convert.l_to_basis_cart(mol.l);
     Index atom_position_index = 0;
     for (Index atom_id : mol.component) {
-      R.col(atom_id) = site_cart + molecule.atom(atom_position_index).cart() +
+      R.col(atom_id) = site_basis_cart +
+                       molecule.atom(atom_position_index).cart() +
                        L * this->atom(atom_id).translation.cast<double>();
       ++atom_position_index;
     }

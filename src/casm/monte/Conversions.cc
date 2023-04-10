@@ -102,7 +102,7 @@ Conversions::Conversions(
   m_lat_column_mat = prim.lattice().lat_column_mat();
   for (Index b = 0; b < prim.basis().size(); ++b) {
     m_basis_cart.push_back(prim.basis()[b].const_cart());
-    m_basis_cart.push_back(prim.basis()[b].const_frac());
+    m_basis_frac.push_back(prim.basis()[b].const_frac());
   }
 
   // find m_Nasym
@@ -182,6 +182,14 @@ Eigen::Vector3d Conversions::l_to_cart(Index l) const {
 Eigen::Vector3d Conversions::l_to_frac(Index l) const {
   xtal::UnitCellCoord bijk = l_to_bijk(l);
   return m_basis_frac[bijk.sublattice()] + bijk.unitcell().cast<double>();
+}
+
+Eigen::Vector3d Conversions::l_to_basis_cart(Index l) const {
+  return m_basis_cart[l_to_b(l)];
+}
+
+Eigen::Vector3d Conversions::l_to_basis_frac(Index l) const {
+  return m_basis_frac[l_to_b(l)];
 }
 
 Index Conversions::bijk_to_l(xtal::UnitCellCoord const &bijk) const {

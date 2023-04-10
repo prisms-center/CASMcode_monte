@@ -69,6 +69,8 @@ class Conversions {
   Index l_to_asym(Index l) const;
   Eigen::Vector3d l_to_cart(Index l) const;
   Eigen::Vector3d l_to_frac(Index l) const;
+  Eigen::Vector3d l_to_basis_cart(Index l) const;
+  Eigen::Vector3d l_to_basis_frac(Index l) const;
 
   Index bijk_to_l(xtal::UnitCellCoord const &bijk) const;
   Index bijk_to_unitl(xtal::UnitCellCoord const &bijk) const;
