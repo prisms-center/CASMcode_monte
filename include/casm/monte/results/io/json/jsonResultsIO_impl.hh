@@ -125,119 +125,6 @@ jsonParser &append_matrix_condition_to_json(
       json);
 }
 
-// /// \brief Append sampled data quantity to summary JSON
-// ///
-// /// \code
-// /// <quantity>: {
-// ///   "shape": [...],   // Scalar: [], Vector: [rows], Matrix: [rows, cols]
-// ///   "component_names": ["0", "1", "2", "3", ...],
-// ///   <component_name>: {
-// ///     "mean": [...], <-- appends to
-// ///     "calculated_precision": [...]  <-- appends to
-// ///     "is_converged": [...] <-- appends to, only if requested to converge
-// ///   }
-// /// }
-// /// \endcode
-// template <typename ResultsType>
-// jsonParser &append_statistics_to_json(
-//     std::pair<std::string, std::shared_ptr<Sampler>> quantity, jsonParser
-//     &json, ResultsType const &results) {
-//   std::string const &quantity_name = quantity.first;
-//   Sampler const &sampler = *quantity.second;
-//   ensure_initialized_objects(json, {quantity_name});
-//   auto &quantity_json = json[quantity_name];
-//
-//   std::vector<std::string> component_names =
-//   quantity.second->component_names(); bool is_scalar =
-//   (quantity.second->shape().size() == 0);
-//
-//   // write shape
-//   quantity_json["shape"] = quantity.second->shape();
-//
-//   // write component names - if not scalar
-//   if (!is_scalar) {
-//     quantity_json["component_names"] = component_names;
-//   }
-//
-//   CompletionCheckResults const &completion_r =
-//   results.completion_check_results; EquilibrationCheckResults const
-//   &equilibration_r =
-//       completion_r.equilibration_check_results;
-//   ConvergenceCheckResults const &convergence_r =
-//       completion_r.convergence_check_results;
-//   auto const &requested_precision = completion_r.params.requested_precision;
-//
-//   bool auto_converge_mode = (requested_precision.size() != 0);
-//
-//   // for each component calculate or get existing convergence check results
-//   Index i = 0;
-//   for (auto const &component_name : component_names) {
-//     SamplerComponent key(quantity_name, i, component_name);
-//
-//     bool is_requested_to_converge =
-//         (requested_precision.find(key) != requested_precision.end());
-//
-//     jsonParser *_tjson;
-//     if (is_scalar) {
-//       _tjson = &quantity_json;
-//     } else {
-//       ensure_initialized_objects(quantity_json, {component_name});
-//       _tjson = &(quantity_json[component_name]);
-//     }
-//
-//     jsonParser &tjson = *_tjson;
-//     ensure_initialized_arrays(tjson, {"mean", "calculated_precision"});
-//     if (is_requested_to_converge) {
-//       ensure_initialized_arrays(tjson, {"is_converged"});
-//     }
-//
-//     if (auto_converge_mode && (!equilibration_r.all_equilibrated ||
-//         convergence_r.N_samples_for_statistics == 0)) {
-//       tjson["mean"].push_back("did_not_equilibrate");
-//       tjson["calculated_precision"].push_back("did_not_equilibrate");
-//       if (is_requested_to_converge) {
-//         tjson["is_converged"].push_back(false);
-//       }
-//     } else {
-//       auto result_it = convergence_r.individual_results.find(key);
-//       if (result_it != convergence_r.individual_results.end()) {
-//         // if is a quantity specifically asked to be converged,
-//         //     use existing results
-//         auto const &result = result_it->second;
-//
-//         tjson["mean"].push_back(result.mean);
-//         tjson["calculated_precision"].push_back(result.calculated_precision);
-//         tjson["is_converged"].push_back(result.is_converged);
-//       } else {
-//         // if not a quantity specifically asked to be converged,
-//         //     do convergence check
-//         Index N_samples_for_statistics;
-//         if (auto_converge_mode) {
-//           N_samples_for_statistics = convergence_r.N_samples_for_statistics;
-//         }
-//         else {
-//           N_samples_for_statistics = sampler.n_samples();
-//         }
-//         double _precision = 0.0;
-//         if (is_requested_to_converge) {
-//           _precision = requested_precision.at(key);
-//         }
-//         auto result = convergence_check(
-//             sampler.component(i).tail(N_samples_for_statistics),
-//             _precision, completion_r.confidence);
-//         tjson["mean"].push_back(result.mean);
-//         tjson["calculated_precision"].push_back(result.calculated_precision);
-//         if (is_requested_to_converge) {
-//           tjson["is_converged"].push_back(result.is_converged);
-//         }
-//       }
-//     }
-//
-//     ++i;
-//   }
-//   return json;
-// }
-
 /// \brief Append sampled data quantity to summary JSON
 ///
 /// \code
@@ -504,7 +391,6 @@ void jsonResultsIO<_ResultsType>::write_summary(results_type const &results,
 
   ensure_initialized_objects(json, {"conditions", "statistics",
                                     "completion_check_results", "analysis"});
-  ensure_initialized_arrays(json, {"completed_runs"});
 
   for (auto const &condition : conditions.scalar_values) {
     append_scalar_condition_to_json(condition, json["conditions"],

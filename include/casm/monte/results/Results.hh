@@ -102,15 +102,19 @@ Index N_samples_for_all_to_equilibrate(
 }
 
 template <typename ConfigType, typename StatisticsType>
-Index N_samples_for_statistics(
-    Results<ConfigType, StatisticsType> const &results) {
-  return results.completion_check_results.convergence_check_results
-      .N_samples_for_statistics;
+Index N_samples(Results<ConfigType, StatisticsType> const &results) {
+  return get_n_samples(results.samplers);
 }
 
 template <typename ConfigType, typename StatisticsType>
-Index N_samples(Results<ConfigType, StatisticsType> const &results) {
-  return get_n_samples(results.samplers);
+Index N_samples_for_statistics(
+    Results<ConfigType, StatisticsType> const &results) {
+  if (is_auto_converge_mode(results)) {
+    return results.completion_check_results.convergence_check_results
+        .N_samples_for_statistics;
+  } else {
+    return N_samples(results);
+  }
 }
 
 template <typename ConfigType, typename StatisticsType>
