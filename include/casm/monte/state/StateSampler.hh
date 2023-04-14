@@ -566,10 +566,11 @@ Eigen::VectorXd StateSamplingFunction<_ConfigType>::operator()() const {
 ///     of the StateSamplingFunction specified by `sampler_name`.
 ///
 /// \throws std::runtime_error if `sampler_name` cannot be found.
-template <typename ConfigType, typename ValueType>
-void set_value(std::map<SamplerComponent, ValueType> &component_map,
-               StateSamplingFunctionMap<ConfigType> const &sampling_functions,
-               std::string const &sampler_name, ValueType const &value) {
+template <typename ConfigType>
+void set_abs_precision(
+    std::map<SamplerComponent, RequestedPrecision> &component_map,
+    StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+    std::string const &sampler_name, double value) {
   auto it = sampling_functions.find(sampler_name);
   if (it == sampling_functions.end()) {
     std::stringstream ss;
@@ -579,7 +580,8 @@ void set_value(std::map<SamplerComponent, ValueType> &component_map,
   Index component_index = 0;
   for (std::string const &component_name : it->second.component_names) {
     component_map.emplace(
-        SamplerComponent(sampler_name, component_index, component_name), value);
+        SamplerComponent(sampler_name, component_index, component_name),
+        RequestedPrecision::abs(value));
     ++component_index;
   }
 }
@@ -597,12 +599,11 @@ void set_value(std::map<SamplerComponent, ValueType> &component_map,
 ///
 /// \throws std::runtime_error if either `sampler_name` cannot be found or
 ///     `component_index` is out of range.
-template <typename ConfigType, typename ValueType>
-void set_value_by_component_index(
-    std::map<SamplerComponent, double> &component_map,
+template <typename ConfigType>
+void set_abs_precision_by_component_index(
+    std::map<SamplerComponent, RequestedPrecision> &component_map,
     StateSamplingFunctionMap<ConfigType> const &sampling_functions,
-    std::string const &sampler_name, Index component_index,
-    ValueType const &value) {
+    std::string const &sampler_name, Index component_index, double value) {
   auto it = sampling_functions.find(sampler_name);
   if (it == sampling_functions.end()) {
     std::stringstream ss;
@@ -618,7 +619,7 @@ void set_value_by_component_index(
   component_map.emplace(
       SamplerComponent(sampler_name, component_index,
                        it->second.component_names[component_index]),
-      value);
+      RequestedPrecision::abs(value));
 }
 
 /// \brief Adds a value in a map of SamplerComponent -> ValueType
@@ -635,12 +636,12 @@ void set_value_by_component_index(
 /// \throws std::runtime_error if either `sampler_name` or `component_name`
 /// cannot
 ///     be found.
-template <typename ConfigType, typename ValueType>
-void set_value_by_component_name(
-    std::map<SamplerComponent, double> &component_map,
+template <typename ConfigType>
+void set_abs_precision_by_component_name(
+    std::map<SamplerComponent, RequestedPrecision> &component_map,
     StateSamplingFunctionMap<ConfigType> const &sampling_functions,
     std::string const &sampler_name, std::string const &component_name,
-    ValueType const &value) {
+    double value) {
   auto it = sampling_functions.find(sampler_name);
   if (it == sampling_functions.end()) {
     std::stringstream ss;
@@ -651,7 +652,8 @@ void set_value_by_component_name(
   for (auto const &name : it->second.component_names) {
     if (name == component_name) {
       component_map.emplace(
-          SamplerComponent(sampler_name, component_index, name), value);
+          SamplerComponent(sampler_name, component_index, name),
+          RequestedPrecision::abs(value));
       return;
     }
     ++component_index;

@@ -34,6 +34,10 @@ inline double get_calculated_precision(BasicStatistics const &stats) {
   return stats.calculated_precision;
 }
 
+inline double get_calculated_relative_precision(BasicStatistics const &stats) {
+  return std::abs(stats.calculated_precision / stats.mean);
+}
+
 /// \brief Calculated statistics for a range of observations
 BasicStatistics calc_basic_statistics(Eigen::VectorXd const &observations,
                                       Eigen::VectorXd const &sample_weight,

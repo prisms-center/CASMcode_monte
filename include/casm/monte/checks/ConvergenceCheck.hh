@@ -17,7 +17,7 @@ struct IndividualConvergenceCheckResult {
   bool is_converged;
 
   /// \brief Requested absolute precision in <X>
-  double requested_precision;
+  RequestedPrecision requested_precision;
 
   StatisticsType stats;
 };
@@ -33,15 +33,15 @@ StatisticsType make_statistics(
 /// \brief Check convergence of a range of observations
 template <typename StatisticsType>
 IndividualConvergenceCheckResult<StatisticsType> convergence_check(
-    StatisticsType const &stats, double requested_precision);
+    StatisticsType const &stats, RequestedPrecision const &requested_precision);
 
 /// \brief Check convergence of a range of observations
 template <typename StatisticsType>
 IndividualConvergenceCheckResult<StatisticsType> convergence_check(
     CalcStatisticsFunction<StatisticsType> calc_statistics_f,
-    SamplerComponent const &key, double requested_precision, double confidence,
-    CountType N_samples_for_statistics, Sampler const &sampler,
-    Sampler const &sample_weight);
+    SamplerComponent const &key, RequestedPrecision const &requested_precision,
+    double confidence, CountType N_samples_for_statistics,
+    Sampler const &sampler, Sampler const &sample_weight);
 
 /// \brief Convergence check results data structure (all requested components)
 template <typename StatisticsType>
@@ -70,7 +70,7 @@ struct ConvergenceCheckResults {
 template <typename StatisticsType>
 ConvergenceCheckResults<StatisticsType> convergence_check(
     CalcStatisticsFunction<StatisticsType> calc_statistics_f,
-    std::map<SamplerComponent, double> const &requested_precision,
+    std::map<SamplerComponent, RequestedPrecision> const &requested_precision,
     double confidence, CountType N_samples_for_equilibration,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
     Sampler const &sample_weight);
@@ -99,11 +99,20 @@ StatisticsType make_statistics(
 /// \brief Check convergence of a range of observations
 template <typename StatisticsType>
 IndividualConvergenceCheckResult<StatisticsType> convergence_check(
-    StatisticsType const &stats, double requested_precision) {
+    StatisticsType const &stats,
+    RequestedPrecision const &requested_precision) {
   IndividualConvergenceCheckResult<StatisticsType> result;
   result.stats = stats;
   result.requested_precision = requested_precision;
-  result.is_converged = get_calculated_precision(stats) < requested_precision;
+  result.is_converged = true;
+  if (result.requested_precision.abs_convergence_is_required) {
+    result.is_converged &= get_calculated_precision(stats) <
+                           result.requested_precision.abs_precision;
+  }
+  if (result.requested_precision.rel_convergence_is_required) {
+    result.is_converged &= get_calculated_relative_precision(stats) <
+                           result.requested_precision.rel_precision;
+  }
   return result;
 }
 
@@ -111,9 +120,9 @@ IndividualConvergenceCheckResult<StatisticsType> convergence_check(
 template <typename StatisticsType>
 IndividualConvergenceCheckResult<StatisticsType> convergence_check(
     CalcStatisticsFunction<StatisticsType> calc_statistics_f,
-    SamplerComponent const &key, double requested_precision, double confidence,
-    CountType N_samples_for_statistics, Sampler const &sampler,
-    Sampler const &sample_weight) {
+    SamplerComponent const &key, RequestedPrecision const &requested_precision,
+    double confidence, CountType N_samples_for_statistics,
+    Sampler const &sampler, Sampler const &sample_weight) {
   return convergence_check(
       make_statistics(calc_statistics_f, key, confidence,
                       N_samples_for_statistics, sampler, sample_weight),
@@ -141,7 +150,7 @@ IndividualConvergenceCheckResult<StatisticsType> convergence_check(
 template <typename StatisticsType>
 ConvergenceCheckResults<StatisticsType> convergence_check(
     CalcStatisticsFunction<StatisticsType> calc_statistics_f,
-    std::map<SamplerComponent, double> const &requested_precision,
+    std::map<SamplerComponent, RequestedPrecision> const &requested_precision,
     double confidence, CountType N_samples_for_equilibration,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
     Sampler const &sample_weight) {
@@ -168,15 +177,15 @@ ConvergenceCheckResults<StatisticsType> convergence_check(
   // check requested sampler components for equilibration
   for (auto const &p : requested_precision) {
     SamplerComponent const &key = p.first;
-    double const &precision = p.second;
+    RequestedPrecision const &component_requested_precision = p.second;
 
     // find and validate sampler name && component index
     Sampler const &sampler = *find_or_throw(samplers, key)->second;
 
     // do convergence check
     IndividualConvergenceCheckResult<StatisticsType> current =
-        convergence_check(calc_statistics_f, key, precision, confidence,
-                          results.N_samples_for_statistics, sampler,
+        convergence_check(calc_statistics_f, key, component_requested_precision,
+                          confidence, results.N_samples_for_statistics, sampler,
                           sample_weight);
 
     // combine results

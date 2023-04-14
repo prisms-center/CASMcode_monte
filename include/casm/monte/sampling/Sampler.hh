@@ -140,6 +140,37 @@ struct SamplerComponent {
   bool operator<(SamplerComponent const &other) const;
 };
 
+struct RequestedPrecision {
+  bool abs_convergence_is_required = false;
+  double abs_precision;
+
+  bool rel_convergence_is_required = false;
+  double rel_precision;
+
+  static RequestedPrecision abs_and_rel(double abs_value, double rel_value) {
+    RequestedPrecision x;
+    x.abs_convergence_is_required = true;
+    x.abs_precision = abs_value;
+    x.rel_convergence_is_required = true;
+    x.rel_precision = rel_value;
+    return x;
+  }
+
+  static RequestedPrecision abs(double value) {
+    RequestedPrecision x;
+    x.abs_convergence_is_required = true;
+    x.abs_precision = value;
+    return x;
+  }
+
+  static RequestedPrecision rel(double value) {
+    RequestedPrecision x;
+    x.rel_convergence_is_required = true;
+    x.rel_precision = value;
+    return x;
+  }
+};
+
 /// \brief Find sampler by name and throw if not found
 inline std::map<std::string, std::shared_ptr<Sampler>>::const_iterator
 find_or_throw(std::map<std::string, std::shared_ptr<Sampler>> const &samplers,

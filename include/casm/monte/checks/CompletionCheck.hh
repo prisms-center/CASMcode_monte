@@ -33,7 +33,7 @@ struct CompletionCheckParams {
 
   /// \brief Sampler components that must be checked for convergence, and the
   ///     estimated precision to which the mean must be converged
-  std::map<SamplerComponent, double> requested_precision;
+  std::map<SamplerComponent, RequestedPrecision> requested_precision;
 
   /// \brief Confidence level for calculated precision of mean
   double confidence = 0.95;

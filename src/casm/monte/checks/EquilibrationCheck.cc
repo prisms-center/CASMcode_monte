@@ -118,7 +118,19 @@ IndividualEquilibrationCheckResult _default_equilibration_check(
 
 IndividualEquilibrationCheckResult default_equilibration_check(
     Eigen::VectorXd const &observations, Eigen::VectorXd const &sample_weight,
-    double prec) {
+    RequestedPrecision requested_precision) {
+  double prec;
+  if (requested_precision.abs_convergence_is_required) {
+    prec = requested_precision.abs_precision;
+  } else if (requested_precision.rel_convergence_is_required) {
+    prec = std::abs(observations.mean() * requested_precision.rel_precision);
+  } else {
+    IndividualEquilibrationCheckResult result;
+    result.is_equilibrated = true;
+    result.N_samples_for_equilibration = 0;
+    return result;
+  }
+
   if (sample_weight.size() == 0) {
     return _default_equilibration_check(observations, prec);
   } else {
@@ -167,7 +179,7 @@ IndividualEquilibrationCheckResult default_equilibration_check(
 ///     `get_n_samples(samplers) - N_samples_for_equilibration`.
 EquilibrationCheckResults equilibration_check(
     EquilibrationCheckFunction equilibration_check_f,
-    std::map<SamplerComponent, double> const &requested_precision,
+    std::map<SamplerComponent, RequestedPrecision> const &requested_precision,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
     Sampler const &sample_weight, bool check_all) {
   EquilibrationCheckResults results;
@@ -182,7 +194,7 @@ EquilibrationCheckResults equilibration_check(
   // check requested sampler components for equilibration
   for (auto const &p : requested_precision) {
     SamplerComponent const &key = p.first;
-    double const &precision = p.second;
+    RequestedPrecision const &component_requested_precision = p.second;
 
     // find and validate sampler name && component index
     Sampler const &sampler = *find_or_throw(samplers, key)->second;
@@ -190,7 +202,7 @@ EquilibrationCheckResults equilibration_check(
     // do equilibration check
     IndividualEquilibrationCheckResult current = equilibration_check_f(
         sampler.component(key.component_index),  // observations
-        sample_weight.component(0), precision);
+        sample_weight.component(0), component_requested_precision);
 
     // combine results
     results.N_samples_for_all_to_equilibrate =

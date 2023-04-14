@@ -57,7 +57,8 @@ template <typename ConfigType, typename StatisticsType>
 void _parse_component_index(
     InputParser<CompletionCheckParams<StatisticsType>> &parser,
     fs::path const &option, StateSamplingFunction<ConfigType> const &function,
-    double precision, std::map<SamplerComponent, double> &requested_precision) {
+    RequestedPrecision const &precision,
+    std::map<SamplerComponent, RequestedPrecision> &requested_precision) {
   // converge components specified by index
   std::vector<Index> component_index;
   parser.optional(component_index, option / "component_index");
@@ -82,7 +83,8 @@ template <typename ConfigType, typename StatisticsType>
 void _parse_component_name(
     InputParser<CompletionCheckParams<StatisticsType>> &parser,
     fs::path const &option, StateSamplingFunction<ConfigType> const &function,
-    double precision, std::map<SamplerComponent, double> &requested_precision) {
+    RequestedPrecision const &precision,
+    std::map<SamplerComponent, RequestedPrecision> &requested_precision) {
   // converge components specified by name
   std::vector<std::string> component_name;
   parser.optional(component_name, option / "component_name");
@@ -109,7 +111,8 @@ template <typename ConfigType, typename StatisticsType>
 void _parse_components(
     InputParser<CompletionCheckParams<StatisticsType>> &parser,
     fs::path const &option, StateSamplingFunction<ConfigType> const &function,
-    double precision, std::map<SamplerComponent, double> &requested_precision) {
+    RequestedPrecision const &precision,
+    std::map<SamplerComponent, RequestedPrecision> &requested_precision) {
   bool has_index =
       (parser.self.find_at(option / "component_index") != parser.self.end());
   bool has_name =
@@ -140,7 +143,7 @@ template <typename ConfigType, typename StatisticsType>
 void _parse_convergence_criteria(
     InputParser<CompletionCheckParams<StatisticsType>> &parser,
     StateSamplingFunctionMap<ConfigType> const &sampling_functions,
-    std::map<SamplerComponent, double> &requested_precision) {
+    std::map<SamplerComponent, RequestedPrecision> &requested_precision) {
   auto it = parser.self.find("convergence");
   if (it == parser.self.end()) {
     return;
@@ -161,9 +164,9 @@ void _parse_convergence_criteria(
       continue;
     }
 
-    // parse "precision"
-    double precision;
-    parser.require(precision, option / "precision");
+    // parse "abs_precision", "rel_precision", "precision" (deprecated)
+    RequestedPrecision precision;
+    from_json(precision, (*it)[i]);
 
     // parse "component_index", "component_name",
     //   or default (neither given, converges all components)

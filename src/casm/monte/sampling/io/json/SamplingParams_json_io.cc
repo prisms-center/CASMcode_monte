@@ -65,11 +65,6 @@ namespace monte {
 ///     If true, request that the entire configuration is saved each time
 ///     samples are taken.
 ///
-///   sample_time: bool (optional, default=false)
-///     If true, request that the time the sample occurred is stored. This
-///     option may be overriden based on the sample_by parameter and
-///     calculation type.
-///
 void parse(InputParser<SamplingParams> &parser,
            std::set<std::string> const &sampling_function_names,
            bool time_sampling_allowed) {
@@ -154,8 +149,7 @@ void parse(InputParser<SamplingParams> &parser,
   // "sample_trajectory"
   parser.optional(sampling_params.do_sample_trajectory, "sample_trajectory");
 
-  // "sample_time"
-  parser.optional(sampling_params.do_sample_time, "sample_time");
+  sampling_params.do_sample_time = time_sampling_allowed;
 
   if (parser.valid()) {
     parser.value = std::make_unique<SamplingParams>(sampling_params);

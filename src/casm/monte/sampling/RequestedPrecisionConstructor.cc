@@ -21,7 +21,7 @@ RequestedPrecisionConstructor::RequestedPrecisionConstructor(
   for (std::string const &component_name : sampler.component_names()) {
     requested_precision.emplace(
         SamplerComponent(sampler_name, i, component_name),
-        std::numeric_limits<double>::infinity());
+        RequestedPrecision());
     ++i;
   }
 }
@@ -39,7 +39,7 @@ RequestedPrecisionConstructor &RequestedPrecisionConstructor::component(
   }
   SamplerComponent component(sampler_name, component_index,
                              sampler.component_names()[component_index]);
-  double chosen = requested_precision.at(component);
+  RequestedPrecision chosen = requested_precision.at(component);
   requested_precision.clear();
   requested_precision.emplace(component, chosen);
   return *this;
@@ -60,7 +60,7 @@ RequestedPrecisionConstructor &RequestedPrecisionConstructor::component(
   }
   Index component_index = std::distance(begin, it);
   SamplerComponent component(sampler_name, component_index, component_name);
-  double chosen = requested_precision.at(component);
+  RequestedPrecision chosen = requested_precision.at(component);
   requested_precision.clear();
   requested_precision.emplace(component, chosen);
   return *this;
@@ -68,16 +68,46 @@ RequestedPrecisionConstructor &RequestedPrecisionConstructor::component(
 
 /// \brief Set the requested convergence precision for selected components
 RequestedPrecisionConstructor &RequestedPrecisionConstructor::precision(
-    double _precision) {
-  for (auto &value : requested_precision) {
-    value.second = _precision;
+    double _value) {
+  return this->abs_precision(_value);
+}
+
+/// \brief Set the requested convergence precision for selected components
+RequestedPrecisionConstructor &RequestedPrecisionConstructor::abs_precision(
+    double _value) {
+  for (auto &x : requested_precision) {
+    x.second.abs_convergence_is_required = true;
+    x.second.abs_precision = _value;
+  }
+  return *this;
+}
+
+/// \brief Set the requested convergence precision for selected components
+RequestedPrecisionConstructor &RequestedPrecisionConstructor::rel_precision(
+    double _value) {
+  for (auto &x : requested_precision) {
+    x.second.rel_convergence_is_required = true;
+    x.second.rel_precision = _value;
+  }
+  return *this;
+}
+
+/// \brief Set the requested convergence precision for selected components
+RequestedPrecisionConstructor &
+RequestedPrecisionConstructor::abs_and_rel_precision(double _abs_value,
+                                                     double _rel_value) {
+  for (auto &x : requested_precision) {
+    x.second.abs_convergence_is_required = true;
+    x.second.abs_precision = _abs_value;
+    x.second.rel_convergence_is_required = true;
+    x.second.rel_precision = _rel_value;
   }
   return *this;
 }
 
 /// \brief Conversion operator
-RequestedPrecisionConstructor::operator std::map<SamplerComponent,
-                                                 double> const &() const {
+RequestedPrecisionConstructor::operator std::map<
+    SamplerComponent, RequestedPrecision> const &() const {
   return requested_precision;
 }
 

@@ -15,8 +15,8 @@ struct RequestedPrecisionConstructor;
 /// // Given some samplers:
 /// std::map<std::string, std::shared_ptr<Sampler>> &samplers;
 ///
-/// // Construct map of SamplerComponent -> double precision:
-/// std::map<SamplerComponent, double> requested_precision =
+/// // Construct map of SamplerComponent -> RequestedPrecision precision:
+/// std::map<SamplerComponent, RequestedPrecision> requested_precision =
 ///     merge(
 ///         converge(samplers, "formation_energy").precision(0.001),
 ///         converge(samplers, "comp_n").component("O").precision(0.001),
@@ -27,17 +27,17 @@ struct RequestedPrecisionConstructor;
 /// \endcode
 ///
 /// Notes:
-/// - Example converging all components to the same precision:
+/// - Example converging all components to the same absolute precision:
 ///   \code
 ///   converge(samplers, "corr").precision(0.001)
 ///   \endcode
 /// - Example converging a particular component (by index) to particular
-///   precision:
+///   absolute precision:
 ///   \code
 ///   converge(samplers, "corr").component(1).precision(0.001)
 ///   \endcode
 /// - Example converging a particular component (by name) to particular
-///   precision:
+///   absolute precision:
 ///   \code
 ///   converge(samplers, "comp_n").component("Mg").precision(0.001)
 ///   \endcode
@@ -66,15 +66,29 @@ struct RequestedPrecisionConstructor {
   /// \brief Select only the specified component - by name
   RequestedPrecisionConstructor &component(std::string component_name);
 
-  /// \brief Set the requested convergence precision for selected components
-  RequestedPrecisionConstructor &precision(double _precision);
+  /// \brief Set the requested convergence absolute precision for selected
+  /// components
+  RequestedPrecisionConstructor &precision(double _abs_precision);
+
+  /// \brief Set the requested convergence absolute precision for selected
+  /// components
+  RequestedPrecisionConstructor &abs_precision(double _value);
+
+  /// \brief Set the requested convergence relative precision for selected
+  /// components
+  RequestedPrecisionConstructor &rel_precision(double _value);
+
+  /// \brief Set the requested convergence absolute and relative precision for
+  /// selected components
+  RequestedPrecisionConstructor &abs_and_rel_precision(double _abs_value,
+                                                       double _rel_value);
 
   /// \brief Conversion operator
-  operator std::map<SamplerComponent, double> const &() const;
+  operator std::map<SamplerComponent, RequestedPrecision> const &() const;
 
   std::string sampler_name;
   Sampler const &sampler;
-  std::map<SamplerComponent, double> requested_precision;
+  std::map<SamplerComponent, RequestedPrecision> requested_precision;
 };
 
 /// \brief Merge

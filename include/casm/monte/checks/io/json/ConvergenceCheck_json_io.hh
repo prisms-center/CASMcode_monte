@@ -3,6 +3,7 @@
 
 #include "casm/casm_io/json/jsonParser.hh"
 #include "casm/monte/checks/ConvergenceCheck.hh"
+#include "casm/monte/sampling/io/json/Sampler_json_io.hh"
 
 namespace CASM {
 

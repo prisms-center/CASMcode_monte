@@ -25,13 +25,13 @@ struct IndividualEquilibrationCheckResult {
 
 typedef std::function<IndividualEquilibrationCheckResult(
     Eigen::VectorXd const &observations, Eigen::VectorXd const &sample_weight,
-    double precision)>
+    RequestedPrecision requested_precision)>
     EquilibrationCheckFunction;
 
 /// \brief Check if a range of observations have equilibrated
 IndividualEquilibrationCheckResult default_equilibration_check(
     Eigen::VectorXd const &observations, Eigen::VectorXd const &sample_weight,
-    double precision);
+    RequestedPrecision requested_precision);
 
 /// \brief Equilibration check results data structure (all requested components)
 struct EquilibrationCheckResults {
@@ -55,7 +55,7 @@ struct EquilibrationCheckResults {
 
 EquilibrationCheckResults equilibration_check(
     EquilibrationCheckFunction equilibration_check_f,
-    std::map<SamplerComponent, double> const &requested_precision,
+    std::map<SamplerComponent, RequestedPrecision> const &requested_precision,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
     Sampler const &sample_weight, bool check_all);
 

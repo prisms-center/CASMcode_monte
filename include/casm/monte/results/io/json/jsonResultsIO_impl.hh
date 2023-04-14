@@ -193,14 +193,8 @@ jsonParser &append_completion_check_results_to_json(
   bool auto_converge_mode = is_auto_converge_mode(results);
 
   if (auto_converge_mode) {
-    ensure_initialized_arrays(
-        json, {"acceptance_rate", "elapsed_clocktime", "all_equilibrated",
-               "N_samples_for_all_to_equilibrate", "all_converged",
-               "N_samples_for_statistics", "N_samples"});
-
-    json["acceptance_rate"].push_back(acceptance_rate(results));
-
-    json["elapsed_clocktime"].push_back(elapsed_clocktime(results));
+    ensure_initialized_arrays(json, {"all_equilibrated", "all_converged",
+                                     "N_samples_for_all_to_equilibrate"});
 
     json["all_equilibrated"].push_back(all_equilibrated(results));
 
@@ -210,24 +204,28 @@ jsonParser &append_completion_check_results_to_json(
       json["N_samples_for_all_to_equilibrate"].push_back(
           N_samples_for_all_to_equilibrate(results));
 
-      json["N_samples_for_statistics"].push_back(
-          N_samples_for_statistics(results));
     } else {
       json["N_samples_for_all_to_equilibrate"].push_back("did_not_equilibrate");
-
-      json["N_samples_for_statistics"].push_back("did_not_equilibrate");
     }
+  }
 
-    json["N_samples"].push_back(N_samples(results));
-  } else {
-    ensure_initialized_arrays(json, {"acceptance_rate", "elapsed_clocktime",
-                                     "N_samples", "N_samples_for_statistics"});
+  ensure_initialized_arrays(
+      json, {"N_samples", "N_samples_for_statistics", "acceptance_rate",
+             "elapsed_clocktime", "count"});
 
-    json["acceptance_rate"].push_back(acceptance_rate(results));
-    json["elapsed_clocktime"].push_back(elapsed_clocktime(results));
-    json["N_samples"].push_back(N_samples(results));
-    json["N_samples_for_statistics"].push_back(
-        N_samples_for_statistics(results));
+  json["N_samples"].push_back(N_samples(results));
+
+  json["N_samples_for_statistics"].push_back(N_samples_for_statistics(results));
+
+  json["acceptance_rate"].push_back(acceptance_rate(results));
+
+  json["elapsed_clocktime"].push_back(elapsed_clocktime(results));
+
+  json["count"].push_back(results.sample_count.back());
+
+  if (results.sample_time.size()) {
+    ensure_initialized_arrays(json, {"time"});
+    json["time"].push_back(results.sample_time.back());
   }
 
   return json;
