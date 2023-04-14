@@ -440,9 +440,19 @@ def make_unit_test(unit_test_directory, ldadd=[]):
         CPPFLAGS=["$(AM_CPPFLAGS)", "-I$(top_srcdir)/tests/unit/"],
     )
 
-    extra_files = [f for f in only_makeable_files if f not in source_files]
-    value += "\n"
-    value += make_add_to_EXTRA_DIST(extra_files)
+    # Data files used in tests are stored in <unit_test_directory>/data
+    datadir = os.path.join(unit_test_directory, "data")
+    if os.path.exists(datadir):
+        all_data_files_relative = [
+            os.path.join(datadir, f)
+            for f in os.listdir(datadir)
+        ]
+        only_tracked_data_files = purge_untracked_files(all_data_files_relative)
+        only_makeable_data_files = purge_git_related_files(only_tracked_data_files)
+
+        extra_files = [f for f in only_makeable_data_files]
+        value += "\n"
+        value += make_add_to_EXTRA_DIST(extra_files)
 
     return value
 
