@@ -31,6 +31,11 @@ struct RunManagerParams {
 
   /// \brief Location to save completed_runs.json if not empty
   fs::path output_dir;
+
+  /// \brief If true, the run is complete if any sampling fixture
+  ///     is complete. Otherwise, all sampling fixtures must be
+  ///     completed for the run to be completed
+  bool global_cutoff = true;
 };
 
 /// \brief Holds sampling fixtures and checks for completion
@@ -140,13 +145,22 @@ struct RunManager : public RunManagerParams {
   bool is_break_point() const { return break_point_set; }
 
   bool is_complete() {
-    // do not quit early so that status files can be printed with
-    // the latest completion check results
-    bool result = true;
+    // do not quit early, so that status
+    // files can be printed with the latest completion
+    // check results
+    bool all_complete = true;
+    bool any_complete = false;
     for (auto &fixture : sampling_fixtures) {
-      result &= fixture.is_complete();
+      if (fixture.is_complete()) {
+        any_complete = true;
+      } else {
+        all_complete = false;
+      }
     }
-    return result;
+    if (this->global_cutoff && any_complete) {
+      return true;
+    }
+    return all_complete;
   }
 
   void write_status_if_due() {
