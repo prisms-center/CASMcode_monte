@@ -60,16 +60,16 @@ void from_json(RequestedPrecision &value, jsonParser const &json) {
     value.abs_convergence_is_required = true;
     value.abs_precision = it->get<double>();
   } else {
-    value.abs_convergence_is_required = false;
-  }
+    // value.abs_convergence_is_required = false;
 
-  // deprecated...
-  it = json.find("precision");
-  if (it != json.end()) {
-    value.abs_convergence_is_required = true;
-    value.abs_precision = it->get<double>();
-  } else {
-    value.abs_convergence_is_required = false;
+    // deprecated...
+    it = json.find("precision");
+    if (it != json.end()) {
+      value.abs_convergence_is_required = true;
+      value.abs_precision = it->get<double>();
+    } else {
+      value.abs_convergence_is_required = false;
+    }
   }
 
   it = json.find("rel_precision");

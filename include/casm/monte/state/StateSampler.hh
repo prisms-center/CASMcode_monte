@@ -487,7 +487,7 @@ struct StateSampler {
     }
     if (step == steps_per_pass) {
       ++pass;
-      if (sample_mode == SAMPLE_MODE::BY_PASS) {
+      if (sample_mode != SAMPLE_MODE::BY_STEP) {
         ++count;
       }
       step = 0;

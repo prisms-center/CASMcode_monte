@@ -69,8 +69,8 @@ struct CompletionCheckResults {
   /// Current time (if given)
   std::optional<TimeType> time;
 
-  /// Elapsed clocktime (if given)
-  std::optional<TimeType> clocktime;
+  /// Elapsed clocktime
+  TimeType clocktime;
 
   /// Current number of samples
   CountType n_samples = 0;
@@ -102,11 +102,11 @@ struct CompletionCheckResults {
   /// - convergence_check_results
   void partial_reset(std::optional<CountType> _count = std::nullopt,
                      std::optional<TimeType> _time = std::nullopt,
-                     CountType _n_samples = 0) {
+                     TimeType _clocktime = 0.0, CountType _n_samples = 0) {
     // params: do not reset
     count = _count;
     time = _time;
-    clocktime = std::nullopt;
+    clocktime = _clocktime;
     n_samples = _n_samples;
     has_all_minimums_met = false;
     has_any_maximum_met = false;
@@ -172,9 +172,9 @@ class CompletionCheck {
 
   double m_n_checks = 0.0;
 
-  Index m_last_n_samples = 0.0;
+  Index m_last_n_samples = 0;
 
-  Index m_last_clocktime = 0.0;
+  double m_last_clocktime = 0.0;
 };
 
 // --- Inline definitions ---
@@ -183,7 +183,7 @@ template <typename StatisticsType>
 void CompletionCheck<StatisticsType>::reset() {
   m_results.full_reset();
   m_n_checks = 0.0;
-  m_last_n_samples = 0.0;
+  m_last_n_samples = 0;
   m_last_clocktime = 0.0;
 }
 
@@ -230,7 +230,7 @@ bool CompletionCheck<StatisticsType>::_is_complete(
     m_last_clocktime = clocktime;
   }
 
-  m_results.partial_reset(count, time, n_samples);
+  m_results.partial_reset(count, time, clocktime, n_samples);
 
   m_results.has_all_minimums_met = all_minimums_met(
       m_params.cutoff_params, count, time, n_samples, clocktime);

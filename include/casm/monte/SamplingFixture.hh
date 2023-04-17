@@ -80,6 +80,7 @@ class SamplingFixture {
       : m_params(_params),
         m_engine(_engine),
         m_n_samples(0),
+        m_count(0),
         m_is_complete(false),
         m_state_sampler(m_engine, m_params.sampling_params,
                         m_params.sampling_functions),
@@ -100,6 +101,7 @@ class SamplingFixture {
 
   void initialize(state_type const &state, Index steps_per_pass) {
     m_n_samples = 0;
+    m_count = 0;
     m_is_complete = false;
     m_state_sampler.reset(steps_per_pass);
     m_completion_check.reset();
@@ -142,13 +144,18 @@ class SamplingFixture {
   }
 
   void write_status_if_due(Index run_index) {
-    // Log method status - for efficiency, only check after a new sample is
-    // taken
-    if (m_n_samples != get_n_samples(m_state_sampler.samplers)) {
+    // Log method status - for efficiency, do not check clocktime every step
+    // unless sampling by step
+    std::optional<double> &log_frequency = m_params.method_log.log_frequency;
+    if (!log_frequency.has_value()) {
+      return;
+    }
+    if (m_n_samples != get_n_samples(m_state_sampler.samplers) ||
+        m_count != m_state_sampler.count) {
       m_n_samples = get_n_samples(m_state_sampler.samplers);
+      m_count = m_state_sampler.count;
 
       Log &log = m_params.method_log.log;
-      std::optional<double> &log_frequency = m_params.method_log.log_frequency;
       if (log_frequency.has_value() && log.lap_time() > *log_frequency) {
         write_status(run_index);
       }
@@ -214,6 +221,9 @@ class SamplingFixture {
 
   /// \brief This is for write_status_if_due only
   Index m_n_samples = 0;
+
+  /// \brief This is for write_status_if_due only
+  Index m_count = 0;
 
   bool m_is_complete = false;
 

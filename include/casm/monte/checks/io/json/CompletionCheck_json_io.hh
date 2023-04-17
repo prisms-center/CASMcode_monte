@@ -208,7 +208,7 @@ void _parse_convergence_criteria(
 ///         Sets minimum and maximum cuttoffs for elapsed calculation time in
 ///         seconds. Options are `min` and `max`, the same as for `count`.
 ///
-///   spacing: string (optional, default="log")
+///   spacing: string (optional, default="linear")
 ///     The spacing of convergence checks in the specified `"period"`. One of
 ///     "linear" or "log".
 ///
@@ -299,7 +299,7 @@ void parse(InputParser<CompletionCheckParams<StatisticsType>> &parser,
   parser.optional_else(completion_check_params.confidence, "confidence", 0.95);
 
   // "spacing"
-  std::string spacing = "log";
+  std::string spacing = "linear";
   parser.optional(spacing, "spacing");
   if (spacing == "linear") {
     completion_check_params.log_spacing = false;
