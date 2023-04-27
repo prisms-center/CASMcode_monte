@@ -115,7 +115,14 @@ PYBIND11_MODULE(_monte, m) {
           [](monte::Conversions const &conversions, Index l) {
             return conversions.l_to_basis_frac(l);
           },
-          py::arg("l"));
+          py::arg("l"))
+      .def(
+          "species_index",
+          [](monte::Conversions const &conversions, Index asym,
+             Index occ_index) {
+            return conversions.species_index(asym, occ_index);
+          },
+          py::arg("sym"), py::arg("occ_index"));
 
 #ifdef VERSION_INFO
   m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
