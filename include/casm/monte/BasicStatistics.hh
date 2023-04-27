@@ -1,6 +1,8 @@
 #ifndef CASM_monte_BasicStatistics
 #define CASM_monte_BasicStatistics
 
+#include <optional>
+
 #include "casm/monte/definitions.hh"
 
 namespace CASM {
