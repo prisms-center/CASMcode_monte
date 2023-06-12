@@ -4,6 +4,7 @@
 #include "casm/casm_io/container/json_io.hh"
 #include "casm/casm_io/json/InputParser_impl.hh"
 #include "casm/casm_io/json/optional.hh"
+#include "casm/monte/BasicStatistics.hh"
 #include "casm/monte/checks/CompletionCheck.hh"
 #include "casm/monte/checks/io/json/ConvergenceCheck_json_io.hh"
 #include "casm/monte/checks/io/json/CutoffCheck_json_io.hh"
@@ -16,10 +17,9 @@ namespace monte {
 template <typename StatisticsType>
 struct CompletionCheckParams;
 
-/// \brief Construct CompletionCheckParams from JSON
-template <typename ConfigType, typename StatisticsType>
-void parse(InputParser<CompletionCheckParams<StatisticsType>> &parser,
-           StateSamplingFunctionMap<ConfigType> const &sampling_functions);
+/// \brief Construct CompletionCheckParams<BasicStatistics> from JSON
+inline void parse(InputParser<CompletionCheckParams<BasicStatistics>> &parser,
+                  StateSamplingFunctionMap const &sampling_functions);
 
 /// \brief CompletionCheckResults to JSON
 template <typename StatisticsType>
@@ -31,32 +31,31 @@ jsonParser &to_json(CompletionCheckResults<StatisticsType> const &value,
 namespace CompletionCheck_json_io_impl {
 
 /// \brief If successfully parsed, result is not empty
-template <typename ConfigType, typename StatisticsType>
-std::unique_ptr<StateSamplingFunction<ConfigType>> _parse_quantity(
+template <typename StatisticsType>
+std::unique_ptr<StateSamplingFunction> _parse_quantity(
     InputParser<CompletionCheckParams<StatisticsType>> &parser,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+    StateSamplingFunctionMap const &sampling_functions,
     fs::path const &option) {
   std::unique_ptr<std::string> quantity =
       parser.template require<std::string>(option / "quantity");
   if (quantity == nullptr) {
-    return std::unique_ptr<StateSamplingFunction<ConfigType>>();
+    return std::unique_ptr<StateSamplingFunction>();
   }
   auto function_it = sampling_functions.find(*quantity);
   if (function_it == sampling_functions.end()) {
     std::stringstream msg;
     msg << "Error: \"" << *quantity << "\" is not a sampling option.";
     parser.insert_error(option / *quantity, msg.str());
-    return std::unique_ptr<StateSamplingFunction<ConfigType>>();
+    return std::unique_ptr<StateSamplingFunction>();
   }
-  return std::make_unique<StateSamplingFunction<ConfigType>>(
-      function_it->second);
+  return std::make_unique<StateSamplingFunction>(function_it->second);
 }
 
 /// \brief If successfully parsed, adds elements to requested_precision
-template <typename ConfigType, typename StatisticsType>
+template <typename StatisticsType>
 void _parse_component_index(
     InputParser<CompletionCheckParams<StatisticsType>> &parser,
-    fs::path const &option, StateSamplingFunction<ConfigType> const &function,
+    fs::path const &option, StateSamplingFunction const &function,
     RequestedPrecision const &precision,
     std::map<SamplerComponent, RequestedPrecision> &requested_precision) {
   // converge components specified by index
@@ -79,10 +78,10 @@ void _parse_component_index(
 }
 
 /// \brief If successfully parsed, adds elements to requested_precision
-template <typename ConfigType, typename StatisticsType>
+template <typename StatisticsType>
 void _parse_component_name(
     InputParser<CompletionCheckParams<StatisticsType>> &parser,
-    fs::path const &option, StateSamplingFunction<ConfigType> const &function,
+    fs::path const &option, StateSamplingFunction const &function,
     RequestedPrecision const &precision,
     std::map<SamplerComponent, RequestedPrecision> &requested_precision) {
   // converge components specified by name
@@ -107,10 +106,10 @@ void _parse_component_name(
 }
 
 /// \brief If successfully parsed, adds elements to requested_precision
-template <typename ConfigType, typename StatisticsType>
+template <typename StatisticsType>
 void _parse_components(
     InputParser<CompletionCheckParams<StatisticsType>> &parser,
-    fs::path const &option, StateSamplingFunction<ConfigType> const &function,
+    fs::path const &option, StateSamplingFunction const &function,
     RequestedPrecision const &precision,
     std::map<SamplerComponent, RequestedPrecision> &requested_precision) {
   bool has_index =
@@ -139,10 +138,10 @@ void _parse_components(
 }
 
 /// \brief If successfully parsed, adds elements to requested_precision
-template <typename ConfigType, typename StatisticsType>
+template <typename StatisticsType>
 void _parse_convergence_criteria(
     InputParser<CompletionCheckParams<StatisticsType>> &parser,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+    StateSamplingFunctionMap const &sampling_functions,
     std::map<SamplerComponent, RequestedPrecision> &requested_precision) {
   auto it = parser.self.find("convergence");
   if (it == parser.self.end()) {
@@ -158,7 +157,7 @@ void _parse_convergence_criteria(
     fs::path option = fs::path("convergence") / std::to_string(i);
 
     // parse "quantity"
-    std::unique_ptr<StateSamplingFunction<ConfigType>> function =
+    std::unique_ptr<StateSamplingFunction> function =
         _parse_quantity(parser, sampling_functions, option);
     if (function == nullptr) {
       continue;
@@ -237,6 +236,19 @@ void _parse_convergence_criteria(
 ///     Confidence level, in range (0, 1.0), used for calculated precision of
 ///     the mean.
 ///
+///   weighted_observations_method: int (optional, default=1)
+///     Method used to estimate precision in the sample mean when observations
+///     are weighted (N-fold way method). Option are:
+///
+///     1) Calculate weighted sample variance directly from weighted samples
+///         and only autocorrelation factor (1+rho)/(1-rho) from resampled
+///         observations
+///     2) Calculate all statistics from resampled observations
+///
+///   n_resamples: int (optional, default=10000)
+///     Number of resampled observations to make for autocovariance estimation
+///     when observations are weighted.
+///
 ///   convergence: array of dict (optional)
 ///     Specify which components of which sampled quantities should be checked
 ///     for convergence. When all specified are converged to the requested
@@ -272,16 +284,24 @@ void _parse_convergence_criteria(
 ///             "component_name": ["Va", "O"]
 ///           }
 ///
-template <typename ConfigType, typename StatisticsType>
-void parse(InputParser<CompletionCheckParams<StatisticsType>> &parser,
-           StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+inline void parse(InputParser<CompletionCheckParams<BasicStatistics>> &parser,
+                  StateSamplingFunctionMap const &sampling_functions) {
   using namespace CompletionCheck_json_io_impl;
-  CompletionCheckParams<StatisticsType> completion_check_params;
 
+  double confidence = 0.95;
+  parser.optional(confidence, "confidence");
+
+  Index weighted_observations_method = 1;
+  parser.optional(weighted_observations_method, "weighted_observations_method");
+
+  Index n_resamples = 10000;
+  parser.optional(n_resamples, "n_resamples");
+
+  CompletionCheckParams<BasicStatistics> completion_check_params;
   completion_check_params.equilibration_check_f =
-      monte::default_equilibration_check;
-  completion_check_params.calc_statistics_f =
-      default_calc_statistics_f<StatisticsType>();
+      monte::default_equilibration_check,
+  completion_check_params.calc_statistics_f = BasicStatisticsCalculator(
+      confidence, weighted_observations_method, n_resamples);
 
   // parse "cutoff"
   auto cutoff_params_subparser =
@@ -295,8 +315,6 @@ void parse(InputParser<CompletionCheckParams<StatisticsType>> &parser,
   // parse "convergence"
   _parse_convergence_criteria(parser, sampling_functions,
                               completion_check_params.requested_precision);
-
-  parser.optional_else(completion_check_params.confidence, "confidence", 0.95);
 
   // "spacing"
   std::string spacing = "linear";
@@ -338,7 +356,7 @@ void parse(InputParser<CompletionCheckParams<StatisticsType>> &parser,
   parser.optional(completion_check_params.check_shift, "shift");
 
   if (parser.valid()) {
-    parser.value = std::make_unique<CompletionCheckParams<StatisticsType>>(
+    parser.value = std::make_unique<CompletionCheckParams<BasicStatistics>>(
         completion_check_params);
   }
 }

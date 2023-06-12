@@ -7,6 +7,9 @@
 namespace CASM {
 
 jsonParser &to_json(monte::ValueMap const &value_map, jsonParser &json) {
+  for (auto const &v : value_map.boolean_values) {
+    json[v.first] = v.second;
+  }
   for (auto const &v : value_map.scalar_values) {
     json[v.first] = v.second;
   }
@@ -24,7 +27,9 @@ void parse(InputParser<monte::ValueMap> &parser) {
   auto it = parser.self.begin();
   auto end = parser.self.end();
   for (; it != end; ++it) {
-    if (it->is_number()) {
+    if (it->is_bool()) {
+      parser.require(value->boolean_values[it.name()], it.name());
+    } else if (it->is_number()) {
       parser.require(value->scalar_values[it.name()], it.name());
     } else if (it->is_array()) {
       if (it->size() && it->begin()->is_array()) {

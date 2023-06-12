@@ -29,8 +29,7 @@ struct SamplingFixtureParams {
   typedef ResultsIO<results_type> results_io_type;
 
   SamplingFixtureParams(
-      std::string _label,
-      StateSamplingFunctionMap<ConfigType> _sampling_functions,
+      std::string _label, StateSamplingFunctionMap _sampling_functions,
       ResultsAnalysisFunctionMap<ConfigType, StatisticsType>
           _analysis_functions,
       monte::SamplingParams _sampling_params,
@@ -49,7 +48,7 @@ struct SamplingFixtureParams {
   std::string label;
 
   /// State sampling functions
-  StateSamplingFunctionMap<ConfigType> sampling_functions;
+  StateSamplingFunctionMap sampling_functions;
 
   /// Results analysis functions
   ResultsAnalysisFunctionMap<ConfigType, StatisticsType> analysis_functions;

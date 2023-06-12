@@ -35,8 +35,7 @@ struct CalculationTest {
         state(nullptr) {}
 
   std::shared_ptr<monte::Sampler> run_case(
-      Eigen::Matrix3l T,
-      monte::StateSamplingFunction<test::Configuration> &function) {
+      Eigen::Matrix3l T, monte::StateSamplingFunction &function) {
     ScopedNullLogging logging;
 
     monte::Conversions convert(*shared_prim, T);
@@ -89,7 +88,7 @@ TEST_F(SamplingTest, CompNSamplingTest) {
   std::vector<std::string> components = {"Zr", "Va", "O"};
   std::vector<Index> shape;
   shape.push_back(components.size());
-  monte::StateSamplingFunction<test::Configuration> comp_n_sampling_f(
+  monte::StateSamplingFunction comp_n_sampling_f(
       "comp_n", "Composition per unit cell", components, shape,
       [calculation, components]() {
         composition::CompositionCalculator composition_calculator(

@@ -167,6 +167,10 @@ struct QuantityStats {
         is_scalar((shape.size() == 0)),
         component_names(sampler.component_names()) {
     auto calc_statistics_f = get_calc_statistics_f(results);
+    if (calc_statistics_f == nullptr) {
+      throw std::runtime_error(
+          "Error in QuantityStats: calc_statistics_f == nullptr");
+    }
 
     Index i = 0;
     for (auto const &component_name : component_names) {
@@ -188,17 +192,32 @@ struct QuantityStats {
             component_stats.push_back(convergence_r.stats);
           } else {
             is_converged.push_back(std::nullopt);
-            component_stats.push_back(
-                make_statistics(calc_statistics_f, key, confidence(results),
-                                N_samples_for_statistics(results), sampler,
-                                results.sample_weight));
+            Index N_stats = N_samples_for_statistics(results);
+            if (results.sample_weight.n_samples() == 0) {
+              static Eigen::VectorXd empty_sample_weight;
+              component_stats.push_back(calc_statistics_f(
+                  sampler.component(key.component_index).tail(N_stats),
+                  empty_sample_weight));
+            } else {
+              component_stats.push_back(calc_statistics_f(
+                  sampler.component(key.component_index).tail(N_stats),
+                  results.sample_weight.component(0).tail(N_stats)));
+            }
           }
         }
       } else {
         is_converged.push_back(std::nullopt);
-        component_stats.push_back(make_statistics(
-            calc_statistics_f, key, confidence(results), sampler.n_samples(),
-            sampler, results.sample_weight));
+        Index N_stats = sampler.n_samples();
+        if (results.sample_weight.n_samples() == 0) {
+          static Eigen::VectorXd empty_sample_weight;
+          component_stats.push_back(calc_statistics_f(
+              sampler.component(key.component_index).tail(N_stats),
+              empty_sample_weight));
+        } else {
+          component_stats.push_back(calc_statistics_f(
+              sampler.component(key.component_index).tail(N_stats),
+              results.sample_weight.component(0).tail(N_stats)));
+        }
       }
 
       ++i;
