@@ -12,14 +12,23 @@
 #include <random>
 
 // CASM
+#include "casm/casm_io/container/json_io.hh"
 #include "casm/casm_io/json/jsonParser.hh"
 #include "casm/crystallography/BasicStructure.hh"
 #include "casm/monte/BasicStatistics.hh"
 #include "casm/monte/Conversions.hh"
+#include "casm/monte/MethodLog.hh"
 #include "casm/monte/RandomNumberGenerator.hh"
 #include "casm/monte/checks/EquilibrationCheck.hh"
+#include "casm/monte/checks/io/json/CompletionCheck_json_io.hh"
+#include "casm/monte/checks/io/json/ConvergenceCheck_json_io.hh"
+#include "casm/monte/checks/io/json/CutoffCheck_json_io.hh"
+#include "casm/monte/checks/io/json/EquilibrationCheck_json_io.hh"
 #include "casm/monte/sampling/Sampler.hh"
 #include "casm/monte/sampling/SamplingParams.hh"
+#include "casm/monte/sampling/io/json/Sampler_json_io.hh"
+#include "casm/monte/sampling/io/json/SamplingParams_json_io.hh"
+#include "casm/monte/state/StateSampler.hh"
 #include "casm/monte/state/ValueMap.hh"
 #include "casm/monte/state/io/json/ValueMap_json_io.hh"
 
@@ -36,6 +45,8 @@ using namespace CASM;
 typedef std::mt19937_64 engine_type;
 typedef monte::RandomNumberGenerator<engine_type> generator_type;
 typedef std::map<std::string, std::shared_ptr<monte::Sampler>> SamplerMap;
+typedef std::map<std::string, monte::StateSamplingFunction>
+    StateSamplingFunctionMap;
 typedef std::map<monte::SamplerComponent, monte::RequestedPrecision>
     RequestedPrecisionMap;
 typedef std::map<
@@ -45,6 +56,15 @@ typedef std::map<
 typedef std::map<monte::SamplerComponent,
                  monte::IndividualEquilibrationCheckResult>
     EquilibrationResultMap;
+
+monte::MethodLog make_MethodLog(std::string logfile_path,
+                                std::optional<double> log_frequency) {
+  monte::MethodLog method_log;
+  method_log.logfile_path = logfile_path;
+  method_log.log_frequency = log_frequency;
+  method_log.reset();
+  return method_log;
+}
 
 std::shared_ptr<monte::Conversions> make_monte_conversions(
     xtal::BasicStructure const &prim,
@@ -97,6 +117,22 @@ monte::RequestedPrecision make_requested_precision(std::optional<double> abs,
   }
 }
 
+monte::StateSamplingFunction make_state_sampling_function(
+    std::string name, std::string description, std::vector<Index> shape,
+    std::function<Eigen::VectorXd()> function,
+    std::optional<std::vector<std::string>> component_names) {
+  if (function == nullptr) {
+    throw std::runtime_error(
+        "Error constructing StateSamplingFunction: function == nullptr");
+  }
+  if (!component_names.has_value()) {
+    return monte::StateSamplingFunction(name, description, shape, function);
+  } else {
+    return monte::StateSamplingFunction(name, description, *component_names,
+                                        shape, function);
+  }
+}
+
 }  // namespace CASMpy
 
 PYBIND11_DECLARE_HOLDER_TYPE(T, std::shared_ptr<T>);
@@ -105,6 +141,7 @@ PYBIND11_MAKE_OPAQUE(std::map<std::string, double>);
 PYBIND11_MAKE_OPAQUE(std::map<std::string, Eigen::VectorXd>);
 PYBIND11_MAKE_OPAQUE(std::map<std::string, Eigen::MatrixXd>);
 PYBIND11_MAKE_OPAQUE(CASMpy::SamplerMap);
+PYBIND11_MAKE_OPAQUE(CASMpy::StateSamplingFunctionMap);
 PYBIND11_MAKE_OPAQUE(CASMpy::RequestedPrecisionMap);
 PYBIND11_MAKE_OPAQUE(CASMpy::ConvergenceResultMap);
 PYBIND11_MAKE_OPAQUE(CASMpy::EquilibrationResultMap);
@@ -113,13 +150,48 @@ PYBIND11_MODULE(_monte, m) {
   using namespace CASMpy;
 
   m.doc() = R"pbdoc(
-        Methods for evaluating functions of configurations
+        Building blocks for Monte Carlo simualations
 
         libcasm.monte
         -------------
 
+        The libcasm-monte is a Python interface to the classes and methods in the CASM::monte namespace of the CASM C++ libraries that are useful building blocks for Monte Carlo simulations.
+
     )pbdoc";
   py::module::import("libcasm.xtal");
+
+  py::class_<monte::MethodLog>(m, "MethodLog", R"pbdoc(
+      Logger for Monte Carlo method status
+
+      )pbdoc")
+      .def(py::init<>(&make_MethodLog),
+           R"pbdoc(
+          Constructor
+
+          Parameters
+          ----------
+          logfile_path : str
+              File location for log output
+          log_frequency : Optional[float]
+              How often to log method status, in seconds
+          )pbdoc",
+           py::arg("logfile_path"), py::arg("log_frequency") = std::nullopt)
+      .def(
+          "logfile_path",
+          [](monte::MethodLog const &x) { return x.logfile_path.string(); },
+          R"pbdoc(
+          File location for log output
+          )pbdoc")
+      .def(
+          "log_frequency",
+          [](monte::MethodLog const &x) { return x.log_frequency; },
+          R"pbdoc(
+          How often to log method status, in seconds
+          )pbdoc")
+      .def("reset", &monte::MethodLog::reset,
+           R"pbdoc(
+          Reset log file, creating parent directories as necessary
+          )pbdoc");
 
   py::bind_map<std::map<std::string, bool>>(m, "BooleanValueMap");
   py::bind_map<std::map<std::string, double>>(m, "ScalarValueMap");
@@ -141,19 +213,19 @@ PYBIND11_MODULE(_monte, m) {
           )pbdoc")
       .def_readwrite("boolean_values", &monte::ValueMap::boolean_values,
                      R"pbdoc(
-          A Dict[str, bool]-like object.
+          :class:`~libcasm.monte.BooleanValueMap`: A Dict[str, bool]-like object.
           )pbdoc")
       .def_readwrite("scalar_values", &monte::ValueMap::scalar_values,
                      R"pbdoc(
-          A Dict[str, float]-like object.
+          :class:`~libcasm.monte.ScalarValueMap`: A Dict[str, float]-like object.
           )pbdoc")
       .def_readwrite("vector_values", &monte::ValueMap::vector_values,
                      R"pbdoc(
-          A Dict[str, numpy.ndarray[numpy.float64[m, 1]]]-like object.
+          :class:`~libcasm.monte.VectorValueMap`: A Dict[str, numpy.ndarray[numpy.float64[m, 1]]]-like object.
           )pbdoc")
       .def_readwrite("matrix_values", &monte::ValueMap::matrix_values,
                      R"pbdoc(
-          A Dict[str, numpy.ndarray[numpy.float64[m, n]]]-like object.
+          :class:`~libcasm.monte.MatrixValueMap`: A Dict[str, numpy.ndarray[numpy.float64[m, n]]]-like object.
           )pbdoc")
       .def_static(
           "from_dict",
@@ -179,14 +251,17 @@ PYBIND11_MODULE(_monte, m) {
           "are combined into a single dict");
 
   m.def("is_mismatched", &monte::is_mismatched,
-        "Return true if A and B do not have the same properties");
+        R"pbdoc(
+        Return true if :class:`~libcasm.monte.ValueMap` do not have the same properties.
+        )pbdoc",
+        py::arg("A"), py::arg("B"));
 
   m.def("make_incremented_values", &monte::make_incremented_values,
         R"pbdoc(
       Return values[property] + n_increment*increment[property] for each property
 
-      Note
-      ----
+      Notes
+      -----
       Does not change boolean values.
       )pbdoc",
         py::arg("values"), py::arg("increment"), py::arg("n_increment"));
@@ -672,71 +747,71 @@ PYBIND11_MODULE(_monte, m) {
       )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
-          ValueMap only has a default constructor
+          SamplingParams only has a default constructor
           )pbdoc")
       .def_readwrite("sample_mode", &monte::SamplingParams::sample_mode,
                      R"pbdoc(
-            Sample by pass, step, or time. Default=``SAMPLE_MODE::BY_PASS``.
+          SAMPLE_MODE: Sample by pass, step, or time. Default=``SAMPLE_MODE.BY_PASS``.
           )pbdoc")
       .def_readwrite("sample_method", &monte::SamplingParams::sample_mode,
                      R"pbdoc(
-            Sample linearly, or logarithmically. Default=``SAMPLE_METHOD::LINEAR``.
+          SAMPLE_METHOD: Sample linearly or logarithmically. Default=``SAMPLE_METHOD.LINEAR``.
 
-            Notes
-            -----
+          Notes
+          -----
 
-            For ``SAMPLE_METHOD::LINEAR``, take the n-th sample when:
+          For ``SAMPLE_METHOD.LINEAR``, take the n-th sample when:
 
-            .. code-block:: Python
+          .. code-block:: Python
 
-                sample/pass = round( begin + (period / samples_per_period) * n )
+              sample/pass = round( begin + (period / samples_per_period) * n )
 
-                time = begin + (period / samples_per_period) * n
+              time = begin + (period / samples_per_period) * n
 
-            The default values are:
+          The default values are:
 
-            For ``SAMPLE_METHOD::LOG``, take the n-th sample when:
+          For ``SAMPLE_METHOD.LOG``, take the n-th sample when:
 
-            .. code-block:: Python
+          .. code-block:: Python
 
-                sample/pass = round( begin + period ** ( (n + shift) /
-                                     samples_per_period ) )
+              sample/pass = round( begin + period ** ( (n + shift) /
+                                   samples_per_period ) )
 
-                time = begin + period ** ( (n + shift) / samples_per_period )
+              time = begin + period ** ( (n + shift) / samples_per_period )
 
-            If ``stochastic_sample_period == true``, then instead of setting the sample
-            time / count deterministally, use the sampling period to determine the
-            sampling rate and determine the next sample time / count stochastically.
+          If ``stochastic_sample_period == true``, then instead of setting the sample
+          time / count deterministally, use the sampling period to determine the
+          sampling rate and determine the next sample time / count stochastically.
           )pbdoc")
       .def_readwrite("begin", &monte::SamplingParams::begin,
                      R"pbdoc(
-            See `sample_method`. Default=``0.0``.
+            float: See `sample_method`. Default=``0.0``.
           )pbdoc")
       .def_readwrite("period", &monte::SamplingParams::period,
                      R"pbdoc(
-            See `sample_method`. Default=``1.0``.
+            float: See `sample_method`. Default=``1.0``.
           )pbdoc")
       .def_readwrite("samples_per_period",
                      &monte::SamplingParams::samples_per_period,
                      R"pbdoc(
-            See `sample_method`. Default=``1.0``.
+            float: See `sample_method`. Default=``1.0``.
           )pbdoc")
       .def_readwrite("shift", &monte::SamplingParams::shift,
                      R"pbdoc(
-            See `sample_method`. Default=``0.0``.
+            float: See `sample_method`. Default=``0.0``.
           )pbdoc")
       .def_readwrite("sampler_names", &monte::SamplingParams::sampler_names,
                      R"pbdoc(
-            The names of quantities to sample (i.e. sampling function names). Default=``[]``.
+            List[str]: The names of quantities to sample (i.e. sampling function names). Default=``[]``.
           )pbdoc")
       .def_readwrite("do_sample_trajectory",
                      &monte::SamplingParams::do_sample_trajectory,
                      R"pbdoc(
-            If true, save the configuration when a sample is taken. Default=``False``.
+            bool: If true, save the configuration when a sample is taken. Default=``False``.
           )pbdoc")
       .def_readwrite("do_sample_time", &monte::SamplingParams::do_sample_time,
                      R"pbdoc(
-            If true, save current time when taking a sample. Default=``False``.
+            bool: If true, save current time when taking a sample. Default=``False``.
           )pbdoc");
 
   m.def(
@@ -758,8 +833,6 @@ PYBIND11_MODULE(_monte, m) {
   m.def("default_component_names", &monte::default_component_names,
         R"pbdoc(
       Construct default component names based on the shape of a quantity.
-
-
 
       Parameters
       ----------
@@ -798,11 +871,15 @@ PYBIND11_MODULE(_monte, m) {
 
   py::class_<monte::Sampler, std::shared_ptr<monte::Sampler>>(m, "Sampler",
                                                               R"pbdoc(
-      Sampler stores vector valued samples in a matrix
+      Sampler stores sampled data in a matrix
 
       Notes
       -----
-      For sampling scalars, a size=1 vector is expected. For sampling matrices, column-major order is expected. These can be obtained with :func:`~libcasm.monte.scalar_as_vector(value)` or :func:`~libcasm.monte.matrix_as_vector(value)`.
+      - :class:`~libcasm.monte.Sampler` helps sampling by re-sizing the underlying matrix holding data automatically, and it allows accessing particular observations as an unrolled vector or accessing a particular component as a vector to check convergence.
+      - Sampler can be used to sample quantities of any dimension (scalar, vector, matrix, etc.) by unrolling values. The standard approach is to use column-major order.
+      - For sampling scalars, a size=1 vector is expected. This can be done with the function :func:`~libcasm.monte.scalar_as_vector`.
+      - For sampling matrices, column-major order unrolling can be done with the function :func:`~libcasm.monte.matrix_as_vector`.
+
       )pbdoc")
       .def(py::init<>(&make_sampler),
            R"pbdoc(
@@ -811,10 +888,10 @@ PYBIND11_MODULE(_monte, m) {
           ----------
           shape : List[int]
               The shape of quantity to be sampled. Use ``[]`` for scalar, ``[n]``
-              for a vector, and ``[m, n]`` for a matrix.
+              for a length ``n`` vector, ``[m, n]`` for a shape ``(m,n)`` matrix, etc.
           component_names : Optional[List[str]] = None
               Names to give to each sampled vector element. If None, components
-              are given default names according to the shape:
+              are given default names according column-major unrolling:
 
               - shape = [] (scalar) -> {"0"}
               - shape = [n] (vector) -> {"0", "1", ..., "n-1"}
@@ -891,16 +968,16 @@ PYBIND11_MODULE(_monte, m) {
 
   py::bind_map<SamplerMap>(m, "SamplerMap",
                            R"pbdoc(
-      SamplerMap stores Sampler by name of the sampled quantity
+      SamplerMap stores :class:`~libcasm.monte.Sampler` by name of the sampled quantity
 
       Notes
       -----
-      SamplerMap is a Dict[str, Sampler]-like object.
+      SamplerMap is a Dict[str, :class:`~libcasm.monte.Sampler`]-like object.
       )pbdoc");
 
   m.def("get_n_samples", monte::get_n_samples,
         R"pbdoc(
-        Return the number of samples taken. Assumes the same value for all samplers in the SamplerMap.
+        Return the number of samples taken. Assumes the same value for all samplers in the :class:`~libcasm.monte.SamplerMap`.
       )pbdoc",
         py::arg("samplers"));
 
@@ -928,11 +1005,158 @@ PYBIND11_MODULE(_monte, m) {
           )pbdoc",
            py::arg("sampler_name"), py::arg("component_index"),
            py::arg("component_name"))
-      .def_readwrite("sampler_name", &monte::SamplerComponent::sampler_name)
+      .def_readwrite("sampler_name", &monte::SamplerComponent::sampler_name,
+                     R"pbdoc(
+                      str : Name of the sampled quantity.
+
+                      Should match keys in a :class:`~libcasm.monte.SamplerMap`.
+                      )pbdoc")
       .def_readwrite("component_index",
-                     &monte::SamplerComponent::component_index)
-      .def_readwrite("component_name",
-                     &monte::SamplerComponent::component_name);
+                     &monte::SamplerComponent::component_index,
+                     R"pbdoc(
+                     int : Index into the unrolled vector of a sampled quantity.
+                     )pbdoc")
+      .def_readwrite("component_name", &monte::SamplerComponent::component_name,
+                     R"pbdoc(
+                     str : Name of sampler component specified by ``component_index``.
+                     )pbdoc");
+
+  py::class_<monte::StateSamplingFunction>(m, "StateSamplingFunction",
+                                           R"pbdoc(
+        A function that samples data from a Monte Carlo state
+
+        Example usage:
+
+        .. code-block:: Python
+
+            from libcasm.clexmonte import SemiGrandCanonical
+            from libcasm.monte import (
+                Sampler, SamplerMap, StateSamplingFunction,
+                StateSamplingFunctionMap,
+            )
+
+            # ... in Monte Carlo simulation setup ...
+            # calculation = SemiGrandCanonical(...)
+
+            # ... create sampling functions ...
+            sampling_functions = StateSamplingFunctionMap()
+
+            composition_calculator = get_composition_calculator(
+                calculation.system
+            )
+
+            def mol_composition_f():
+                return composition_calculator.
+                    mean_num_each_component(get_occupation(calculation.state))
+
+            f = monte.StateSamplingFunction(
+                name="mol_composition",
+                description="Mol composition per unit cell",
+                shape=[len(composition_calculator.components())],
+                function=mol_composition_f,
+                component_names=composition_calculator.components(),
+            )
+            sampling_functions[f.name] = f
+
+            # ... create samplers to hold data ...
+            samplers = SamplerMap()
+            for name, f in sampling_functions.items():
+                samplers[name] = Sampler(
+                    shape=f.shape,
+                    component_names=f.component_names,
+                )
+
+            # ... in Monte Carlo simulation ...
+            # ... sample data ...
+            for name, f in sampling_functions.items():
+                samplers[name].append(f())
+
+
+        Notes
+        -----
+        - Typically this holds a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
+        - StateSamplingFunction can be used to sample quantities of any dimension (scalar, vector, matrix, etc.) by unrolling values. The standard approach is to use column-major order.
+        - For sampling scalars, a size=1 vector is expected. This can be done with the function :func:`~libcasm.monte.scalar_as_vector`.
+        - For sampling matrices, column-major order unrolling can be done with the function :func:`~libcasm.monte.matrix_as_vector`.
+        - Data sampled by a StateSamplingFunction can be stored in a :class:`~libcasm.monte.Sampler`.
+        - A call operator exists (:func:`~libcasm.monte.StateSamplingFunction.__call__`) to call the function held by :class:`~libcasm.monte.StateSamplingFunction`.
+        )pbdoc")
+      .def(py::init<>(&make_state_sampling_function),
+           R"pbdoc(
+
+          Parameters
+          ----------
+          name : str
+              Name of the sampled quantity.
+
+          description : str
+              Description of the function.
+
+          component_index : int
+              Index into the unrolled vector of a sampled quantity.
+
+          shape : List[int]
+              Shape of quantity, with column-major unrolling
+
+              Scalar: [], Vector: [n], Matrix: [m, n], etc.
+
+          function : function
+              A function with 0 arguments that returns an array of the proper size sampling the current state. Typically this is a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
+
+          component_names : Optional[List[str]]
+              A name for each component of the resulting vector.
+
+              Can be strings representing an indices (i.e "0", "1", "2", etc.) or can be a descriptive string (i.e. "Mg", "Va", "O", etc.). If None, indices for column-major ordering are used (i.e. "0,0", "1,0", ..., "m-1,n-1")
+
+          )pbdoc",
+           py::arg("name"), py::arg("description"), py::arg("shape"),
+           py::arg("function"), py::arg("component_names"))
+      .def_readwrite("name", &monte::StateSamplingFunction::name,
+                     R"pbdoc(
+          str : Name of the sampled quantity.
+          )pbdoc")
+      .def_readwrite("description", &monte::StateSamplingFunction::description,
+                     R"pbdoc(
+          str : Description of the function.
+          )pbdoc")
+      .def_readwrite("shape", &monte::StateSamplingFunction::shape,
+                     R"pbdoc(
+          List[int] : Shape of quantity, with column-major unrolling.
+
+          Scalar: [], Vector: [n], Matrix: [m, n], etc.
+          )pbdoc")
+      .def_readwrite("component_names",
+                     &monte::StateSamplingFunction::component_names,
+                     R"pbdoc(
+          List[str] : A name for each component of the resulting vector.
+
+          Can be strings representing an indices (i.e "0", "1", "2", etc.) or can be a descriptive string (i.e. "Mg", "Va", "O", etc.). If the sampled quantity is an unrolled matrix, indices for column-major ordering are typical (i.e. "0,0", "1,0", ..., "m-1,n-1").
+          )pbdoc")
+      .def_readwrite("function", &monte::StateSamplingFunction::function,
+                     R"pbdoc(
+          function : The function to be evaluated.
+
+          A function with 0 arguments that returns an array of the proper size sampling the current state. Typically this is a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
+          )pbdoc")
+      .def(
+          "__call__",
+          [](monte::StateSamplingFunction const &f) -> Eigen::VectorXd {
+            return f();
+          },
+          R"pbdoc(
+          Evaluates the state sampling function
+
+          Equivalent to calling :py::attr:`~libcasm.monte.StateSamplingFunction.function`.
+          )pbdoc");
+
+  py::bind_map<StateSamplingFunctionMap>(m, "StateSamplingFunctionMap",
+                                         R"pbdoc(
+      StateSamplingFunctionMap stores :class:`~libcasm.monte.StateSamplingFunction` by name of the sampled quantity.
+
+      Notes
+      -----
+      StateSamplingFunctionMap is a Dict[str, :class:`~libcasm.monte.StateSamplingFunction`]-like object.
+      )pbdoc");
 
   py::class_<monte::RequestedPrecision>(m, "RequestedPrecision",
                                         R"pbdoc(
@@ -986,7 +1210,24 @@ PYBIND11_MODULE(_monte, m) {
       .def_readwrite("rel_precision", &monte::RequestedPrecision::rel_precision,
                      R"pbdoc(
                      float: Value of requsted relative precision, :math:`p_{rel}`.
-                     )pbdoc");
+                     )pbdoc")
+      .def(
+          "to_dict",
+          [](monte::RequestedPrecision const &x) {
+            jsonParser json;
+            to_json(x, json);
+            return static_cast<nlohmann::json>(json);
+          },
+          "Represent RequestedPrecision as a Python dict.")
+      .def_static(
+          "from_dict",
+          [](const nlohmann::json &data) {
+            jsonParser json{data};
+            monte::RequestedPrecision x;
+            from_json(x, json);
+            return x;
+          },
+          "Construct RequestedPrecision from a Python dict.", py::arg("data"));
 
   py::bind_map<RequestedPrecisionMap>(m, "RequestedPrecisionMap",
                                       R"pbdoc(
@@ -994,13 +1235,13 @@ PYBIND11_MODULE(_monte, m) {
 
       Notes
       -----
-      RequestedPrecisionMap is a Dict[SamplerComponent, RequestedPrecision]-like object.
+      RequestedPrecisionMap is a Dict[:class:`~libcasm.monte.SamplerComponent`, :class:`~libcasm.monte.RequestedPrecision`]-like object.
       )pbdoc");
 
   py::class_<monte::IndividualEquilibrationCheckResult>(
       m, "IndividualEquilibrationResult",
       R"pbdoc(
-      Equilibration check results for a single SamplerComponent
+      Equilibration check results for a single :class:`~libcasm.monte.SamplerComponent`
       )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
@@ -1025,15 +1266,23 @@ PYBIND11_MODULE(_monte, m) {
           convergence, so statistics are only taken when *all* requested values are
           equilibrated.
 
-          )pbdoc");
+          )pbdoc")
+      .def(
+          "to_dict",
+          [](monte::IndividualEquilibrationCheckResult const &x) {
+            jsonParser json;
+            to_json(x, json);
+            return static_cast<nlohmann::json>(json);
+          },
+          "Represent IndividualEquilibrationResult as a Python dict.");
 
   py::bind_map<EquilibrationResultMap>(m, "EquilibrationResultMap",
                                        R"pbdoc(
-      EquilibrationResultMap stores IndividualEquilibrationResult by SamplerComponent
+      EquilibrationResultMap stores :class:`~libcasm.monte.IndividualEquilibrationResult` by :class:`~libcasm.monte.SamplerComponent`
 
       Notes
       -----
-      EquilibrationResultMap is a Dict[SamplerComponent, IndividualEquilibrationResult]-like object.
+      EquilibrationResultMap is a Dict[:class:`~libcasm.monte.SamplerComponent`, :class:`~libcasm.monte.IndividualEquilibrationResult`]-like object.
       )pbdoc");
 
   py::class_<monte::EquilibrationCheckResults>(m, "EquilibrationCheckResults",
@@ -1067,7 +1316,84 @@ PYBIND11_MODULE(_monte, m) {
                      &monte::EquilibrationCheckResults::individual_results,
                      R"pbdoc(
           Results from checking equilibration criteria.
-          )pbdoc");
+          )pbdoc")
+      .def(
+          "to_dict",
+          [](monte::EquilibrationCheckResults const &x) {
+            jsonParser json;
+            to_json(x, json);
+            return static_cast<nlohmann::json>(json);
+          },
+          "Represent EquilibrationCheckResults as a Python dict.");
+
+  m.def("default_equilibration_check", &monte::default_equilibration_check,
+        R"pbdoc(
+      Check if a range of observations have equilibrated
+
+      Notes
+      -----
+      This uses the following algorithm, based on Van de Walle and Asta, Modelling Simul. Mater. Sci. Eng. 10 (2002) 521–538.
+
+      Partition observations into three ranges:
+
+        - equilibriation stage:  [0, start1)
+        - first partition:  [start1, start2)
+        - second partition: [start2, N)
+
+      where N is observations.size(), start1 and start 2 are indices into
+      observations such 0 <= start1 < start2 <= N, the number of elements in
+      the first and second partition are the same (within 1).
+
+      The calculation is considered equilibrated at start1 if the mean of the
+      elements in the first and second partition are approximately equal to the
+      desired precsion: (std::abs(mean1 - mean2) < prec).
+
+      Additionally, the value start1 is incremented as much as needed to ensure
+      that the equilibriation stage has observations on either side of the total
+      mean.
+
+      If all observations are approximately equal, then:
+
+      - is_equilibrated = true
+      - N_samples_for_equilibration = 0
+
+      If the equilibration conditions are met, the result contains:
+
+      - is_equilibrated = true
+      - N_samples_for_equilibration = start1
+
+      If the equilibration conditions are not met, the result contains:
+
+      - is_equilibrated = false
+      - N_samples_for_equilibration = <undefined>
+
+      Is samples are weighted, the following change is made:
+
+      Use:
+
+          weighted_observation(i) = sample_weight[i] * observation(i) * N / W
+
+      where:
+
+          W = sum_i sample_weight[i]
+
+      The same weight_factor N/W applies for all properties.
+
+
+      Parameters
+      ----------
+      observations : array_like
+          A 1d array of observations. Should include all samples.
+      sample_weight : array_like
+          Sample weights associated with observations. May have size 0, in which case the observations are treated as being equally weighted and no resampling is performed, or have the same size as `observations`.
+      requested_precision : :class:`~libcasm.monte.RequestedPrecisionMap`
+          The requested precision level for convergence.
+
+      Returns
+      -------
+      results : :class:`~libcasm.monte.IndividualEquilibrationResult`
+          The equilibration check results.
+      )pbdoc");
 
   py::class_<monte::BasicStatistics>(m, "BasicStatistics",
                                      R"pbdoc(
@@ -1099,40 +1425,112 @@ PYBIND11_MODULE(_monte, m) {
           },
           "Represent the BasicStatistics as a Python dict.");
 
-  m.def(
-      "calc_basic_statistics",
-      [](Eigen::VectorXd const &observations, double confidence,
-         std::optional<Eigen::VectorXd> const &sample_weight) {
-        if (sample_weight.has_value()) {
-          return monte::calc_basic_statistics(observations, *sample_weight,
-                                              confidence);
-        } else {
-          static Eigen::VectorXd empty_sample_weight;
-          return monte::calc_basic_statistics(observations, empty_sample_weight,
-                                              confidence);
-        }
-      },
-      R"pbdoc(
+  py::class_<monte::BasicStatisticsCalculator>(m, "BasicStatisticsCalculator",
+                                               R"pbdoc(
+      Basic statistics calculator
+      )pbdoc")
+      .def(py::init<double, Index, Index>(),
+           R"pbdoc(
+          Constructor
 
-      Parameters
-      ----------
-      observations : numpy.ndarray[numpy.float64[n_samples, 1]]]
-          Values to calculate statistics.
-      confidence : float = 0.95
-          Confidence level to use for calculated precision of the mean.
-      sample_weight : Optional[numpy.ndarray[numpy.float64[n_samples, 1]]]]
-          Optional weight to give to each to observation. If sample weights are
-          provided, a time-series is constructed from the observations and
-          covariances used to estimate the precision of the mean are calculated
-          by re-sampling at 10000 equally spaced time intervals.
-      )pbdoc",
-      py::arg("observations"), py::arg("confidence") = 0.95,
-      py::arg("sample_weight") = std::nullopt);
+          Parameters
+          ----------
+          confidence : float = 0.95
+              Confidence level to use for calculated precision of the mean.
+          weighted_observations_method : int = 1
+              Method used to estimate precision in the sample mean when observations
+              are weighted (i.e. N-fold way method). Options are:
+
+              1) Calculate weighted sample variance directly from weighted samples and only autocorrelation factor (1+rho)/(1-rho) from resampled observations
+              2) Calculate all statistics from resampled observations
+          n_resamples : int = 10000
+              Number of resampled observations to make for autocovariance estimation when observations are weighted.
+
+          )pbdoc",
+           py::arg("confidence") = 0.95,
+           py::arg("weighted_observations_method") = 1,
+           py::arg("n_resamples") = 10000)
+      .def_readwrite("confidence",
+                     &monte::BasicStatisticsCalculator::confidence,
+                     R"pbdoc(
+          float : Confidence level used to calculate error interval.
+          )pbdoc")
+      .def_readwrite("weighted_observations_method",
+                     &monte::BasicStatisticsCalculator::method,
+                     R"pbdoc(
+            int : Method used to estimate precision in the sample mean when observations
+            are weighted.
+
+            Options are:
+
+            1) Calculate weighted sample variance directly from weighted samples and only autocorrelation factor (1+rho)/(1-rho) from resampled observations
+            2) Calculate all statistics from resampled observations
+          )pbdoc")
+      .def_readwrite("n_resamples",
+                     &monte::BasicStatisticsCalculator::n_resamples,
+                     R"pbdoc(
+          int : Number of resampled observations to make for autocovariance estimation when observations are weighted.
+          )pbdoc")
+      .def(
+          "__call__",
+          [](monte::BasicStatisticsCalculator const &f,
+             Eigen::VectorXd const &observations,
+             Eigen::VectorXd const &sample_weight) {
+            return f(observations, sample_weight);
+          },
+          R"pbdoc(
+          Calculate statistics for a range of weighted observations
+
+          The method used to estimate precision in the sample mean when observations are weighted (i.e. N-fold way method) depends on the parameter :py:attr:`~libcasm.monte.weighted_observations_method`.
+
+          Parameters
+          ----------
+          observations : array_like
+              A 1d array of observations. Should only include samples after the calculation has equilibrated.
+          sample_weight : array_like
+              Sample weights associated with observations. May have size 0, in which case the observations are treated as being equally weighted and no resampling is performed, or have the same size as `observations`.
+
+          Returns
+          -------
+          stats : :class:`~libcasm.monte.BasicStatistics`
+              Calculated statistics.
+
+          )pbdoc")
+      .def(
+          "to_dict",
+          [](monte::BasicStatisticsCalculator const &f) {
+            jsonParser json;
+            json["confidence"] = f.confidence;
+            json["weighted_observations_method"] = f.method;
+            json["n_resamples"] = f.n_resamples;
+            return static_cast<nlohmann::json>(json);
+          },
+          "Represent the BasicStatistics as a Python dict.")
+      .def_static(
+          "from_dict",
+          [](const nlohmann::json &data) {
+            jsonParser json{data};
+
+            double confidence = 0.95;
+            json.get_if(confidence, "confidence");
+
+            Index weighted_observations_method = 1;
+            json.get_if(weighted_observations_method,
+                        "weighted_observations_method");
+
+            Index n_resamples = 10000;
+            json.get_if(n_resamples, "n_resamples");
+
+            return monte::BasicStatisticsCalculator(
+                confidence, weighted_observations_method, n_resamples);
+          },
+          "Construct a BasicStatisticsCalculator from a Python dict.",
+          py::arg("data"));
 
   py::class_<monte::IndividualConvergenceCheckResult<monte::BasicStatistics>>(
       m, "IndividualConvergenceResult",
       R"pbdoc(
-      Convergence check results for a single SamplerComponent
+      Convergence check results for a single :class:`~libcasm.monte.SamplerComponent`
       )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
@@ -1155,15 +1553,25 @@ PYBIND11_MODULE(_monte, m) {
                          monte::BasicStatistics>::stats,
                      R"pbdoc(
           Calculated statistics.
-          )pbdoc");
+          )pbdoc")
+      .def(
+          "to_dict",
+          [](monte::IndividualConvergenceCheckResult<
+              monte::BasicStatistics> const &x) {
+            jsonParser json;
+            to_json(x, json);
+            return static_cast<nlohmann::json>(json);
+          },
+          "Represent the individual convergence check results as a Python "
+          "dict.");
 
   py::bind_map<ConvergenceResultMap>(m, "ConvergenceResultMap",
                                      R"pbdoc(
-      ConvergenceResultMap stores IndividualConvergenceResult by SamplerComponent
+      ConvergenceResultMap stores :class:`~libcasm.monte.IndividualConvergenceResult` by :class:`~libcasm.monte.SamplerComponent`
 
       Notes
       -----
-      ConvergenceResultMap is a Dict[SamplerComponent, IndividualConvergenceResult]-like object.
+      ConvergenceResultMap is a Dict[:class:`~libcasm.monte.SamplerComponent`, :class:`~libcasm.monte.IndividualConvergenceResult`]-like object.
       )pbdoc");
 
   py::class_<monte::ConvergenceCheckResults<monte::BasicStatistics>>(
@@ -1171,7 +1579,6 @@ PYBIND11_MODULE(_monte, m) {
       R"pbdoc(
       Stores convergence check results
       )pbdoc")
-      //
       .def(py::init<>(),
            R"pbdoc(
           Default constructor only.
@@ -1206,75 +1613,626 @@ PYBIND11_MODULE(_monte, m) {
                          monte::BasicStatistics>::individual_results,
                      R"pbdoc(
           Results from checking convergence criteria.
-          )pbdoc");
+          )pbdoc")
+      .def(
+          "to_dict",
+          [](monte::ConvergenceCheckResults<monte::BasicStatistics> const &x) {
+            jsonParser json;
+            to_json(x, json);
+            return static_cast<nlohmann::json>(json);
+          },
+          "Represent the convergence check results as a Python dict.");
 
-  //
   m.def(
-      "convergence_check",
-      [](RequestedPrecisionMap const &requested_precision,
-         monte::CountType N_samples_for_equilibration,
-         std::map<std::string, std::shared_ptr<monte::Sampler>> const &samplers,
-         monte::CalcStatisticsFunction<monte::BasicStatistics> calc_statistics_f)
-          -> monte::ConvergenceCheckResults<monte::BasicStatistics> {
-    return monte::convergence_check(requested_precision,
-                                    N_samples_for_equilibration, samplers,
-                                    calc_statistics_f);
-        }
-},
+      "component_convergence_check",
+      [](monte::Sampler const &sampler,
+         std::shared_ptr<monte::Sampler> const &sample_weight,
+         monte::SamplerComponent const &key,
+         monte::RequestedPrecision const &requested_precision,
+         monte::CountType N_samples_for_statistics,
+         monte::CalcStatisticsFunction<monte::BasicStatistics>
+             calc_statistics_f)
+          -> monte::IndividualConvergenceCheckResult<monte::BasicStatistics> {
+        return monte::component_convergence_check(
+            sampler, *sample_weight, key, requested_precision,
+            N_samples_for_statistics, calc_statistics_f);
+      },
       R"pbdoc(
+        Check convergence of an individual sampler component
 
-      Parameters
-      ----------
-      samplers: :class:`~libcasm.monte.SamplerMap`
-          The samplers containing the sampled data.
-      requested_precision : :class:`~libcasm.monte.RequestedPrecisionMap`
-          The requested precision levels for all :class:`~libcasm.monte.SamplerComponent` that are requested to converge.
-      N_samples_for_equilibration : int
-          Number of initial samples to exclude from statistics because the system is out of equilibrium.
-      calc_statistics_f : function, default=`~libcasm.monte.calc_basic_statistics()`
-          Fucntion used to calculate statistics.
-      )pbdoc",
-      py::arg("samplers"),
-      py::arg("requested_precision"),
-      py::arg("N_samples_for_equilibration"),
+        Parameters
+        ----------
+        sampler: :class:`~libcasm.monte.Sampler`
+            The sampler containing the sampled data.
+        sample_weight : :class:`~libcasm.monte.Sampler`
+            Optional weight to give to each to observation.
+        key : :class:`~libcasm.monte.SamplerComponent`
+            Specifies the component of sampler being checked for convergence.
+        requested_precision : :class:`~libcasm.monte.RequestedPrecisionMap`
+            The requested precision level for convergence.
+        N_samples_for_statistics : int
+            The number of tail samples from `sampler` to include in statistics.
+        calc_statistics_f : function
+            Fucntion used to calculate :class:`~libcasm.monte.BasicStatistics`. For example, an instance of :class:`~libcasm.monte.BasicStatistics`.
+        )pbdoc",
+      py::arg("sampler"), py::arg("sample_weight"), py::arg("key"),
+      py::arg("requested_precision"), py::arg("N_samples_for_statistics"),
       py::arg("calc_statistics_f"));
 
-//
-m.def(
-    "weighted_convergence_check",
-    [](std::map<std::string, std::shared_ptr<monte::Sampler>> const &samplers,
-       std::shared_ptr<monte::Sampler> const &sample_weight,
-       RequestedPrecisionMap const &requested_precision,
-       monte::CountType N_samples_for_equilibration,
-       monte::CalcWeightedStatisticsFunction<monte::BasicStatistics>
-           calc_weighted_statistics_f)
-        -> monte::ConvergenceCheckResults<monte::BasicStatistics> {
-      return monte::convergence_check(
-          samplers, *sample_weight, requested_precision,
-          N_samples_for_equilibration, calc_weighted_statistics_f);
-    },
-    R"pbdoc(
+  m.def(
+      "convergence_check",
+      [](std::map<std::string, std::shared_ptr<monte::Sampler>> const &samplers,
+         std::shared_ptr<monte::Sampler> const &sample_weight,
+         RequestedPrecisionMap const &requested_precision,
+         monte::CountType N_samples_for_equilibration,
+         monte::CalcStatisticsFunction<monte::BasicStatistics>
+             calc_statistics_f)
+          -> monte::ConvergenceCheckResults<monte::BasicStatistics> {
+        return monte::convergence_check(
+            samplers, *sample_weight, requested_precision,
+            N_samples_for_equilibration, calc_statistics_f);
+      },
+      R"pbdoc(
+        Check convergence of all requested sampler components
+
+        Parameters
+        ----------
+        samplers: :class:`~libcasm.monte.SamplerMap`
+            The samplers containing the sampled data.
+        sample_weight : :class:`~libcasm.monte.Sampler`
+            Optional weight to give to each to observation.
+        requested_precision : :class:`~libcasm.monte.RequestedPrecisionMap`
+            The requested precision levels for all :class:`~libcasm.monte.SamplerComponent` that are requested to converge.
+        N_samples_for_equilibration : int
+            Number of initial samples to exclude from statistics because the system is out of equilibrium.
+        calc_statistics_f : function
+            Fucntion used to calculate :class:`~libcasm.monte.BasicStatistics`. For example, an instance of :class:`~libcasm.monte.BasicStatistics`.
+        )pbdoc",
+      py::arg("samplers"), py::arg("sample_weight"),
+      py::arg("requested_precision"), py::arg("N_samples_for_equilibration"),
+      py::arg("calc_statistics_f"));
+
+  py::class_<monte::CutoffCheckParams>(m, "CutoffCheckParams",
+                                       R"pbdoc(
+        Completion check parameters that don't depend on the sampled values.
+
+        Notes
+        -----
+        - A Monte Carlo simulation does not stop before all minimums are met
+        - A Monte Carlo simulation does stop when any maximum is met
+
+        )pbdoc")
+      .def(py::init<>(),
+           R"pbdoc(
+           Constructor
+           )pbdoc")
+      .def_readwrite("min_count", &monte::CutoffCheckParams::min_count,
+                     R"pbdoc(
+                     Optional[int]: Minimum number of steps or passes.
+                     )pbdoc")
+      .def_readwrite("min_time", &monte::CutoffCheckParams::min_time,
+                     R"pbdoc(
+                     Optional[float]: Minimum simulated time.
+                     )pbdoc")
+      .def_readwrite("min_sample", &monte::CutoffCheckParams::min_sample,
+                     R"pbdoc(
+                     Optional[int]: Minimum number of samples.
+                     )pbdoc")
+      .def_readwrite("min_time", &monte::CutoffCheckParams::min_clocktime,
+                     R"pbdoc(
+                     Optional[float]: Minimum elapsed clocktime.
+                     )pbdoc")
+      .def_readwrite("max_count", &monte::CutoffCheckParams::max_count,
+                     R"pbdoc(
+                     Optional[int]: Maximum number of steps or passes.
+                     )pbdoc")
+      .def_readwrite("max_time", &monte::CutoffCheckParams::max_time,
+                     R"pbdoc(
+                     Optional[float]: Maximum simulated time.
+                     )pbdoc")
+      .def_readwrite("max_sample", &monte::CutoffCheckParams::max_sample,
+                     R"pbdoc(
+                     Optional[int]: Maximum number of samples.
+                     )pbdoc")
+      .def_readwrite("max_time", &monte::CutoffCheckParams::max_clocktime,
+                     R"pbdoc(
+                     Optional[float]: Maximum elapsed clocktime.
+                     )pbdoc")
+      .def(
+          "to_dict",
+          [](monte::CutoffCheckParams const &x) {
+            jsonParser json;
+            to_json(x, json);
+            return static_cast<nlohmann::json>(json);
+          },
+          "Represent CutoffCheckParams as a Python dict.")
+      .def_static(
+          "from_dict",
+          [](const nlohmann::json &data) {
+            jsonParser json{data};
+            InputParser<monte::CutoffCheckParams> parser(json);
+            std::runtime_error error_if_invalid{
+                "Error in libcasm.monte.CutoffCheckParams.from_dict"};
+            report_and_throw_if_invalid(parser, CASM::log(), error_if_invalid);
+            return std::move(*parser.value);
+          },
+          "Construct CutoffCheckParams from a Python dict.");
+
+  m.def("all_minimums_met", &monte::all_minimums_met,
+        R"pbdoc(
+      Check if all cutoff check minimums have been met
 
       Parameters
       ----------
-      samplers: :class:`~libcasm.monte.SamplerMap`
-          The samplers containing the sampled data.
-      sample_weight : :class:`~libcasm.monte.Sampler`
-          Optional weight to give to each to observation.
-      requested_precision : :class:`~libcasm.monte.RequestedPrecisionMap`
-          The requested precision levels for all :class:`~libcasm.monte.SamplerComponent` that are requested to converge.
-      N_samples_for_equilibration : int
-          Number of initial samples to exclude from statistics because the system is out of equilibrium.
-      calc_weighted_statistics_f : function
-          Fucntion used to calculate statistics from weighted observations.
+      cutoff_params : :class:`~libcasm.monte.CutoffCheckParams`
+          Cutoff check parameters
+      count : Optional[int]
+          Number of steps or passes
+      time : Optional[float]
+          Simulated time
+      n_samples : int
+          Number of samples taken
+      clocktime : float
+          Elapsed clock time.
+
+      Returns
+      -------
+      result : bool
+          If all cutoff check minimums have been met, return True, else False.
       )pbdoc",
-    py::arg("samplers"), py::arg("sample_weight"),
-    py::arg("requested_precision"), py::arg("N_samples_for_equilibration"),
-    py::arg("calc_statistics_f"));
+        py::arg("cutoff_params"), py::arg("count"), py::arg("time"),
+        py::arg("n_samples"), py::arg("clocktime"));
+
+  m.def("any_maximum_met", &monte::any_maximum_met,
+        R"pbdoc(
+      Check if any cutoff check maximum has been met
+
+      Parameters
+      ----------
+      cutoff_params : :class:`~libcasm.monte.CutoffCheckParams`
+          Cutoff check parameters
+      count : Optional[int]
+          Number of steps or passes
+      time : Optional[float]
+          Simulated time
+      n_samples : int
+          Number of samples taken
+      clocktime : float
+          Elapsed clock time.
+
+      Returns
+      -------
+      result : bool
+          If any cutoff check maximum has been met, return True, else False.
+      )pbdoc",
+        py::arg("cutoff_params"), py::arg("count"), py::arg("time"),
+        py::arg("n_samples"), py::arg("clocktime"));
+
+  py::class_<monte::CompletionCheckParams<monte::BasicStatistics>>(
+      m, "CompletionCheckParams",
+      R"pbdoc(
+      Parameters that determine if a simulation is complete
+      )pbdoc")
+      .def(py::init<>(),
+           R"pbdoc(
+          Default constructor only.
+          )pbdoc")
+      .def_readwrite(
+          "cutoff_params",
+          &monte::CompletionCheckParams<monte::BasicStatistics>::cutoff_params,
+          R"pbdoc(
+          :class:`~libcasm.monte.CutoffCheckParams`: Cutoff check parameters
+          )pbdoc")
+      .def_readwrite("equilibration_check_f",
+                     &monte::CompletionCheckParams<
+                         monte::BasicStatistics>::equilibration_check_f,
+                     R"pbdoc(
+                     function: Function that performs equilibration checking.
+
+                     A function, such as :func:`~libcasm.monte.default_equilibration_check`, with signature f(array_like observations, array_like sample_weight,
+                     :class:`~libcasm.monte.RequestedPrecision` requested_precision) -> :class:`~libcasm.monte.IndividualEquilibrationResult`.
+                     )pbdoc")
+      .def_readwrite("calc_statistics_f",
+                     &monte::CompletionCheckParams<
+                         monte::BasicStatistics>::calc_statistics_f,
+                     R"pbdoc(
+                     function: Function to calculate statistics.
+
+                     A function, such as an instance of  :class:`~libcasm.monte.BasicStatisticsCalculator`, with signature f(array_like observations, array_like sample_weight) -> :class:`~libcasm.monte.BasicStatistics`.
+                     )pbdoc")
+      .def_readwrite("requested_precision",
+                     &monte::CompletionCheckParams<
+                         monte::BasicStatistics>::requested_precision,
+                     R"pbdoc(
+                     :class:`~libcasm.monte.RequestedPrecisionMap`: Requested precision for convergence of sampler components.
+
+                     A Dict[:class:`~libcasm.monte.SamplerComponent`, :class:`~libcasm.monte.RequestedPrecision`]-like object that specifies convergence criteria.
+                     )pbdoc")
+      .def_readwrite(
+          "log_spacing",
+          &monte::CompletionCheckParams<monte::BasicStatistics>::log_spacing,
+          R"pbdoc(
+          bool: If True, use logirithmic spacing for completiong checking; else use  linear spacing.
+
+          The default value is False, for linear spacing between completion checks. For linear spacing, the n-th check will be taken when:
+
+          .. code-block:: Python
+
+              sample = round( check_begin + (check_period / checks_per_period) * n )
+
+          For "log" spacing, the n-th check will be taken when:
+
+          .. code-block:: Python
+
+              sample = round( check_begin + check_period ^ ( (n + check_shift) /
+                              checks_per_period ) )
+
+          )pbdoc")
+      .def_readwrite(
+          "check_begin",
+          &monte::CompletionCheckParams<monte::BasicStatistics>::check_begin,
+          R"pbdoc(
+                     float: Completion check beginning. Default =`0.0`.
+                     )pbdoc")
+      .def_readwrite(
+          "check_period",
+          &monte::CompletionCheckParams<monte::BasicStatistics>::check_period,
+          R"pbdoc(
+                     float: Completion check period. Default =`10.0`.
+                     )pbdoc")
+      .def_readwrite("checks_per_period",
+                     &monte::CompletionCheckParams<
+                         monte::BasicStatistics>::checks_per_period,
+                     R"pbdoc(
+                     float: Completion checks per period. Default =`1.0`.
+                     )pbdoc")
+      .def_readwrite(
+          "check_shift",
+          &monte::CompletionCheckParams<monte::BasicStatistics>::check_shift,
+          R"pbdoc(
+                     float: Completion check shift. Default =`1.0`.
+                     )pbdoc")
+      .def_static(
+          "from_dict",
+          [](const nlohmann::json &data,
+             StateSamplingFunctionMap const &sampling_functions) {
+            jsonParser json{data};
+            InputParser<monte::CompletionCheckParams<monte::BasicStatistics>>
+                parser(json, sampling_functions);
+            std::runtime_error error_if_invalid{
+                "Error in libcasm.monte.CompletionCheckParams.from_dict"};
+            report_and_throw_if_invalid(parser, CASM::log(), error_if_invalid);
+            return std::move(*parser.value);
+          },
+          "Construct a CompletionCheckParams from a Python dict.",
+          py::arg("data"), py::arg("sampling_functions"));
+
+  py::class_<monte::CompletionCheckResults<monte::BasicStatistics>>(
+      m, "CompletionCheckResults",
+      R"pbdoc(
+      Results of completion checks
+      )pbdoc")
+      .def(py::init<>(),
+           R"pbdoc(
+          Default constructor only.
+          )pbdoc")
+      .def_readwrite(
+          "params",
+          &monte::CompletionCheckResults<monte::BasicStatistics>::params,
+          R"pbdoc(
+                     :class:`~libcasm.monte.CompletionCheckParams`: Completion check parameters
+                     )pbdoc")
+      .def_readwrite(
+          "count",
+          &monte::CompletionCheckResults<monte::BasicStatistics>::count,
+          R"pbdoc(
+                     Optional[int]: Number of steps or passes
+                     )pbdoc")
+      .def_readwrite(
+          "time", &monte::CompletionCheckResults<monte::BasicStatistics>::time,
+          R"pbdoc(
+                     Optional[int]: Simulated time
+                     )pbdoc")
+      .def_readwrite(
+          "clocktime",
+          &monte::CompletionCheckResults<monte::BasicStatistics>::clocktime,
+          R"pbdoc(
+           float: Elapsed clock time
+           )pbdoc")
+      .def_readwrite(
+          "n_samples",
+          &monte::CompletionCheckResults<monte::BasicStatistics>::n_samples,
+          R"pbdoc(
+          int: Number of samples taken
+          )pbdoc")
+      .def_readwrite("has_all_minimums_met",
+                     &monte::CompletionCheckResults<
+                         monte::BasicStatistics>::has_all_minimums_met,
+                     R"pbdoc(
+           bool: True if all cutoff check minimums have been met
+           )pbdoc")
+      .def_readwrite("has_any_maximum_met",
+                     &monte::CompletionCheckResults<
+                         monte::BasicStatistics>::has_any_maximum_met,
+                     R"pbdoc(
+           bool: True if any cutoff check maximums have been met
+           )pbdoc")
+      .def_readwrite(
+          "n_samples_at_convergence_check",
+          &monte::CompletionCheckResults<
+              monte::BasicStatistics>::n_samples_at_convergence_check,
+          R"pbdoc(
+           Optional[int]: Number of samples when the converence check was performed
+           )pbdoc")
+      .def_readwrite("equilibration_check_results",
+                     &monte::CompletionCheckResults<
+                         monte::BasicStatistics>::equilibration_check_results,
+                     R"pbdoc(
+           :class:`~libcasm.monte.EquilibrationCheckResults`: Results of equilibration check
+           )pbdoc")
+      .def_readwrite("convergence_check_results",
+                     &monte::CompletionCheckResults<
+                         monte::BasicStatistics>::convergence_check_results,
+                     R"pbdoc(
+           :class:`~libcasm.monte.ConvergenceCheckResults`: Results of convergence check
+           )pbdoc")
+      .def_readwrite(
+          "is_complete",
+          &monte::CompletionCheckResults<monte::BasicStatistics>::is_complete,
+          R"pbdoc(
+           bool: Outcome of the completion check
+           )pbdoc")
+      .def(
+          "partial_reset",
+          &monte::CompletionCheckResults<monte::BasicStatistics>::partial_reset,
+          R"pbdoc(
+          Reset for step by step updates
+
+          Reset most values, but not:
+
+          - params
+          - n_samples_at_convergence_check
+          - equilibration_check_results
+          - convergence_check_results
+
+          Parameters
+          ----------
+          count : Optional[int] = None
+              Number of steps or passes to reset to
+          time : Optional[float] = None
+              Simulated time to reset to
+          clocktime : float = 0.0
+              Elapsed clocktime to reset to
+          n_samples : int = 0
+              Number of samples to reset to
+          )pbdoc",
+          py::arg("count") = std::nullopt, py::arg("time") = std::nullopt,
+          py::arg("clocktime") = 0.0, py::arg("n_samples") = 0)
+      .def("full_reset",
+           &monte::CompletionCheckResults<monte::BasicStatistics>::full_reset,
+           R"pbdoc(
+          Reset for next run
+
+          Reset all values except:
+
+          - params
+
+          Parameters
+          ----------
+          count : Optional[int] = None
+              Number of steps or passes to reset to
+          time : Optional[float] = None
+              Simulated time to reset to
+          n_samples : int = 0
+              Number of samples to reset to
+          )pbdoc",
+           py::arg("count") = std::nullopt, py::arg("time") = std::nullopt,
+           py::arg("n_samples") = 0)
+      .def(
+          "to_dict",
+          [](monte::CompletionCheckResults<monte::BasicStatistics> const &x) {
+            jsonParser json;
+            to_json(x, json);
+            return static_cast<nlohmann::json>(json);
+          },
+          "Represent the CompletionCheckResults as a Python dict.");
+
+  py::class_<monte::CompletionCheck<monte::BasicStatistics>>(m,
+                                                             "CompletionCheck",
+                                                             R"pbdoc(
+      Implements completion checks
+      )pbdoc")
+      .def(py::init<monte::CompletionCheckParams<monte::BasicStatistics>>(),
+           R"pbdoc(
+          Constructor
+
+          Parameters
+          ----------
+          params : :class:`~libcasm.monte.CompletionCheckParams`
+              Data struture holding completion check parameters.
+          )pbdoc")
+      .def("reset", &monte::CompletionCheck<monte::BasicStatistics>::reset,
+           R"pbdoc(
+          Reset CompletionCheck for next run
+          )pbdoc")
+      .def("results", &monte::CompletionCheck<monte::BasicStatistics>::results,
+           R"pbdoc(
+          Get detailed results of the last check
+          )pbdoc")
+      .def(
+          "count_check",
+          [](monte::CompletionCheck<monte::BasicStatistics> &x,
+             std::map<std::string, std::shared_ptr<monte::Sampler>> const
+                 &samplers,
+             monte::Sampler const &sample_weight, monte::CountType count,
+             monte::MethodLog &method_log) {
+            return x.is_complete(samplers, sample_weight, count,
+                                 method_log.log);
+          },
+          R"pbdoc(
+          Perform count based completion check
+
+          Parameters
+          ----------
+          samplers: :class:`~libcasm.monte.SamplerMap`
+              The samplers containing the sampled data.
+          sample_weight : :class:`~libcasm.monte.Sampler`
+              Sample weights associated with observations. May have 0 samples, in which case the obsservations are treated as being equally weighted, otherwise must match the number of samples made by each sampler in `samplers`.
+          count : int
+              Number of steps or passes
+          method_log : :class:`~libcasm.monte.MethodLog`
+              The method log specifies where to write status updates and internally tracks the elapsed clock time.
+
+          Returns
+          -------
+          is_complete : bool
+              True if complete, False otherwise
+          )pbdoc",
+          py::arg("samplers"), py::arg("sample_weight"), py::arg("count"),
+          py::arg("method_log"))
+      .def(
+          "__call__",
+          [](monte::CompletionCheck<monte::BasicStatistics> &x,
+             std::map<std::string, std::shared_ptr<monte::Sampler>> const
+                 &samplers,
+             monte::Sampler const &sample_weight,
+             std::optional<monte::CountType> count,
+             std::optional<monte::TimeType> time,
+             monte::MethodLog &method_log) {
+            if (count.has_value()) {
+              if (time.has_value()) {
+                return x.is_complete(samplers, sample_weight, *count, *time,
+                                     method_log.log);
+              } else {
+                return x.is_complete(samplers, sample_weight, *count,
+                                     method_log.log);
+              }
+            } else {
+              if (time.has_value()) {
+                return x.is_complete(samplers, sample_weight, *time,
+                                     method_log.log);
+              } else {
+                return x.is_complete(samplers, sample_weight, method_log.log);
+              }
+            }
+          },
+          R"pbdoc(
+          Perform completion check, with optional count- or time-based cutoff checks
+
+          Parameters
+          ----------
+          samplers: :class:`~libcasm.monte.SamplerMap`
+              The samplers containing the sampled data.
+          sample_weight : :class:`~libcasm.monte.Sampler`
+              Sample weights associated with observations. May have 0 samples, in which case the obsservations are treated as being equally weighted, otherwise must match the number of samples made by each sampler in `samplers`.
+          count : Optional[int]
+              Number of steps or passes
+          time : Optional[float]
+              Simulated time
+          method_log : :class:`~libcasm.monte.MethodLog`
+              The method log specifies where to write status updates and internally tracks the elapsed clock time.
+
+          Returns
+          -------
+          is_complete : bool
+              True if complete, False otherwise
+          )pbdoc",
+          py::arg("samplers"), py::arg("sample_weight"), py::arg("count"),
+          py::arg("time"), py::arg("method_log"))
+      .def(
+          "count_and_time_check",
+          [](monte::CompletionCheck<monte::BasicStatistics> &x,
+             std::map<std::string, std::shared_ptr<monte::Sampler>> const
+                 &samplers,
+             monte::Sampler const &sample_weight, monte::CountType count,
+             monte::TimeType time, monte::MethodLog &method_log) {
+            return x.is_complete(samplers, sample_weight, count, time,
+                                 method_log.log);
+          },
+          R"pbdoc(
+          Perform completion check, with count- and time-based cutoff checks
+
+          Parameters
+          ----------
+          samplers: :class:`~libcasm.monte.SamplerMap`
+              The samplers containing the sampled data.
+          sample_weight : :class:`~libcasm.monte.Sampler`
+              Sample weights associated with observations. May have 0 samples, in which case the obsservations are treated as being equally weighted, otherwise must match the number of samples made by each sampler in `samplers`.
+          count : int
+              Number of steps or passes
+          time : float
+              Simulated time
+          method_log : :class:`~libcasm.monte.MethodLog`
+              The method log specifies where to write status updates and internally tracks the elapsed clock time.
+
+          Returns
+          -------
+          is_complete : bool
+              True if complete, False otherwise
+          )pbdoc",
+          py::arg("samplers"), py::arg("sample_weight"), py::arg("count"),
+          py::arg("time"), py::arg("method_log"))
+      .def(
+          "time_check",
+          [](monte::CompletionCheck<monte::BasicStatistics> &x,
+             std::map<std::string, std::shared_ptr<monte::Sampler>> const
+                 &samplers,
+             monte::Sampler const &sample_weight, monte::CountType time,
+             monte::MethodLog &method_log) {
+            return x.is_complete(samplers, sample_weight, time, method_log.log);
+          },
+          R"pbdoc(
+          Perform completion check, with time-based cutoff checks
+
+          Parameters
+          ----------
+          samplers: :class:`~libcasm.monte.SamplerMap`
+              The samplers containing the sampled data.
+          sample_weight : :class:`~libcasm.monte.Sampler`
+              Sample weights associated with observations. May have 0 samples, in which case the observations are treated as being equally weighted, otherwise must match the number of samples made by each sampler in `samplers`.
+          time : float
+              Simulated time
+          method_log : :class:`~libcasm.monte.MethodLog`
+              The method log specifies where to write status updates and internally tracks the elapsed clock time.
+
+          Returns
+          -------
+          is_complete : bool
+              True if complete, False otherwise
+          )pbdoc",
+          py::arg("samplers"), py::arg("sample_weight"), py::arg("time"),
+          py::arg("method_log"))
+      .def(
+          "check",
+          [](monte::CompletionCheck<monte::BasicStatistics> &x,
+             std::map<std::string, std::shared_ptr<monte::Sampler>> const
+                 &samplers,
+             monte::Sampler const &sample_weight,
+             monte::MethodLog &method_log) {
+            return x.is_complete(samplers, sample_weight, method_log.log);
+          },
+          R"pbdoc(
+          Perform completion check, without count- or time-based cutoff checks
+
+          Parameters
+          ----------
+          samplers: :class:`~libcasm.monte.SamplerMap`
+              The samplers containing the sampled data.
+          sample_weight : :class:`~libcasm.monte.Sampler`
+              Sample weights associated with observations. May have 0 samples, in which case the obsservations are treated as being equally weighted, otherwise must match the number of samples made by each sampler in `samplers`.
+          method_log : :class:`~libcasm.monte.MethodLog`
+              The method log specifies where to write status updates and internally tracks the elapsed clock time.
+
+          Returns
+          -------
+          is_complete : bool
+              True if complete, False otherwise
+          )pbdoc",
+          py::arg("samplers"), py::arg("sample_weight"), py::arg("method_log"));
 
 #ifdef VERSION_INFO
-m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
+  m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
 #else
-m.attr("__version__") = "dev";
+  m.attr("__version__") = "dev";
 #endif
 }

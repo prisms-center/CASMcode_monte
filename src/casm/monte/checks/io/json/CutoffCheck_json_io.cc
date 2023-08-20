@@ -7,6 +7,48 @@
 namespace CASM {
 namespace monte {
 
+/// \brief Convert CutoffCheckParams to JSON
+jsonParser &to_json(CutoffCheckParams const &params, jsonParser &json) {
+  json.put_obj();
+  if (params.min_count.has_value() || params.max_count.has_value()) {
+    json["count"].put_obj();
+    if (params.min_count.has_value()) {
+      json["count"]["min"] = params.min_count.value();
+    }
+    if (params.max_count.has_value()) {
+      json["count"]["max"] = params.max_count.value();
+    }
+  }
+  if (params.min_time.has_value() || params.max_time.has_value()) {
+    json["time"].put_obj();
+    if (params.min_time.has_value()) {
+      json["time"]["min"] = params.min_time.value();
+    }
+    if (params.max_time.has_value()) {
+      json["time"]["max"] = params.max_time.value();
+    }
+  }
+  if (params.min_sample.has_value() || params.max_sample.has_value()) {
+    json["sample"].put_obj();
+    if (params.min_sample.has_value()) {
+      json["sample"]["min"] = params.min_sample.value();
+    }
+    if (params.max_sample.has_value()) {
+      json["sample"]["max"] = params.max_sample.value();
+    }
+  }
+  if (params.min_clocktime.has_value() || params.max_clocktime.has_value()) {
+    json["clocktime"].put_obj();
+    if (params.min_clocktime.has_value()) {
+      json["clocktime"]["min"] = params.min_clocktime.value();
+    }
+    if (params.max_clocktime.has_value()) {
+      json["clocktime"]["max"] = params.max_clocktime.value();
+    }
+  }
+  return json;
+}
+
 /// \brief Construct CutoffCheckParams from JSON
 ///
 /// Expected:
