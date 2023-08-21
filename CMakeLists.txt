@@ -90,11 +90,9 @@ set(
   ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/math.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/occupation_metropolis.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/nfold.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/conditional_nfold.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/metropolis.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/kinetic_monte_carlo.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/calculator/LocalCalculatorTemplate.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/calculator/KMCEventCalculatorTemplate.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/calculator/CalculatorTemplate.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/CutoffCheck.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/EquilibrationCheck.hh
