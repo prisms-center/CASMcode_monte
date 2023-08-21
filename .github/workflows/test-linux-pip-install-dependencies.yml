@@ -3,7 +3,7 @@ name: Test CASM dependencies from PyPI on Ubuntu
 on: [push, pull_request]
 
 jobs:
-  build-depends:
+  install-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
