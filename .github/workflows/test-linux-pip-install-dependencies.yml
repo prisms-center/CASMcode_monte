@@ -1,0 +1,68 @@
+name: Build CASM dependencies on Ubuntu
+
+on:
+  workflow_call:
+
+jobs:
+  build-depends:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Set up requirements & configuration variables
+        run: |
+          sudo apt-get update
+          sudo apt-get install build-essential cmake
+          pip install --upgrade pip wheel build
+
+      ### libcasm-global ###
+      - name: checkout libcasm-global tests
+        uses: actions/checkout@v3
+        with:
+          repository: prisms-center/CASMcode_global
+          path: CASMcode_global
+          ref: v2.0.3
+
+      - name: test libcasm-global
+        shell: bash
+        run: |
+          cd CASMcode_global
+          pip install libcasm-global==2.0.3
+          pip install -r test_requirements.txt
+          python -m pytest -rsap python/tests
+
+      ### libcasm-composition ###
+      - name: checkout libcasm-composition tests
+        uses: actions/checkout@v3
+        with:
+          repository: prisms-center/CASMcode_composition
+          path: CASMcode_composition
+          ref: v2.0a1
+
+      - name: test libcasm-composition
+        if: steps.cache-libcasm-composition-restore.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          cd CASMcode_composition
+          pip install libcasm-composition==2.0a1
+          pip install -r test_requirements.txt
+          python -m pytest -rsap python/tests
+
+      ### libcasm-xtal ###
+      - name: checkout libcasm-xtal tests
+        uses: actions/checkout@v3
+        with:
+          repository: prisms-center/CASMcode_crystallography
+          path: CASMcode_crystallography
+          ref: v2.0a2
+
+      - name: test libcasm-xtal
+        shell: bash
+        run: |
+          cd CASMcode_crystallography
+          pip install libcasm-xtal==2.0a2
+          pip install -r test_requirements.txt
+          python -m pytest -rsap python/tests
