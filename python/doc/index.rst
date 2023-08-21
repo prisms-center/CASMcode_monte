@@ -37,7 +37,6 @@ Documentation
     :maxdepth: 2
 
     Installation <installation>
-    Usage <usage>
     Reference <reference/libcasm/index>
 
 
