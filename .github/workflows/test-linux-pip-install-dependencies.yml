@@ -1,7 +1,6 @@
-name: Build CASM dependencies on Ubuntu
+name: Test CASM dependencies from PyPI on Ubuntu
 
-on:
-  workflow_call:
+on: [push, pull_request]
 
 jobs:
   build-depends:
