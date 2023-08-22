@@ -277,6 +277,17 @@ CompletionCheck<StatisticsType>::CompletionCheck(
     : m_params(params) {
   m_results.params = m_params;
   m_results.is_complete = false;
+
+  if (m_params.equilibration_check_f == nullptr) {
+    throw std::runtime_error(
+        "Error constructing CompletionCheck: params.equilibration_check_f == "
+        "nullptr");
+  }
+  if (m_params.calc_statistics_f == nullptr) {
+    throw std::runtime_error(
+        "Error constructing CompletionCheck: params.calc_statistics_f == "
+        "nullptr");
+  }
 }
 
 /// \brief Check for equilibration and convergence, then set m_results

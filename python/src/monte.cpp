@@ -1,4 +1,5 @@
 #include <pybind11/eigen.h>
+#include <pybind11/functional.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -824,7 +825,9 @@ PYBIND11_MODULE(_monte, m) {
 
   m.def(
       "matrix_as_vector",
-      [](Eigen::MatrixXd const &value) { return value.reshaped(); },
+      [](Eigen::MatrixXd const &value) -> Eigen::VectorXd {
+        return value.reshaped();
+      },
       R"pbdoc(
       Return a vector or matrix as column-major vector (np.ndarray).
       )pbdoc",
@@ -1178,7 +1181,7 @@ PYBIND11_MODULE(_monte, m) {
               If provided, the specified relative precision level requested, :math:`p_{rel}`.
 
           )pbdoc",
-           py::arg("abs"), py::arg("rel"))
+           py::arg("abs") = std::nullopt, py::arg("rel") = std::nullopt)
       .def_readwrite("abs_convergence_is_required",
                      &monte::RequestedPrecision::abs_convergence_is_required,
                      R"pbdoc(
@@ -1386,7 +1389,7 @@ PYBIND11_MODULE(_monte, m) {
           A 1d array of observations. Should include all samples.
       sample_weight : array_like
           Sample weights associated with observations. May have size 0, in which case the observations are treated as being equally weighted and no resampling is performed, or have the same size as `observations`.
-      requested_precision : :class:`~libcasm.monte.RequestedPrecisionMap`
+      requested_precision : :class:`~libcasm.monte.RequestedPrecision`
           The requested precision level for convergence.
 
       Returns
@@ -1653,7 +1656,7 @@ PYBIND11_MODULE(_monte, m) {
         N_samples_for_statistics : int
             The number of tail samples from `sampler` to include in statistics.
         calc_statistics_f : function
-            Fucntion used to calculate :class:`~libcasm.monte.BasicStatistics`. For example, an instance of :class:`~libcasm.monte.BasicStatistics`.
+            Fucntion used to calculate :class:`~libcasm.monte.BasicStatistics`. For example, an instance of :class:`~libcasm.monte.BasicStatisticsCalculator`.
         )pbdoc",
       py::arg("sampler"), py::arg("sample_weight"), py::arg("key"),
       py::arg("requested_precision"), py::arg("N_samples_for_statistics"),

@@ -34,11 +34,14 @@ jsonParser &to_json(EquilibrationCheckResults const &value, jsonParser &json) {
   } else {
     json["N_samples_for_equilibration"] = "did_not_equilibrate";
   }
-  json["individual_results"];
+  json["individual_results"].put_array();
   for (auto const &pair : value.individual_results) {
-    std::string name =
-        pair.first.sampler_name + "(" + pair.first.component_name + ")";
-    json["individual_results"][name] = pair.second;
+    jsonParser tjson;
+    to_json(pair.second, tjson);
+    tjson["sampler_name"] = pair.first.sampler_name;
+    tjson["component_name"] = pair.first.component_name;
+    tjson["component_index"] = pair.first.component_index;
+    json["individual_results"].push_back(tjson);
   }
   return json;
 }

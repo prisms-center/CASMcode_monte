@@ -217,7 +217,9 @@ inline Sampler::Sampler(std::vector<Index> _shape,
       m_component_names(default_component_names(_shape)),
       m_shape(_shape),
       m_n_samples(0),
-      m_capacity_increment(_capacity_increment) {}
+      m_capacity_increment(_capacity_increment) {
+  clear();
+}
 
 /// \brief Sampler constructor - custom component names
 ///

@@ -1,11 +1,11 @@
 """libcasm-monte: CASM Monte Carlo tools"""
+from ._completion_check_params import CompletionCheckParams
 from ._monte import (
     SAMPLE_METHOD,
     SAMPLE_MODE,
     BasicStatistics,
     BasicStatisticsCalculator,
     CompletionCheck,
-    CompletionCheckParams,
     CompletionCheckResults,
     ConvergenceCheckResults,
     ConvergenceResultMap,
@@ -33,6 +33,7 @@ from ._monte import (
     component_convergence_check,
     convergence_check,
     default_component_names,
+    default_equilibration_check,
     get_n_samples,
     is_mismatched,
     make_incremented_values,

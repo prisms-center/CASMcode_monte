@@ -49,11 +49,14 @@ jsonParser &to_json(ConvergenceCheckResults<StatisticsType> const &value,
   json.put_obj();
   json["all_converged"] = value.all_converged;
   json["N_samples_for_statistics"] = value.N_samples_for_statistics;
-  json["individual_results"];
+  json["individual_results"].put_array();
   for (auto const &pair : value.individual_results) {
-    std::string name =
-        pair.first.sampler_name + "(" + pair.first.component_name + ")";
-    json["individual_results"][name] = pair.second;
+    jsonParser tjson;
+    to_json(pair.second, tjson);
+    tjson["sampler_name"] = pair.first.sampler_name;
+    tjson["component_name"] = pair.first.component_name;
+    tjson["component_index"] = pair.first.component_index;
+    json["individual_results"].push_back(tjson);
   }
   return json;
 }
