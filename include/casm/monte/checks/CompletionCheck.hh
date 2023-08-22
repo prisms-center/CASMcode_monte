@@ -18,10 +18,6 @@ namespace monte {
 /// \brief Parameters that determine if a calculation is complete
 template <typename StatisticsType>
 struct CompletionCheckParams {
-  CompletionCheckParams()
-      : equilibration_check_f(default_equilibration_check),
-        calc_statistics_f(default_calc_statistics_f<StatisticsType>()) {}
-
   /// \brief Completion check parameters that don't depend on the sampled values
   CutoffCheckParams cutoff_params;
 
@@ -34,9 +30,6 @@ struct CompletionCheckParams {
   /// \brief Sampler components that must be checked for convergence, and the
   ///     estimated precision to which the mean must be converged
   std::map<SamplerComponent, RequestedPrecision> requested_precision;
-
-  /// \brief Confidence level for calculated precision of mean
-  double confidence = 0.95;
 
   //  For "linear" spacing, the n-th check will be taken when:
   //
@@ -284,6 +277,17 @@ CompletionCheck<StatisticsType>::CompletionCheck(
     : m_params(params) {
   m_results.params = m_params;
   m_results.is_complete = false;
+
+  if (m_params.equilibration_check_f == nullptr) {
+    throw std::runtime_error(
+        "Error constructing CompletionCheck: params.equilibration_check_f == "
+        "nullptr");
+  }
+  if (m_params.calc_statistics_f == nullptr) {
+    throw std::runtime_error(
+        "Error constructing CompletionCheck: params.calc_statistics_f == "
+        "nullptr");
+  }
 }
 
 /// \brief Check for equilibration and convergence, then set m_results
@@ -303,12 +307,11 @@ void CompletionCheck<StatisticsType>::_check_convergence(
 
     // if all requested to converge are equilibrated, then check convergence
     if (m_results.equilibration_check_results.all_equilibrated) {
-      m_results.convergence_check_results =
-          convergence_check(m_params.calc_statistics_f,
-                            m_params.requested_precision, m_params.confidence,
-                            m_results.equilibration_check_results
-                                .N_samples_for_all_to_equilibrate,
-                            samplers, sample_weight);
+      m_results.convergence_check_results = convergence_check(
+          samplers, sample_weight, m_params.requested_precision,
+          m_results.equilibration_check_results
+              .N_samples_for_all_to_equilibrate,
+          m_params.calc_statistics_f);
     } else {
       m_results.convergence_check_results =
           ConvergenceCheckResults<StatisticsType>();

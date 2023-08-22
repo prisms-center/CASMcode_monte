@@ -21,8 +21,7 @@ class jsonResultsIO : public ResultsIO<_ResultsType> {
   typedef typename results_type::stats_type stats_type;
 
   jsonResultsIO(
-      fs::path _output_dir,
-      StateSamplingFunctionMap<config_type> _sampling_functions,
+      fs::path _output_dir, StateSamplingFunctionMap _sampling_functions,
       ResultsAnalysisFunctionMap<config_type, stats_type> _analysis_functions,
       bool _write_trajectory, bool _write_observations);
 
@@ -46,7 +45,7 @@ class jsonResultsIO : public ResultsIO<_ResultsType> {
 
  private:
   fs::path m_output_dir;
-  StateSamplingFunctionMap<config_type> m_sampling_functions;
+  StateSamplingFunctionMap m_sampling_functions;
   ResultsAnalysisFunctionMap<config_type, stats_type> m_analysis_functions;
   bool m_write_trajectory;
   bool m_write_observations;

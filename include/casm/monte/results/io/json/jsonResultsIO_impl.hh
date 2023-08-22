@@ -7,6 +7,7 @@
 #include "casm/casm_io/json/optional.hh"
 #include "casm/monte/results/Results.hh"
 #include "casm/monte/results/io/json/jsonResultsIO.hh"
+#include "casm/monte/state/StateSampler.hh"
 
 namespace CASM {
 namespace monte {
@@ -90,10 +91,9 @@ inline jsonParser &append_condition_to_json(
   return json;
 }
 
-template <typename ConfigType>
-jsonParser &append_scalar_condition_to_json(
+inline jsonParser &append_scalar_condition_to_json(
     std::pair<std::string, double> const &condition, jsonParser &json,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+    StateSamplingFunctionMap const &sampling_functions) {
   return append_condition_to_json(
       condition.first, reshaped(condition.second), std::vector<Index>(),
       get_scalar_component_names(condition.first, condition.second,
@@ -101,10 +101,9 @@ jsonParser &append_scalar_condition_to_json(
       json);
 }
 
-template <typename ConfigType>
-jsonParser &append_vector_condition_to_json(
+inline jsonParser &append_vector_condition_to_json(
     std::pair<std::string, Eigen::VectorXd> const &condition, jsonParser &json,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+    StateSamplingFunctionMap const &sampling_functions) {
   return append_condition_to_json(
       condition.first, reshaped(condition.second),
       std::vector<Index>({condition.second.size()}),
@@ -113,10 +112,9 @@ jsonParser &append_vector_condition_to_json(
       json);
 }
 
-template <typename ConfigType>
-jsonParser &append_matrix_condition_to_json(
+inline jsonParser &append_matrix_condition_to_json(
     std::pair<std::string, Eigen::MatrixXd> const &condition, jsonParser &json,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+    StateSamplingFunctionMap const &sampling_functions) {
   return append_condition_to_json(
       condition.first, reshaped(condition.second),
       std::vector<Index>({condition.second.rows(), condition.second.cols()}),
@@ -301,8 +299,7 @@ jsonParser &append_results_analysis_to_json(
 
 template <typename _ResultsType>
 jsonResultsIO<_ResultsType>::jsonResultsIO(
-    fs::path _output_dir,
-    StateSamplingFunctionMap<config_type> _sampling_functions,
+    fs::path _output_dir, StateSamplingFunctionMap _sampling_functions,
     ResultsAnalysisFunctionMap<config_type, stats_type> _analysis_functions,
     bool _write_trajectory, bool _write_observations)
     : m_output_dir(_output_dir),
@@ -378,8 +375,7 @@ void jsonResultsIO<_ResultsType>::write_summary(results_type const &results,
                                                 ValueMap const &conditions) {
   using namespace jsonResultsIO_impl;
 
-  StateSamplingFunctionMap<config_type> const &sampling_functions =
-      m_sampling_functions;
+  StateSamplingFunctionMap const &sampling_functions = m_sampling_functions;
   ResultsAnalysisFunctionMap<config_type, stats_type> const
       &analysis_functions = m_analysis_functions;
   fs::path const &output_dir = m_output_dir;

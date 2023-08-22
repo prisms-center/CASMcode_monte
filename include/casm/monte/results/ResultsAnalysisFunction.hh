@@ -14,6 +14,8 @@ namespace monte {
 template <typename ConfigType, typename StatisticsType>
 struct Results;
 
+// TODO: remove template parameters
+
 /// \brief Use to calculate functions of the sampled data at the
 ///     end of a run (ex. covariance)
 template <typename ConfigType, typename StatisticsType>

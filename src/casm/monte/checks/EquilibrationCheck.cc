@@ -182,6 +182,11 @@ EquilibrationCheckResults equilibration_check(
     std::map<SamplerComponent, RequestedPrecision> const &requested_precision,
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
     Sampler const &sample_weight, bool check_all) {
+  if (equilibration_check_f == nullptr) {
+    throw std::runtime_error(
+        "Error in equilibration_check: equilibration_check_f == nullptr");
+  }
+
   EquilibrationCheckResults results;
 
   if (!requested_precision.size()) {

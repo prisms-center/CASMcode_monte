@@ -17,14 +17,14 @@ struct CutoffCheckParams {
   std::optional<CountType> min_count;
   std::optional<TimeType> min_time;
   std::optional<CountType> min_sample;
-  std::optional<CountType> min_clocktime;
+  std::optional<TimeType> min_clocktime;
 
   // --- A calculation does stop when any maximum is met ---
 
   std::optional<CountType> max_count;
   std::optional<TimeType> max_time;
   std::optional<CountType> max_sample;
-  std::optional<CountType> max_clocktime;
+  std::optional<TimeType> max_clocktime;
 };
 
 bool all_minimums_met(CutoffCheckParams const &cutoff_params,

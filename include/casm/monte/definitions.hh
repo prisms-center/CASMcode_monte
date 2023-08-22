@@ -25,6 +25,10 @@ template <typename _ConfigType>
 class FixedConfigGenerator;
 
 struct SamplingParams;
+class Sampler;
+struct SamplerComponent;
+struct RequestedPrecision;
+
 template <typename _ConfigType>
 struct State;
 
@@ -46,21 +50,20 @@ using StateModifyingFunctionMap =
 template <typename _ConfigType, typename _EngineType>
 struct StateSampler;
 
-template <typename _ConfigType>
 struct StateSamplingFunction;
-
-template <typename _ConfigType>
-using StateSamplingFunctionMap =
-    std::map<std::string, StateSamplingFunction<_ConfigType>>;
+typedef std::map<std::string, StateSamplingFunction> StateSamplingFunctionMap;
 
 struct BasicStatistics;
 template <typename StatisticsType>
 using CalcStatisticsFunction = std::function<StatisticsType(
-    Eigen::VectorXd const &observations, Eigen::VectorXd const &sample_weight,
-    double confidence)>;
+    Eigen::VectorXd const &observations, Eigen::VectorXd const &sample_weight)>;
 
-template <typename StatisticsType>
-CalcStatisticsFunction<BasicStatistics> default_calc_statistics_f();
+struct IndividualEquilibrationCheckResult;
+struct EquilibrationCheckResults;
+typedef std::function<IndividualEquilibrationCheckResult(
+    Eigen::VectorXd const &observations, Eigen::VectorXd const &sample_weight,
+    RequestedPrecision requested_precision)>
+    EquilibrationCheckFunction;
 
 template <typename _ConfigType, typename _StatisticsType>
 struct Results;

@@ -14,18 +14,14 @@ namespace monte {
 /// \brief A function to be evaluated when taking a sample of a Monte Carlo
 ///     calculation state
 ///
-/// - Each StateSamplingFunction takes a State<ConfigType> and returns an
-///   Eigen::VectorXd
+/// - Each StateSamplingFunction returns an Eigen::VectorXd
 /// - A StateSamplingFunction has additional information (name, description,
 ///   component_names) to enable specifying convergence criteria, allow input
 ///   and output descriptions, help and error messages, etc.
 /// - Use `reshaped` (in casm/monte/sampling/Sampler.hh) to output scalars or
 ///   matrices as vectors.
 ///
-template <typename _ConfigType>
 struct StateSamplingFunction {
-  typedef _ConfigType ConfigType;
-
   /// \brief Constructor - default component names
   StateSamplingFunction(std::string _name, std::string _description,
                         std::vector<Index> _shape,
@@ -61,22 +57,22 @@ struct StateSamplingFunction {
   Eigen::VectorXd operator()() const;
 };
 
-template <typename ConfigType, typename ValueType>
+template <typename ValueType>
 void set_value(std::map<SamplerComponent, ValueType> &component_map,
-               StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+               StateSamplingFunctionMap const &sampling_functions,
                std::string const &sampler_name, ValueType const &value);
 
-template <typename ConfigType, typename ValueType>
+template <typename ValueType>
 void set_value_by_component_index(
     std::map<SamplerComponent, double> &component_map,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+    StateSamplingFunctionMap const &sampling_functions,
     std::string const &sampler_name, Index component_index,
     ValueType const &value);
 
-template <typename ConfigType, typename ValueType>
+template <typename ValueType>
 void set_value_by_component_name(
     std::map<SamplerComponent, double> &component_map,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+    StateSamplingFunctionMap const &sampling_functions,
     std::string const &sampler_name, std::string const &component_name,
     ValueType const &value);
 
@@ -153,8 +149,8 @@ struct StateSampler {
 
   /// \brief State sampling functions to be used when taking a sample
   ///
-  /// Each function takes a State<ConfigType> and returns an Eigen::VectorXd
-  std::vector<StateSamplingFunction<ConfigType>> functions;
+  /// Each function returns an Eigen::VectorXd
+  std::vector<StateSamplingFunction> functions;
 
   /// --- Step / pass / time tracking ---
 
@@ -224,7 +220,7 @@ struct StateSampler {
   /// Note: Call `reset(double _steps_per_pass)` before sampling begins.
   StateSampler(std::shared_ptr<EngineType> _engine,
                SamplingParams const &_sampling_params,
-               StateSamplingFunctionMap<ConfigType> const &sampling_functions)
+               StateSamplingFunctionMap const &sampling_functions)
       : StateSampler(
             _engine, _sampling_params.sample_mode,
             {},  // functions populated in constructor body
@@ -247,8 +243,7 @@ struct StateSampler {
   ///
   /// \param _sample_mode Sample by step, pass, or time
   /// \param _functions State sampling functions to be used when taking a
-  ///     sample. Each function takes a `State<ConfigType>` and returns an
-  ///     `Eigen::VectorXd`.
+  ///     sample. Each function returns an `Eigen::VectorXd`.
   /// \param _sample_method Whether to take linearly spaced or logarithmically
   ///     spaced samples.
   /// \param _sample_begin When the first sample is taken. See `sample_method`.
@@ -269,7 +264,7 @@ struct StateSampler {
   ///
   /// Note: Call `reset(double _steps_per_pass)` before sampling begins.
   StateSampler(std::shared_ptr<EngineType> _engine, SAMPLE_MODE _sample_mode,
-               std::vector<StateSamplingFunction<ConfigType>> const &_functions,
+               std::vector<StateSamplingFunction> const &_functions,
                SAMPLE_METHOD _sample_method = SAMPLE_METHOD::LINEAR,
                double _sample_begin = 0.0, double _sampling_period = 1.0,
                double _samples_per_period = 1.0,
@@ -502,22 +497,19 @@ struct StateSampler {
 };
 
 /// \brief Get component names for a particular function, else use defaults
-template <typename ConfigType>
 std::vector<std::string> get_scalar_component_names(
     std::string const &function_name, double const &value,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions);
+    StateSamplingFunctionMap const &sampling_functions);
 
 /// \brief Get component names for a particular function, else use defaults
-template <typename ConfigType>
 std::vector<std::string> get_vector_component_names(
     std::string const &function_name, Eigen::VectorXd const &value,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions);
+    StateSamplingFunctionMap const &sampling_functions);
 
 /// \brief Get component names for a particular function, else use defaults
-template <typename ConfigType>
 std::vector<std::string> get_matrix_component_names(
     std::string const &function_name, Eigen::MatrixXd const &value,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions);
+    StateSamplingFunctionMap const &sampling_functions);
 
 }  // namespace monte
 }  // namespace CASM
@@ -528,8 +520,7 @@ namespace CASM {
 namespace monte {
 
 /// \brief Constructor - custom component names
-template <typename _ConfigType>
-StateSamplingFunction<_ConfigType>::StateSamplingFunction(
+inline StateSamplingFunction::StateSamplingFunction(
     std::string _name, std::string _description, std::vector<Index> _shape,
     std::function<Eigen::VectorXd()> _function)
     : name(_name),
@@ -539,8 +530,7 @@ StateSamplingFunction<_ConfigType>::StateSamplingFunction(
       function(_function) {}
 
 /// \brief Constructor - custom component names
-template <typename _ConfigType>
-StateSamplingFunction<_ConfigType>::StateSamplingFunction(
+inline StateSamplingFunction::StateSamplingFunction(
     std::string _name, std::string _description,
     std::vector<std::string> const &_component_names, std::vector<Index> _shape,
     std::function<Eigen::VectorXd()> _function)
@@ -551,8 +541,7 @@ StateSamplingFunction<_ConfigType>::StateSamplingFunction(
       function(_function) {}
 
 /// \brief Take a sample
-template <typename _ConfigType>
-Eigen::VectorXd StateSamplingFunction<_ConfigType>::operator()() const {
+inline Eigen::VectorXd StateSamplingFunction::operator()() const {
   return function();
 }
 
@@ -566,10 +555,9 @@ Eigen::VectorXd StateSamplingFunction<_ConfigType>::operator()() const {
 ///     of the StateSamplingFunction specified by `sampler_name`.
 ///
 /// \throws std::runtime_error if `sampler_name` cannot be found.
-template <typename ConfigType>
-void set_abs_precision(
+inline void set_abs_precision(
     std::map<SamplerComponent, RequestedPrecision> &component_map,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+    StateSamplingFunctionMap const &sampling_functions,
     std::string const &sampler_name, double value) {
   auto it = sampling_functions.find(sampler_name);
   if (it == sampling_functions.end()) {
@@ -599,10 +587,9 @@ void set_abs_precision(
 ///
 /// \throws std::runtime_error if either `sampler_name` cannot be found or
 ///     `component_index` is out of range.
-template <typename ConfigType>
-void set_abs_precision_by_component_index(
+inline void set_abs_precision_by_component_index(
     std::map<SamplerComponent, RequestedPrecision> &component_map,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+    StateSamplingFunctionMap const &sampling_functions,
     std::string const &sampler_name, Index component_index, double value) {
   auto it = sampling_functions.find(sampler_name);
   if (it == sampling_functions.end()) {
@@ -636,10 +623,9 @@ void set_abs_precision_by_component_index(
 /// \throws std::runtime_error if either `sampler_name` or `component_name`
 /// cannot
 ///     be found.
-template <typename ConfigType>
-void set_abs_precision_by_component_name(
+inline void set_abs_precision_by_component_name(
     std::map<SamplerComponent, RequestedPrecision> &component_map,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions,
+    StateSamplingFunctionMap const &sampling_functions,
     std::string const &sampler_name, std::string const &component_name,
     double value) {
   auto it = sampling_functions.find(sampler_name);
@@ -673,10 +659,9 @@ void set_abs_precision_by_component_name(
 ///   of the same name.
 /// - If function not found, returns default component names ("0")
 /// - Throws if function found, but component_names dimension does not match
-template <typename ConfigType>
-std::vector<std::string> get_scalar_component_names(
+inline std::vector<std::string> get_scalar_component_names(
     std::string const &function_name, double const &value,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+    StateSamplingFunctionMap const &sampling_functions) {
   std::vector<Index> shape({});
   auto function_it = sampling_functions.find(function_name);
   if (function_it == sampling_functions.end()) {
@@ -702,10 +687,9 @@ std::vector<std::string> get_scalar_component_names(
 ///   ...)
 /// - Throws if function found, but component_names dimension does not match
 ///   value.size().
-template <typename ConfigType>
-std::vector<std::string> get_vector_component_names(
+inline std::vector<std::string> get_vector_component_names(
     std::string const &function_name, Eigen::VectorXd const &value,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+    StateSamplingFunctionMap const &sampling_functions) {
   std::vector<Index> shape({value.size()});
   auto function_it = sampling_functions.find(function_name);
   if (function_it == sampling_functions.end()) {
@@ -731,10 +715,9 @@ std::vector<std::string> get_vector_component_names(
 ///   ...)
 /// - Throws if function found, but component_names dimension does not match
 ///   value.size().
-template <typename ConfigType>
-std::vector<std::string> get_matrix_component_names(
+inline std::vector<std::string> get_matrix_component_names(
     std::string const &function_name, Eigen::MatrixXd const &value,
-    StateSamplingFunctionMap<ConfigType> const &sampling_functions) {
+    StateSamplingFunctionMap const &sampling_functions) {
   std::vector<Index> shape({value.rows(), value.cols()});
   auto function_it = sampling_functions.find(function_name);
   if (function_it == sampling_functions.end()) {

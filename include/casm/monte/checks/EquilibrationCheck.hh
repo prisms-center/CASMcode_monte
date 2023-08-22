@@ -23,11 +23,6 @@ struct IndividualEquilibrationCheckResult {
   CountType N_samples_for_equilibration = 0;
 };
 
-typedef std::function<IndividualEquilibrationCheckResult(
-    Eigen::VectorXd const &observations, Eigen::VectorXd const &sample_weight,
-    RequestedPrecision requested_precision)>
-    EquilibrationCheckFunction;
-
 /// \brief Check if a range of observations have equilibrated
 IndividualEquilibrationCheckResult default_equilibration_check(
     Eigen::VectorXd const &observations, Eigen::VectorXd const &sample_weight,
