@@ -2,14 +2,6 @@ from typing import Callable, Optional
 
 import libcasm.monte._monte as _monte
 
-# from ._monte import (
-#     _CompletionCheckParams,
-#     CutoffCheckParams,
-#     IndividualEquilibrationResult,
-#     RequestedPrecision,
-#     default_equilibration_check,
-# )
-
 
 class CompletionCheckParams(_monte.CompletionCheckParams):
     """Parameters that determine if a simulation is complete

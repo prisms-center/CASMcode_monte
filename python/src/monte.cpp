@@ -192,6 +192,231 @@ PYBIND11_MODULE(_monte, m) {
       .def("reset", &monte::MethodLog::reset,
            R"pbdoc(
           Reset log file, creating parent directories as necessary
+          )pbdoc")
+      //
+      .def(
+          "section" [](monte::MethodLog &x, std::string what, bool show_clock) {
+            x.log.indent() << "-- " << what << " -- ";
+            if (show_clock) {
+              x.log << "Time: " << x.log.time_s() << " (s)" << std::endl;
+            }
+            x.log << std::endl;
+          },
+          R"pbdoc(
+          Print a nicely formatted section header, optionally with the current timer value.
+          )pbdoc",
+          py::arg("what"), py::arg(show_clock) = false)
+      // verbosity controlled printing
+      .def(
+          "set_quiet"
+          [](monte::MethodLog &x) { return x.log.set_verbosity(Log::quiet); },
+          R"pbdoc(
+          Set to "quiet" printing mode. The "standard", "verbose", and "debug" sections will not be printed.
+          )pbdoc")
+      .def(
+          "set_standard" [](monte::MethodLog &x) {
+            return x.log.set_verbosity(Log::standard);
+          },
+          R"pbdoc(
+          Set to "standard" printing mode. The "verbose" and "debug" sections will not be printed.
+          )pbdoc")
+      .def(
+          "set_verbose"
+          [](monte::MethodLog &x) { return x.log.set_verbosity(Log::verbose); },
+          R"pbdoc(
+          Set to "verbose" printing mode. Only "debug" sections will not be printed.
+          )pbdoc")
+      .def(
+          "set_debug"
+          [](monte::MethodLog &x) { return x.log.set_verbosity(Log::debug); },
+          R"pbdoc(
+          Set to "debug" printing mode. All sections will be printed.
+          )pbdoc")
+      .def(
+          "begin_section_print_always"
+          [](monte::MethodLog &x) { return x.log.begin_section<Log::none>(); },
+          R"pbdoc(
+          Begin a section which always prints, for every `verbosity_level`.
+          )pbdoc")
+      .def(
+          "begin_section_print_if_quiet" [](monte::MethodLog &x) {
+            return x.log.begin_section<Log::standard>();
+          },
+          R"pbdoc(
+          Begin a section which only prints if `verbosity_level` >= "quiet".
+          )pbdoc")
+      .def(
+          "begin_section_print_if_standard" [](monte::MethodLog &x) {
+            return x.log.begin_section<Log::standard>();
+          },
+          R"pbdoc(
+          Begin a section which only prints if `verbosity_level` >= "standard".
+          )pbdoc")
+      .def(
+          "begin_section_print_if_verbose" [](monte::MethodLog &x) {
+            return x.log.begin_section<Log::verbose>();
+          },
+          R"pbdoc(
+          Begin a section which only prints if `verbosity_level` >= "verbose".
+          )pbdoc")
+      .def(
+          "begin_section_print_if_debug"
+          [](monte::MethodLog &x) { return x.log.begin_section<Log::debug>(); },
+          R"pbdoc(
+          Begin a section which only prints if `verbosity_level` >= "debug".
+          )pbdoc")
+      .def(
+          "end_section" [](monte::MethodLog &x) { return x.log.end_section(); },
+          R"pbdoc(
+          End the current section.
+          )pbdoc")
+      // clock
+      .def(
+          "restart_clock",
+          [](monte::MethodLog &x) { return x.log.restart_clock(); },
+          R"pbdoc(
+          Restart internal timer.
+          )pbdoc")
+      .def(
+          "time_s", [](monte::MethodLog const &x) { return x.log.time_s(); },
+          R"pbdoc(
+          Time in seconds since construction or `restart_clock`.
+          )pbdoc")
+      .def(
+          "begin_lap", [](monte::MethodLog &x) { return x.log.begin_lap(); },
+          R"pbdoc(
+          Begin a new lap.
+          )pbdoc")
+      .def(
+          "lap_time",
+          [](monte::MethodLog const &x) { return x.log.lap_time(); },
+          R"pbdoc(
+          Time in seconds since `begin_lap`.
+          )pbdoc")
+      .def(
+          "show_clock", [](monte::MethodLog &x) { return x.log.show_clock(); },
+          R"pbdoc(
+          Show `time_s` as a part of section headings.
+          )pbdoc")
+      .def(
+          "hide_clock", [](monte::MethodLog &x) { return x.log.hide_clock(); },
+          R"pbdoc(
+          Do not show time as a part of section headings.
+          )pbdoc")
+      // printing
+      .def(
+          "print",
+          [](monte::MethodLog &x, std::string const &text) {
+            x.log.indent() << text;
+          },
+          R"pbdoc(
+          Print with indent.
+          )pbdoc",
+          py::arg("text"))
+      .def(
+          "set_paragraph_width",
+          [](monte::MethodLog &x, int width) { x.log.set_width(width); },
+          R"pbdoc(
+          Set paragraph width.
+          )pbdoc")
+      .def(
+          "paragraph_width", [](monte::MethodLog const &x) { x.log.width(); },
+          R"pbdoc(
+          Return paragraph width.
+          )pbdoc")
+      .def(
+          "set_paragraph_justification",
+          [](monte::MethodLog &x, std::string justification_type) {
+            // enum class JustificationType { Left, Right, Center, Full };
+            if (justification_type == "left") {
+              x.log.set_justification(JustificationType::Left);
+            } else if (justification_type == "right") {
+              x.log.set_justification(JustificationType::Right);
+            } else if (justification_type == "center") {
+              x.log.set_justification(JustificationType::Center);
+            } else if (justification_type == "full") {
+              x.log.set_justification(JustificationType::Full);
+            } else {
+              throw std::runtime_error("Invalid justification_type");
+            }
+          },
+          R"pbdoc(
+          Set paragraph justification type. One of "left", "right", "center" or "full".
+          )pbdoc",
+          py::arg("justification_type"))
+      .def(
+          "paragraph_justification",
+          [](monte::MethodLog const &x) -> std::string {
+            // enum class JustificationType { Left, Right, Center, Full };
+            if (x.log.justification() == JustificationType::Left) {
+              return std::string("left");
+            }
+            if (x.log.justification() == JustificationType::Right) {
+              return std::string("right");
+            }
+            if (x.log.justification() == JustificationType::Center) {
+              return std::string("center");
+            }
+            if (x.log.justification() == JustificationType::Full) {
+              return std::string("full");
+            }
+          },
+          R"pbdoc(
+          Return paragraph justification type. One of "left", "right", "center" or "full".
+          )pbdoc")
+      .def(
+          "paragraph",
+          [](monte::MethodLog &x, std::string const &text) {
+            x.log.paragraph(text);
+          },
+          R"pbdoc(
+          Print with indent, line wrapping, and justification.
+          )pbdoc",
+          py::arg("text"))
+      .def(
+          "verbatim",
+          [](monte::MethodLog &x, std::string const &text,
+             bool indent_first_line) {
+            x.log.verbatim(text, indent_first_line);
+          },
+          R"pbdoc(
+          Print with indent and line wrapping, without justification.
+          )pbdoc",
+          py::arg("text"), py::arg("indent_first_line") = true)
+      .def(
+          "set_initial_indent_space",
+          [](monte::MethodLog &x, int initial_indent_space) {
+            x.log.set_initial_indent_space(int initial_indent_space);
+          },
+          R"pbdoc(
+          Set an initial number of indent spaces, before applying indent levels.
+          )pbdoc",
+          py::arg("initial_indent_space"))
+      .def(
+          "set_indent_space",
+          [](monte::MethodLog &x, int indent_space) {
+            x.log.set_indent_space(indent_space);
+          },
+          R"pbdoc(
+          Set the number of spaces per indent level.
+          )pbdoc",
+          py::arg("indent_space"))
+      .def(
+          "increase_indent",
+          [](monte::MethodLog &x) { x.log.increase_indent(); },
+          R"pbdoc(
+          Increase indent level.
+          )pbdoc")
+      .def(
+          "decrease_indent",
+          [](monte::MethodLog &x) { x.log.decrease_indent(); },
+          R"pbdoc(
+          Decrease indent level.
+          )pbdoc")
+      .def(
+          "indent_str", [](monte::MethodLog &x) { x.log.indent_str(); },
+          R"pbdoc(
+          The current indent string.
           )pbdoc");
 
   py::bind_map<std::map<std::string, bool>>(m, "BooleanValueMap");
@@ -1431,6 +1656,31 @@ PYBIND11_MODULE(_monte, m) {
   py::class_<monte::BasicStatisticsCalculator>(m, "BasicStatisticsCalculator",
                                                R"pbdoc(
       Basic statistics calculator
+
+      This is a callable class, which calculates :class:`~libcasm.monte.BasicStatistics`
+      from a series of observations, and optionally sample weights.
+
+      .. rubric:: Special Methods
+
+      The call operator is equivalent to :func:`~libcasm.monte.BasicStatisticsCalculator.calculate`.
+
+      .. code-block:: Python
+
+
+
+      .. rubric:: Equally weighted observations
+
+      If input argument
+
+      Transform an :class:`~libcasm.xtal.IntegralSiteCoordinate` via multiplication operator ``*``:
+
+      .. code-block:: Python
+
+          from libcasm.xtal import IntegralSiteCoordinate, IntegralSiteCoordinateRep
+          rep = IntegralSiteCoordinateRep(...)
+          integral_site_coordinate = IntegralSiteCoordinate(...)
+          transformed_integral_site_coordinate = rep * integral_site_coordinate
+
       )pbdoc")
       .def(py::init<double, Index, Index>(),
            R"pbdoc(
@@ -1473,6 +1723,50 @@ PYBIND11_MODULE(_monte, m) {
                      &monte::BasicStatisticsCalculator::n_resamples,
                      R"pbdoc(
           int : Number of resampled observations to make for autocovariance estimation when observations are weighted.
+          )pbdoc")
+      .def(
+          "calculate",
+          [](monte::BasicStatisticsCalculator const &f,
+             Eigen::VectorXd const &observations,
+             Eigen::VectorXd const &sample_weight) {
+            return f(observations, sample_weight);
+          },
+          R"pbdoc(
+          Calculate statistics for a range of weighted observations
+
+          The method used to estimate precision in the sample mean when observations are
+          weighted (i.e. N-fold way method) depends on the parameter
+          :py:attr:`~libcasm.monte.weighted_observations_method`.
+
+          .. rubric:: Case 1: No sample weights
+
+          The calculated precision is estimated as
+
+          .. math::
+
+              \hat{\gamma}_k &= \sum^{N-k}_i\left( X_i - \bar{X} \right) \left( X_{i+k} - \bar{X} \right)
+
+              \gamma_k = \gamma_0 \rho^{-|k|}
+
+              \sigma^2 = \gamma_0 \left(\frac{1+\rho}{1-\rho}\right)
+
+
+
+          Parameters
+          ----------
+          observations : array_like
+              A 1d array of observations. Should only include samples after the calculation
+              has equilibrated.
+          sample_weight : array_like
+              Sample weights associated with observations. May have size 0, in which case the
+              observations are treated as being equally weighted and no resampling is
+              performed, or have the same size as `observations`.
+
+          Returns
+          -------
+          stats : :class:`~libcasm.monte.BasicStatistics`
+              Calculated statistics.
+
           )pbdoc")
       .def(
           "__call__",
@@ -1721,7 +2015,7 @@ PYBIND11_MODULE(_monte, m) {
                      R"pbdoc(
                      Optional[int]: Minimum number of samples.
                      )pbdoc")
-      .def_readwrite("min_time", &monte::CutoffCheckParams::min_clocktime,
+      .def_readwrite("min_clocktime", &monte::CutoffCheckParams::min_clocktime,
                      R"pbdoc(
                      Optional[float]: Minimum elapsed clocktime.
                      )pbdoc")
@@ -1737,7 +2031,7 @@ PYBIND11_MODULE(_monte, m) {
                      R"pbdoc(
                      Optional[int]: Maximum number of samples.
                      )pbdoc")
-      .def_readwrite("max_time", &monte::CutoffCheckParams::max_clocktime,
+      .def_readwrite("max_clocktime", &monte::CutoffCheckParams::max_clocktime,
                      R"pbdoc(
                      Optional[float]: Maximum elapsed clocktime.
                      )pbdoc")
