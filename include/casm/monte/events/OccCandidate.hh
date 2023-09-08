@@ -32,8 +32,7 @@ struct OccCandidate : public Comparisons<CRTPBase<OccCandidate>> {
   }
 };
 
-/// \brief Store swap type, mutating sites, and info for keeping OccLocation
-/// up-to-date
+/// \brief Represents a Monte Carlo event that swaps occupants
 ///
 /// This object does not specify which particular sites are changing, just the
 /// type of change (which occupant types on which asymmetric unit sites).
@@ -87,6 +86,11 @@ class OccCandidateList {
 
   OccCandidateList() {}
 
+  /// \brief Construct with custom list of OccCandidate
+  OccCandidateList(std::vector<OccCandidate> candidates,
+                   const Conversions &convert);
+
+  /// \brief Construct with all possible OccCandidate
   OccCandidateList(const Conversions &convert);
 
   /// Return index into std::vector<OccCandidate>, or _candidate.size() if not
@@ -132,7 +136,7 @@ bool is_valid(Conversions const &convert, OccCandidate const &cand_a,
 /// \brief Check that swap is valid (won't cause segfaults)
 bool is_valid(Conversions const &convert, OccSwap const &swap);
 
-/// \brief Check that species are different and allowed on both sites
+/// \brief Check that candidates form an allowed canonical Monte Carlo event
 bool allowed_canonical_swap(Conversions const &convert, OccCandidate cand_a,
                             OccCandidate cand_b);
 
@@ -140,7 +144,8 @@ bool allowed_canonical_swap(Conversions const &convert, OccCandidate cand_a,
 std::vector<OccSwap> make_canonical_swaps(
     Conversions const &convert, OccCandidateList const &occ_candidate_list);
 
-/// \brief Check that species are different and allowed on both sites
+/// \brief Check that candidates form an allowed semi-grand canonical Monte
+/// Carlo event
 bool allowed_grand_canonical_swap(Conversions const &convert,
                                   OccCandidate cand_a, OccCandidate cand_b);
 

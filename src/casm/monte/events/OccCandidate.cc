@@ -8,6 +8,26 @@
 namespace CASM {
 namespace monte {
 
+/// \brief Construct with custom list of OccCandidate
+OccCandidateList::OccCandidateList(std::vector<OccCandidate> candidates,
+                                   const Conversions &convert)
+    : m_candidate(candidates) {
+  // create lookup table of asym, species_index -> candidate index,
+  //   will return {Nasym, Nspecies} if {asym, species_index} not allowed
+  Index Nspecies = convert.species_size();
+  Index Nasym = convert.asym_size();
+  m_end = m_candidate.size();
+  std::vector<Index> unallowed(Nspecies, m_end);
+  m_species_to_cand_index = std::vector<std::vector<Index> >(Nasym, unallowed);
+
+  Index index = 0;
+  for (const auto &cand : m_candidate) {
+    m_species_to_cand_index[cand.asym][cand.species_index] = index;
+    ++index;
+  }
+}
+
+/// \brief Construct with all possible OccCandidate
 OccCandidateList::OccCandidateList(const Conversions &convert) {
   // create set of 'candidate' asym / species pairs
   m_candidate.clear();
@@ -39,10 +59,16 @@ OccCandidateList::OccCandidateList(const Conversions &convert) {
   }
 }
 
-/// \brief Check that OccCandidate is valid (won't cause segfaults)
+/// \brief Check that OccCandidate is valid
+///
+/// Checks that:
+/// - indices are in allowed range
+/// - species is allowed on the asymmetric unit site
 bool is_valid(Conversions const &convert, OccCandidate const &cand) {
   return cand.asym >= 0 && cand.asym < convert.asym_size() &&
-         cand.species_index >= 0 && cand.species_index < convert.species_size();
+         cand.species_index >= 0 &&
+         cand.species_index < convert.species_size() &&
+         convert.species_allowed(cand.asym, cand.species_index);
 }
 
 /// \brief Check that swap is valid (won't cause segfaults)
@@ -56,10 +82,15 @@ bool is_valid(Conversions const &convert, OccSwap const &swap) {
   return is_valid(convert, swap.cand_a, swap.cand_b);
 }
 
-/// \brief Check that species are different and allowed on both sites
+/// \brief Check that candidates form an allowed canonical Monte Carlo event
+///
+/// Checks that:
+/// - cand_a and cand_b are valid
+/// - the species are different and allowed on both sites
 bool allowed_canonical_swap(Conversions const &convert, OccCandidate cand_a,
                             OccCandidate cand_b) {
-  return cand_a.species_index != cand_b.species_index &&
+  return is_valid(convert, cand_a) && is_valid(convert, cand_b) &&
+         cand_a.species_index != cand_b.species_index &&
          convert.species_allowed(cand_a.asym, cand_b.species_index) &&
          convert.species_allowed(cand_b.asym, cand_a.species_index);
 };
@@ -85,12 +116,19 @@ std::vector<OccSwap> make_canonical_swaps(
   return canonical_swaps;
 }
 
-/// \brief Check that asym is the same and species_index is different
+/// \brief Check that candidates form an allowed semi-grand canonical Monte
+/// Carlo event
+///
+/// Checks that:
+/// - cand_a and cand_b are valid
+/// - the asym index is the same
+/// - the species are different and both allowed on the asym site
 bool allowed_grand_canonical_swap(Conversions const &convert,
                                   OccCandidate cand_a, OccCandidate cand_b) {
-  return cand_a.species_index != cand_b.species_index &&
-         convert.species_allowed(cand_a.asym, cand_b.species_index) &&
-         convert.species_allowed(cand_b.asym, cand_a.species_index);
+  return is_valid(convert, cand_a) && is_valid(convert, cand_b) &&
+         cand_a.asym == cand_b.asym &&
+         cand_a.species_index != cand_b.species_index &&
+         convert.species_allowed(cand_a.asym, cand_b.species_index);
 };
 
 /// \brief Construct OccSwap allowed for grand canonical Monte Carlo

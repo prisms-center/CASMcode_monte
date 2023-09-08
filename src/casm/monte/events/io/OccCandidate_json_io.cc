@@ -38,6 +38,30 @@ jsonParser &to_json(monte::OccSwap const &swap,
   return json;
 }
 
+monte::OccCandidateList jsonConstructor<monte::OccCandidateList>::from_json(
+    const jsonParser &json, const monte::Conversions &convert) {
+  jsonParser const *ptr = nullptr;
+  if (json.is_array()) {
+    ptr = &json;
+  } else if (json.is_obj() && json.contains("candidate") &&
+             json["candidate"].is_array()) {
+    ptr = &json;
+  }
+
+  if (ptr == nullptr) {
+    throw std::runtime_error(
+        "Error in jsonConstructor<monte::OccCandidateList>::from_json: not an "
+        "array, or an object with a \"candidate\" array.");
+  }
+
+  std::vector<monte::OccCandidate> candidates;
+  for (auto const &x : *ptr) {
+    candidates.push_back(
+        jsonConstructor<monte::OccCandidate>::from_json(x, convert));
+  }
+  return monte::OccCandidateList(candidates, convert);
+}
+
 /// \brief Write OccCandidateList to json, including all possible canonical and
 ///     grand canonical swaps
 jsonParser &to_json(monte::OccCandidateList const &list,

@@ -90,10 +90,9 @@ set(
   ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/math.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/occupation_metropolis.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/nfold.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/basic_occupation_metropolis.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/metropolis.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/kinetic_monte_carlo.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/calculator/LocalCalculatorTemplate.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/calculator/CalculatorTemplate.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/CutoffCheck.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/EquilibrationCheck.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/ConvergenceCheck.hh
@@ -107,6 +106,7 @@ set(
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/SamplingParams.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/io/json/SamplingParams_json_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/io/json/Sampler_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/models/basic_ising_eigen.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/state/StateSampler.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/state/FixedConfigGenerator.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/state/IncrementalConditionsStateGenerator.hh
@@ -123,6 +123,10 @@ set(
   ${PROJECT_SOURCE_DIR}/include/casm/monte/results/io/ResultsIO.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/results/io/json/jsonResultsIO.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/results/io/json/jsonResultsIO_impl.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/calculators/LocalCalculatorTemplate.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/calculators/complete_semigrand_canonical.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/calculators/CalculatorTemplate.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/calculators/basic_semigrand_canonical.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/events/OccEvent.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/events/OccEventProposal.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/events/OccLocation.hh
@@ -264,6 +268,40 @@ if(DEFINED SKBUILD)
   else()
     set_target_properties(
       _monte PROPERTIES INSTALL_RPATH "$ORIGIN/../lib")
+  endif()
+
+  ### libcasm.monte.events._monte_events ###
+  pybind11_add_module(_monte_events MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_events.cpp")
+  target_link_libraries(_monte_events PRIVATE
+    CASM::casm_global
+    CASM::casm_crystallography
+    casm_monte
+  )
+  install(TARGETS _monte_events DESTINATION monte/events)
+  if(APPLE)
+    set_target_properties(
+      _monte_events PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_events PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
+  ### libcasm.monte.methods._monte_methods ###
+  pybind11_add_module(_monte_methods MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_methods.cpp")
+  target_link_libraries(_monte_methods PRIVATE
+    CASM::casm_global
+    CASM::casm_crystallography
+    casm_monte
+  )
+  install(TARGETS _monte_methods DESTINATION monte/methods)
+  if(APPLE)
+    set_target_properties(
+      _monte_methods PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_methods PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
   endif()
 
 endif()

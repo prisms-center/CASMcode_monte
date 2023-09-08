@@ -254,11 +254,9 @@ struct StateSampler {
   /// \param _log_sampling_shift Controls logarithmically sampling spacing. See
   ///     `sample_method`.
   /// \param _stochastic_sample_period If true, then instead of setting the
-  /// sample
-  ///      time / count deterministally, use the sampling period to determine
-  ///      the sampling rate and determine the next sample time / count
-  ///      stochastically.
-
+  ///     sample time / count deterministally, use the sampling period to
+  ///     determine the sampling rate and determine the next sample
+  ///     time / count stochastically.
   /// \param _do_sample_trajectory If true, save the configuration when a sample
   ///     is taken
   ///
@@ -548,11 +546,13 @@ inline Eigen::VectorXd StateSamplingFunction::operator()() const {
 /// \brief Adds values in a map of SamplerComponent -> ValueType
 ///
 /// \param component_map Map to add a std::pair<SamplerComponent, ValueType>
-/// into \param sampling_functions Container of sampling functions referred to
+///     into
+/// \param sampling_functions Container of sampling functions referred to
 /// \param sampler_name The name of a StateSamplingFunction in
-/// `sampling_functions` \param value The value added to `component_map` for
-/// each SamplerComponent
-///     of the StateSamplingFunction specified by `sampler_name`.
+///     `sampling_functions`
+/// \param value The value added to `component_map` for
+///     each SamplerComponent of the StateSamplingFunction specified by
+///     `sampler_name`.
 ///
 /// \throws std::runtime_error if `sampler_name` cannot be found.
 inline void set_abs_precision(
@@ -577,11 +577,12 @@ inline void set_abs_precision(
 /// \brief Adds a value in a map of SamplerComponent -> ValueType
 ///
 /// \param component_map Map to add a std::pair<SamplerComponent, ValueType>
-/// into \param sampling_functions Container of sampling functions referred to
+///     into
+/// \param sampling_functions Container of sampling functions referred to
 /// \param sampler_name The name of a StateSamplingFunction in
-/// `sampling_functions` \param component_index An index into components of the
-/// StateSamplingFunction
-///     specified by `sample_name`.
+///     `sampling_functions`
+/// \param component_index An index into components of the
+///     StateSamplingFunction specified by `sample_name`.
 /// \param value The value added to `component_map` for the SamplerComponent
 ///     specified by `sampler_name` and `component_name`.
 ///
@@ -612,11 +613,12 @@ inline void set_abs_precision_by_component_index(
 /// \brief Adds a value in a map of SamplerComponent -> ValueType
 ///
 /// \param component_map Map to add a std::pair<SamplerComponent, ValueType>
-/// into \param sampling_functions Container of sampling functions referred to
+///     into
+/// \param sampling_functions Container of sampling functions referred to
 /// \param sampler_name The name of a StateSamplingFunction in
-/// `sampling_functions` \param component_name A name in `component_names` of
-/// the StateSamplingFunction
-///     specified by `sample_name`.
+///     `sampling_functions`
+/// \param component_name A name in `component_names` of
+///     the StateSamplingFunction specified by `sample_name`.
 /// \param value The value added to `component_map` for the SamplerComponent
 ///     specified by `sampler_name` and `component_name`.
 ///

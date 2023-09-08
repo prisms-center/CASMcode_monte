@@ -34,7 +34,13 @@ struct jsonConstructor<monte::OccSwap> {
 jsonParser &to_json(monte::OccSwap const &swap,
                     monte::Conversions const &convert, jsonParser &json);
 
-jsonParser &to_json(monte::OccCandidateList const &list,
+template <>
+struct jsonConstructor<monte::OccCandidateList> {
+  static monte::OccCandidateList from_json(const jsonParser &json,
+                                           const monte::Conversions &convert);
+};
+
+jsonParser &to_json(monte::OccCandidateList const &swap,
                     monte::Conversions const &convert, jsonParser &json);
 
 }  // namespace CASM

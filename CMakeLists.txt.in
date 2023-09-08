@@ -202,4 +202,38 @@ if(DEFINED SKBUILD)
       _monte PROPERTIES INSTALL_RPATH "$ORIGIN/../lib")
   endif()
 
+  ### libcasm.monte.events._monte_events ###
+  pybind11_add_module(_monte_events MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_events.cpp")
+  target_link_libraries(_monte_events PRIVATE
+    CASM::casm_global
+    CASM::casm_crystallography
+    casm_monte
+  )
+  install(TARGETS _monte_events DESTINATION monte/events)
+  if(APPLE)
+    set_target_properties(
+      _monte_events PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_events PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
+  ### libcasm.monte.methods._monte_methods ###
+  pybind11_add_module(_monte_methods MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_methods.cpp")
+  target_link_libraries(_monte_methods PRIVATE
+    CASM::casm_global
+    CASM::casm_crystallography
+    casm_monte
+  )
+  install(TARGETS _monte_methods DESTINATION monte/methods)
+  if(APPLE)
+    set_target_properties(
+      _monte_methods PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_methods PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
 endif()

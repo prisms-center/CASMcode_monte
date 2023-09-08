@@ -110,6 +110,8 @@ class Sampler {
   Eigen::MatrixXd m_values;
 };
 
+typedef std::map<std::string, std::shared_ptr<monte::Sampler>> SamplerMap;
+
 /// \brief Construct vector of component_names
 std::vector<std::string> default_component_names(std::vector<Index> shape);
 

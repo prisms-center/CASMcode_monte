@@ -4,7 +4,7 @@ __version__ = "2.0a1"
 
 # Available at setup time due to pyproject.toml
 from pybind11.setup_helpers import Pybind11Extension, build_ext
-from setuptools import setup
+from setuptools import Extension, setup
 
 # If on macosx, target 10.15 (ignored otherwise)
 os.environ["MACOSX_DEPLOYMENT_TARGET"] = "10.15"
@@ -67,6 +67,16 @@ ext_modules_params = {
 
 ext_modules = [
     Pybind11Extension("libcasm.monte._monte", ["src/monte.cpp"], **ext_modules_params),
+    Pybind11Extension(
+        "libcasm.monte.events._monte_events",
+        ["src/monte_events.cpp"],
+        **ext_modules_params,
+    ),
+    Pybind11Extension(
+        "libcasm.monte.methods._monte_methods",
+        ["src/monte_methods.cpp"],
+        **ext_modules_params,
+    ),
 ]
 
 
@@ -76,6 +86,10 @@ setup(
     packages=[
         "libcasm",
         "libcasm.monte",
+        "libcasm.monte.events",
+        "libcasm.monte.calculators",
+        "libcasm.monte.methods",
+        "libcasm.monte.models",
     ],
     install_requires=[
         "pybind11",

@@ -208,29 +208,34 @@ void _parse_convergence_criteria(
 ///         seconds. Options are `min` and `max`, the same as for `count`.
 ///
 ///   spacing: string (optional, default="linear")
-///     The spacing of convergence checks in the specified `"period"`. One of
-///     "linear" or "log".
+///     The spacing of convergence checks. One of "linear" or "log".
 ///
 ///     For "linear" spacing, the n-th check will be taken when:
 ///
-///         sample = round( begin + (period / checks_per_period) * n )
+///         sample(n) = begin + period * n
 ///
 ///     For "log" spacing, the n-th check will be taken when:
 ///
-///         sample = round( begin + period ^ ( (n + shift) /
-///                           checks_per_period ) )
+///         sample(n) = begin + round( base ^ (n + shift) )
 ///
-///   begin: number (optional, default=0.0)
+///     However, if sample(n) - sample(n-1) > period_max, then subsequent
+///     samples are taken every `period_max` samples.
+///
+///   begin: int (optional)
 ///     The earliest number of samples at which to begin convergence checking.
+///     Default is 100 for linear checking spacing, 0 for log checking spacing.
 ///
-///   period: number (optional, default=10.0)
-///     A number of samples.
+///   period: int (optional, default=100)
+///     Number of samples per check for linear check spacing.
 ///
-///   checks_per_period: number (optional, default=1.0)
-///     The number of convergence checks to be made in the specified `"period"`.
+///   base: number (optional, default=10.0)
+///     Base for log check spacing.
 ///
-///   shift: number (optional, default=1.0)
-///     Used with `"spacing": "log"`.
+///   period_max: int (optional, default=10000.0)
+///     Maximum check spacing for log check spacing.
+///
+///   shift: number (optional, default=2.0)
+///     Offset for the log check spacing exponent.
 ///
 ///   confidence: number (optional, default=0.95)
 ///     Confidence level, in range (0, 1.0), used for calculated precision of
@@ -321,39 +326,38 @@ inline void parse(InputParser<CompletionCheckParams<BasicStatistics>> &parser,
   parser.optional(spacing, "spacing");
   if (spacing == "linear") {
     completion_check_params.log_spacing = false;
+    completion_check_params.check_begin = 100;
+    completion_check_params.check_period = 100;
   } else if (spacing == "log") {
     completion_check_params.log_spacing = true;
+    completion_check_params.check_begin = 0;
+    completion_check_params.check_base = 10.0;
+    completion_check_params.check_shift = 2.0;
+    completion_check_params.check_period_max = 10000;
   } else {
     parser.insert_error(
         "spacing", "Error: \"spacing\" must be one of \"linear\", \"log\".");
   }
 
   // "begin"
-  completion_check_params.check_begin = 0.0;
   parser.optional(completion_check_params.check_begin, "begin");
 
+  // linear check spacing:
+
   // "period"
-  completion_check_params.check_period = 10.0;
   parser.optional(completion_check_params.check_period, "period");
-  if (completion_check_params.log_spacing &&
-      completion_check_params.check_period <= 1.0) {
-    parser.insert_error(
-        "period", "Error: For \"spacing\"==\"log\", \"period\" must > 1.0.");
-  }
-  if (completion_check_params.log_spacing == false &&
-      completion_check_params.check_period <= 0.0) {
-    parser.insert_error(
-        "period", "Error: For \"spacing\"==\"log\", \"period\" must > 0.0.");
+  if (completion_check_params.check_period <= 1) {
+    parser.insert_error("period", "Error: \"period\" must > 0.");
   }
 
-  // "checks_per_period"
-  completion_check_params.checks_per_period = 1.0;
-  parser.optional(completion_check_params.checks_per_period,
-                  "checks_per_period");
+  // log check spacing:
 
-  // "shift"
-  completion_check_params.check_shift = 1.0;
+  parser.optional(completion_check_params.check_base, "base");
   parser.optional(completion_check_params.check_shift, "shift");
+  parser.optional(completion_check_params.check_period_max, "period_max");
+  if (completion_check_params.check_base <= 1.0) {
+    parser.insert_error("base", "Error: \"base\" must > 1.0");
+  }
 
   if (parser.valid()) {
     parser.value = std::make_unique<CompletionCheckParams<BasicStatistics>>(

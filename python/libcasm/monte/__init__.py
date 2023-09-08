@@ -40,3 +40,7 @@ from ._monte import (
     matrix_as_vector,
     scalar_as_vector,
 )
+from ._requested_precision_constructor import (
+    RequstedPrecisionConstructor,
+    converge,
+)

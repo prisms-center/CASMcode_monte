@@ -43,16 +43,18 @@ namespace CASMpy {
 
 using namespace CASM;
 
+// used for libcasm.monte:
 typedef std::mt19937_64 engine_type;
 typedef monte::RandomNumberGenerator<engine_type> generator_type;
+typedef monte::BasicStatistics statistics_type;
+
 typedef std::map<std::string, std::shared_ptr<monte::Sampler>> SamplerMap;
 typedef std::map<std::string, monte::StateSamplingFunction>
     StateSamplingFunctionMap;
 typedef std::map<monte::SamplerComponent, monte::RequestedPrecision>
     RequestedPrecisionMap;
-typedef std::map<
-    monte::SamplerComponent,
-    monte::IndividualConvergenceCheckResult<monte::BasicStatistics>>
+typedef std::map<monte::SamplerComponent,
+                 monte::IndividualConvergenceCheckResult<statistics_type>>
     ConvergenceResultMap;
 typedef std::map<monte::SamplerComponent,
                  monte::IndividualEquilibrationCheckResult>
@@ -72,7 +74,7 @@ std::shared_ptr<monte::Conversions> make_monte_conversions(
     Eigen::Matrix3l const &transformation_matrix_to_super) {
   return std::make_shared<monte::Conversions>(prim,
                                               transformation_matrix_to_super);
-};
+}
 
 /// \brief Make a random number engine seeded by std::random_device
 std::shared_ptr<engine_type> make_random_number_engine() {
@@ -80,7 +82,7 @@ std::shared_ptr<engine_type> make_random_number_engine() {
   std::random_device device;
   engine->seed(device());
   return engine;
-};
+}
 
 /// \brief Make a random number generator that uses the provided engine
 ///
@@ -89,7 +91,7 @@ std::shared_ptr<engine_type> make_random_number_engine() {
 generator_type make_random_number_generator(
     std::shared_ptr<engine_type> _engine = std::shared_ptr<engine_type>()) {
   return monte::RandomNumberGenerator(_engine);
-};
+}
 
 std::shared_ptr<monte::Sampler> make_sampler(
     std::vector<Index> shape,
@@ -156,7 +158,9 @@ PYBIND11_MODULE(_monte, m) {
         libcasm.monte
         -------------
 
-        The libcasm-monte is a Python interface to the classes and methods in the CASM::monte namespace of the CASM C++ libraries that are useful building blocks for Monte Carlo simulations.
+        The libcasm-monte is a Python interface to the classes and methods in the
+        CASM::monte namespace of the CASM C++ libraries that are useful building blocks
+        for Monte Carlo simulations.
 
     )pbdoc";
   py::module::import("libcasm.xtal");
@@ -195,7 +199,8 @@ PYBIND11_MODULE(_monte, m) {
           )pbdoc")
       //
       .def(
-          "section" [](monte::MethodLog &x, std::string what, bool show_clock) {
+          "section",
+          [](monte::MethodLog &x, std::string what, bool show_clock) {
             x.log.indent() << "-- " << what << " -- ";
             if (show_clock) {
               x.log << "Time: " << x.log.time_s() << " (s)" << std::endl;
@@ -203,70 +208,78 @@ PYBIND11_MODULE(_monte, m) {
             x.log << std::endl;
           },
           R"pbdoc(
-          Print a nicely formatted section header, optionally with the current timer value.
+          Print a nicely formatted section header, optionally with the current timer
+          value.
           )pbdoc",
-          py::arg("what"), py::arg(show_clock) = false)
+          py::arg("what"), py::arg("show_clock") = false)
       // verbosity controlled printing
       .def(
-          "set_quiet"
+          "set_quiet",
           [](monte::MethodLog &x) { return x.log.set_verbosity(Log::quiet); },
           R"pbdoc(
-          Set to "quiet" printing mode. The "standard", "verbose", and "debug" sections will not be printed.
+          Set to "quiet" printing mode. The "standard", "verbose", and "debug" sections
+          will not be printed.
           )pbdoc")
       .def(
-          "set_standard" [](monte::MethodLog &x) {
+          "set_standard",
+          [](monte::MethodLog &x) {
             return x.log.set_verbosity(Log::standard);
           },
           R"pbdoc(
-          Set to "standard" printing mode. The "verbose" and "debug" sections will not be printed.
+          Set to "standard" printing mode. The "verbose" and "debug" sections will not
+          be printed.
           )pbdoc")
       .def(
-          "set_verbose"
+          "set_verbose",
           [](monte::MethodLog &x) { return x.log.set_verbosity(Log::verbose); },
           R"pbdoc(
           Set to "verbose" printing mode. Only "debug" sections will not be printed.
           )pbdoc")
       .def(
-          "set_debug"
+          "set_debug",
           [](monte::MethodLog &x) { return x.log.set_verbosity(Log::debug); },
           R"pbdoc(
           Set to "debug" printing mode. All sections will be printed.
           )pbdoc")
       .def(
-          "begin_section_print_always"
+          "begin_section_print_always",
           [](monte::MethodLog &x) { return x.log.begin_section<Log::none>(); },
           R"pbdoc(
           Begin a section which always prints, for every `verbosity_level`.
           )pbdoc")
       .def(
-          "begin_section_print_if_quiet" [](monte::MethodLog &x) {
+          "begin_section_print_if_quiet",
+          [](monte::MethodLog &x) {
             return x.log.begin_section<Log::standard>();
           },
           R"pbdoc(
           Begin a section which only prints if `verbosity_level` >= "quiet".
           )pbdoc")
       .def(
-          "begin_section_print_if_standard" [](monte::MethodLog &x) {
+          "begin_section_print_if_standard",
+          [](monte::MethodLog &x) {
             return x.log.begin_section<Log::standard>();
           },
           R"pbdoc(
           Begin a section which only prints if `verbosity_level` >= "standard".
           )pbdoc")
       .def(
-          "begin_section_print_if_verbose" [](monte::MethodLog &x) {
+          "begin_section_print_if_verbose",
+          [](monte::MethodLog &x) {
             return x.log.begin_section<Log::verbose>();
           },
           R"pbdoc(
           Begin a section which only prints if `verbosity_level` >= "verbose".
           )pbdoc")
       .def(
-          "begin_section_print_if_debug"
+          "begin_section_print_if_debug",
           [](monte::MethodLog &x) { return x.log.begin_section<Log::debug>(); },
           R"pbdoc(
           Begin a section which only prints if `verbosity_level` >= "debug".
           )pbdoc")
       .def(
-          "end_section" [](monte::MethodLog &x) { return x.log.end_section(); },
+          "end_section",
+          [](monte::MethodLog &x) { return x.log.end_section(); },
           R"pbdoc(
           End the current section.
           )pbdoc")
@@ -346,7 +359,7 @@ PYBIND11_MODULE(_monte, m) {
           py::arg("justification_type"))
       .def(
           "paragraph_justification",
-          [](monte::MethodLog const &x) -> std::string {
+          [](monte::MethodLog &x) -> std::string {
             // enum class JustificationType { Left, Right, Center, Full };
             if (x.log.justification() == JustificationType::Left) {
               return std::string("left");
@@ -360,9 +373,11 @@ PYBIND11_MODULE(_monte, m) {
             if (x.log.justification() == JustificationType::Full) {
               return std::string("full");
             }
+            throw std::runtime_error("Error in paragraph_justification");
           },
           R"pbdoc(
-          Return paragraph justification type. One of "left", "right", "center" or "full".
+          Return paragraph justification type. One of "left", "right", "center" or
+          "full".
           )pbdoc")
       .def(
           "paragraph",
@@ -386,7 +401,7 @@ PYBIND11_MODULE(_monte, m) {
       .def(
           "set_initial_indent_space",
           [](monte::MethodLog &x, int initial_indent_space) {
-            x.log.set_initial_indent_space(int initial_indent_space);
+            x.log.set_initial_indent_space(initial_indent_space);
           },
           R"pbdoc(
           Set an initial number of indent spaces, before applying indent levels.
@@ -474,7 +489,12 @@ PYBIND11_MODULE(_monte, m) {
             return static_cast<nlohmann::json>(json);
           },
           "Represent the ValueMap as a Python dict. Items from all attributes "
-          "are combined into a single dict");
+          "are combined into a single dict")
+      .def("__copy__",
+           [](monte::ValueMap const &self) { return monte::ValueMap(self); })
+      .def("__deepcopy__", [](monte::ValueMap const &self, py::dict) {
+        return monte::ValueMap(self);
+      });
 
   m.def("is_mismatched", &monte::is_mismatched,
         R"pbdoc(
@@ -500,14 +520,22 @@ PYBIND11_MODULE(_monte, m) {
       -----
       The following shorthand is used for member function names:
 
-      - ``l``, :math:`l`: Linear site index in a particular supercell
-      - ``b``, :math:`b`: :class:`~libcasm.xtal.Prim` sublattice index
-      - ``unitl``, :math:`l'`: Linear site index in a non-primitive unit cell. When a non-primitive unit cell is used to construct a supercell and determines the appropriate symmetry for a problem, conversions between :math:`l`, :math:`b`, and :math:`l'` may all be useful.
-      - ``ijk``, :math:`(i,j,k)`: Integer unit cell indices (fractional coordinates with respect to the :class:`~libcasm.xtal.Prim` lattice vectors)
-      - ``bijk``, :math:`(b, i, j, k)`: Integral site coordinates (sublattice index and integer unit cell indices)
-      - ``asym``, :math:`a`: Asymmetric unit orbit index (value is the same for all sites which are symmetrically equivalent)
-      - ``occ_index``, :math:`s`: Index into occupant list for a particular site
-      - ``species_index``: Index into the molecule list for a particular :class:`~libcasm.xtal.Prim`. If there are orientational variants, ``species_index`` should correspond to ``orientation_index``.
+      - `l`, :math:`l`: Linear site index in a particular supercell
+      - `b`, :math:`b`: :class:`~libcasm.xtal.Prim` sublattice index
+      - `unitl`, :math:`l'`: Linear site index in a non-primitive unit cell. When a
+        non-primitive unit cell is used to construct a supercell and determines the
+        appropriate symmetry for a problem, conversions between :math:`l`, :math:`b`,
+        and :math:`l'` may all be useful.
+      - `ijk`, :math:`(i,j,k)`: Integer unit cell indices (fractional coordinates with
+        respect to the :class:`~libcasm.xtal.Prim` lattice vectors)
+      - `bijk`, :math:`(b, i, j, k)`: Integral site coordinates (sublattice index and
+        integer unit cell indices)
+      - `asym`, :math:`a`: Asymmetric unit orbit index (value is the same for all
+        sites which are symmetrically equivalent)
+      - `occ_index`, :math:`s`: Index into occupant list for a particular site
+      - `species_index`: Index into the molecule list for a particular
+        :class:`~libcasm.xtal.Prim`. If there are orientational variants,
+        `species_index` should correspond to `orientation_index`.
 
       )pbdoc")
       .def(py::init<>(&make_monte_conversions),
@@ -770,7 +798,7 @@ PYBIND11_MODULE(_monte, m) {
             return conversions.species_index(asym, occ_index);
           },
           R"pbdoc(
-          Get the ``species_index`` of an occupant from the occupant index and asymmetric unit index, :math:`a`, of the site it is occupying.
+          Get the `species_index` of an occupant from the occupant index and asymmetric unit index, :math:`a`, of the site it is occupying.
           )pbdoc",
           py::arg("asym"), py::arg("occ_index"))
       .def(
@@ -780,12 +808,12 @@ PYBIND11_MODULE(_monte, m) {
             return conversions.occ_index(asym, species_index);
           },
           R"pbdoc(
-          Get the ``occ_index`` of an occupant from the species index and asymmetric unit index, :math:`a`, of the site it is occupying.
+          Get the `occ_index` of an occupant from the species index and asymmetric unit index, :math:`a`, of the site it is occupying.
           )pbdoc",
           py::arg("asym"), py::arg("species_index"))
       .def("species_allowed", &monte::Conversions::species_allowed,
            R"pbdoc(
-          Return True is a species, specified by ``species_index``, is allowed on the sites with specified asymmetric unit index, :math:`a`.
+          Return True is a species, specified by `species_index`, is allowed on the sites with specified asymmetric unit index, :math:`a`.
           )pbdoc",
            py::arg("asym"), py::arg("species_index"))
       .def("species_size", &monte::Conversions::species_size,
@@ -798,7 +826,7 @@ PYBIND11_MODULE(_monte, m) {
             return conversions.species_index(species_name);
           },
           R"pbdoc(
-          Get the ``species_index`` from the species name.
+          Get the `species_index` from the species name.
           )pbdoc",
           py::arg("species_name"))
       .def(
@@ -816,7 +844,7 @@ PYBIND11_MODULE(_monte, m) {
             return conversions.species_name(species_index);
           },
           R"pbdoc(
-          Get the species name from the ``species_index``.
+          Get the species name from the `species_index`.
           )pbdoc",
           py::arg("species_index"))
       .def(
@@ -825,7 +853,7 @@ PYBIND11_MODULE(_monte, m) {
             return conversions.species_name(species_index);
           },
           R"pbdoc(
-          Get the number of atomic components in an occupant, by ``species_index``.
+          Get the number of atomic components in an occupant, by `species_index`.
           )pbdoc",
           py::arg("species_index"));
 
@@ -1009,30 +1037,26 @@ PYBIND11_MODULE(_monte, m) {
           time / count deterministally, use the sampling period to determine the
           sampling rate and determine the next sample time / count stochastically.
           )pbdoc")
-      .def_readwrite("begin", &monte::SamplingParams::begin,
-                     R"pbdoc(
-            float: See `sample_method`. Default=``0.0``.
+      .def_readwrite("begin", &monte::SamplingParams::begin, R"pbdoc(
+          float: See `sample_method`. Default=``0.0``.
           )pbdoc")
-      .def_readwrite("period", &monte::SamplingParams::period,
-                     R"pbdoc(
-            float: See `sample_method`. Default=``1.0``.
+      .def_readwrite("period", &monte::SamplingParams::period, R"pbdoc(
+          float: See `sample_method`. Default=``1.0``.
           )pbdoc")
       .def_readwrite("samples_per_period",
-                     &monte::SamplingParams::samples_per_period,
-                     R"pbdoc(
-            float: See `sample_method`. Default=``1.0``.
+                     &monte::SamplingParams::samples_per_period, R"pbdoc(
+          float: See `sample_method`. Default=``1.0``.
           )pbdoc")
-      .def_readwrite("shift", &monte::SamplingParams::shift,
-                     R"pbdoc(
-            float: See `sample_method`. Default=``0.0``.
+      .def_readwrite("shift", &monte::SamplingParams::shift, R"pbdoc(
+          float: See `sample_method`. Default=``0.0``.
           )pbdoc")
       .def_readwrite("sampler_names", &monte::SamplingParams::sampler_names,
                      R"pbdoc(
-            List[str]: The names of quantities to sample (i.e. sampling function names). Default=``[]``.
+          List[str]: The names of quantities to sample (i.e. sampling function \
+          names). Default=``[]``.
           )pbdoc")
       .def_readwrite("do_sample_trajectory",
-                     &monte::SamplingParams::do_sample_trajectory,
-                     R"pbdoc(
+                     &monte::SamplingParams::do_sample_trajectory, R"pbdoc(
             bool: If true, save the configuration when a sample is taken. Default=``False``.
           )pbdoc")
       .def_readwrite("do_sample_time", &monte::SamplingParams::do_sample_time,
@@ -1623,6 +1647,8 @@ PYBIND11_MODULE(_monte, m) {
           The equilibration check results.
       )pbdoc");
 
+  /// BasicStatistics implementation ~~~~~~~~~~~~~~~~~~~~~~~~~
+
   py::class_<monte::BasicStatistics>(m, "BasicStatistics",
                                      R"pbdoc(
       Basic statistics calculated from samples
@@ -1824,7 +1850,21 @@ PYBIND11_MODULE(_monte, m) {
           "Construct a BasicStatisticsCalculator from a Python dict.",
           py::arg("data"));
 
-  py::class_<monte::IndividualConvergenceCheckResult<monte::BasicStatistics>>(
+  /// Equilibration, convergence, completion checks ~~~~~~~~~~~~~~~~~~~~~~~~~
+  /// - templated by statistics_type
+  ///
+  /// Should work for another statistics_type if there is a statistics
+  /// calculating function with signature:
+  /// - f(Eigen::VectorXd const &observations,
+  ///     Eigen::VectorXd const &sample_weight) -> statistics_type
+  /// and the following are implemented:
+  /// - double get_calculated_precision(statistics_type const &stats);
+  /// - double get_calculated_relative_precision(statistics_type const &stats);
+  /// - void to_json(statistics_type const &stats, jsonParser &json);
+  /// - void append_statistics_to_json_arrays(
+  ///     std::optional<statistics_type> const &stats, jsonParser &json);
+
+  py::class_<monte::IndividualConvergenceCheckResult<statistics_type>>(
       m, "IndividualConvergenceResult",
       R"pbdoc(
       Convergence check results for a single :class:`~libcasm.monte.SamplerComponent`
@@ -1835,26 +1875,26 @@ PYBIND11_MODULE(_monte, m) {
           )pbdoc")
       .def_readwrite("is_converged",
                      &monte::IndividualConvergenceCheckResult<
-                         monte::BasicStatistics>::is_converged,
+                         statistics_type>::is_converged,
                      R"pbdoc(
           True if mean is converged to requested precision. Default=``False``.
           )pbdoc")
       .def_readwrite("requested_precision",
                      &monte::IndividualConvergenceCheckResult<
-                         monte::BasicStatistics>::requested_precision,
+                         statistics_type>::requested_precision,
                      R"pbdoc(
           Requested precision of the mean.
           )pbdoc")
-      .def_readwrite("stats",
-                     &monte::IndividualConvergenceCheckResult<
-                         monte::BasicStatistics>::stats,
-                     R"pbdoc(
+      .def_readwrite(
+          "stats",
+          &monte::IndividualConvergenceCheckResult<statistics_type>::stats,
+          R"pbdoc(
           Calculated statistics.
           )pbdoc")
       .def(
           "to_dict",
-          [](monte::IndividualConvergenceCheckResult<
-              monte::BasicStatistics> const &x) {
+          [](monte::IndividualConvergenceCheckResult<statistics_type> const
+                 &x) {
             jsonParser json;
             to_json(x, json);
             return static_cast<nlohmann::json>(json);
@@ -1871,7 +1911,7 @@ PYBIND11_MODULE(_monte, m) {
       ConvergenceResultMap is a Dict[:class:`~libcasm.monte.SamplerComponent`, :class:`~libcasm.monte.IndividualConvergenceResult`]-like object.
       )pbdoc");
 
-  py::class_<monte::ConvergenceCheckResults<monte::BasicStatistics>>(
+  py::class_<monte::ConvergenceCheckResults<statistics_type>>(
       m, "ConvergenceCheckResults",
       R"pbdoc(
       Stores convergence check results
@@ -1880,10 +1920,10 @@ PYBIND11_MODULE(_monte, m) {
            R"pbdoc(
           Default constructor only.
           )pbdoc")
-      .def_readwrite("all_converged",
-                     &monte::ConvergenceCheckResults<
-                         monte::BasicStatistics>::all_converged,
-                     R"pbdoc(
+      .def_readwrite(
+          "all_converged",
+          &monte::ConvergenceCheckResults<statistics_type>::all_converged,
+          R"pbdoc(
           True if all required properties are converged to the requested precision.
 
           Notes
@@ -1895,7 +1935,7 @@ PYBIND11_MODULE(_monte, m) {
           )pbdoc")
       .def_readwrite("N_samples_for_statistics",
                      &monte::ConvergenceCheckResults<
-                         monte::BasicStatistics>::N_samples_for_statistics,
+                         statistics_type>::N_samples_for_statistics,
                      R"pbdoc(
           How many samples were used to get statistics.
 
@@ -1905,15 +1945,15 @@ PYBIND11_MODULE(_monte, m) {
           - Set to the total number of samples if no convergence checks were
             requested
           )pbdoc")
-      .def_readwrite("individual_results",
-                     &monte::ConvergenceCheckResults<
-                         monte::BasicStatistics>::individual_results,
-                     R"pbdoc(
+      .def_readwrite(
+          "individual_results",
+          &monte::ConvergenceCheckResults<statistics_type>::individual_results,
+          R"pbdoc(
           Results from checking convergence criteria.
           )pbdoc")
       .def(
           "to_dict",
-          [](monte::ConvergenceCheckResults<monte::BasicStatistics> const &x) {
+          [](monte::ConvergenceCheckResults<statistics_type> const &x) {
             jsonParser json;
             to_json(x, json);
             return static_cast<nlohmann::json>(json);
@@ -1927,9 +1967,8 @@ PYBIND11_MODULE(_monte, m) {
          monte::SamplerComponent const &key,
          monte::RequestedPrecision const &requested_precision,
          monte::CountType N_samples_for_statistics,
-         monte::CalcStatisticsFunction<monte::BasicStatistics>
-             calc_statistics_f)
-          -> monte::IndividualConvergenceCheckResult<monte::BasicStatistics> {
+         monte::CalcStatisticsFunction<statistics_type> calc_statistics_f)
+          -> monte::IndividualConvergenceCheckResult<statistics_type> {
         return monte::component_convergence_check(
             sampler, *sample_weight, key, requested_precision,
             N_samples_for_statistics, calc_statistics_f);
@@ -1962,9 +2001,8 @@ PYBIND11_MODULE(_monte, m) {
          std::shared_ptr<monte::Sampler> const &sample_weight,
          RequestedPrecisionMap const &requested_precision,
          monte::CountType N_samples_for_equilibration,
-         monte::CalcStatisticsFunction<monte::BasicStatistics>
-             calc_statistics_f)
-          -> monte::ConvergenceCheckResults<monte::BasicStatistics> {
+         monte::CalcStatisticsFunction<statistics_type> calc_statistics_f)
+          -> monte::ConvergenceCheckResults<statistics_type> {
         return monte::convergence_check(
             samplers, *sample_weight, requested_precision,
             N_samples_for_equilibration, calc_statistics_f);
@@ -2105,7 +2143,7 @@ PYBIND11_MODULE(_monte, m) {
         py::arg("cutoff_params"), py::arg("count"), py::arg("time"),
         py::arg("n_samples"), py::arg("clocktime"));
 
-  py::class_<monte::CompletionCheckParams<monte::BasicStatistics>>(
+  py::class_<monte::CompletionCheckParams<statistics_type>>(
       m, "CompletionCheckParams",
       R"pbdoc(
       Parameters that determine if a simulation is complete
@@ -2116,86 +2154,110 @@ PYBIND11_MODULE(_monte, m) {
           )pbdoc")
       .def_readwrite(
           "cutoff_params",
-          &monte::CompletionCheckParams<monte::BasicStatistics>::cutoff_params,
+          &monte::CompletionCheckParams<statistics_type>::cutoff_params,
           R"pbdoc(
           :class:`~libcasm.monte.CutoffCheckParams`: Cutoff check parameters
           )pbdoc")
-      .def_readwrite("equilibration_check_f",
-                     &monte::CompletionCheckParams<
-                         monte::BasicStatistics>::equilibration_check_f,
-                     R"pbdoc(
-                     function: Function that performs equilibration checking.
+      .def_readwrite(
+          "equilibration_check_f",
+          &monte::CompletionCheckParams<statistics_type>::equilibration_check_f,
+          R"pbdoc(
+          function: Function that performs equilibration checking.
 
-                     A function, such as :func:`~libcasm.monte.default_equilibration_check`, with signature f(array_like observations, array_like sample_weight,
-                     :class:`~libcasm.monte.RequestedPrecision` requested_precision) -> :class:`~libcasm.monte.IndividualEquilibrationResult`.
-                     )pbdoc")
-      .def_readwrite("calc_statistics_f",
-                     &monte::CompletionCheckParams<
-                         monte::BasicStatistics>::calc_statistics_f,
-                     R"pbdoc(
-                     function: Function to calculate statistics.
+          A function, such as :func:`~libcasm.monte.default_equilibration_check`, with
+          signature f(array_like observations, array_like sample_weight,
+          :class:`~libcasm.monte.RequestedPrecision` requested_precision) ->
+          :class:`~libcasm.monte.IndividualEquilibrationResult`.
+          )pbdoc")
+      .def_readwrite(
+          "calc_statistics_f",
+          &monte::CompletionCheckParams<statistics_type>::calc_statistics_f,
+          R"pbdoc(
+          function: Function to calculate statistics.
 
-                     A function, such as an instance of  :class:`~libcasm.monte.BasicStatisticsCalculator`, with signature f(array_like observations, array_like sample_weight) -> :class:`~libcasm.monte.BasicStatistics`.
-                     )pbdoc")
-      .def_readwrite("requested_precision",
-                     &monte::CompletionCheckParams<
-                         monte::BasicStatistics>::requested_precision,
-                     R"pbdoc(
-                     :class:`~libcasm.monte.RequestedPrecisionMap`: Requested precision for convergence of sampler components.
+          A function, such as an instance of
+          :class:`~libcasm.monte.BasicStatisticsCalculator`, with signature
+          f(array_like observations, array_like sample_weight) ->
+          :class:`~libcasm.monte.BasicStatistics`.
+          )pbdoc")
+      .def_readwrite(
+          "requested_precision",
+          &monte::CompletionCheckParams<statistics_type>::requested_precision,
+          R"pbdoc(
+          :class:`~libcasm.monte.RequestedPrecisionMap`: Requested precision for \
+          convergence of sampler components.
 
-                     A Dict[:class:`~libcasm.monte.SamplerComponent`, :class:`~libcasm.monte.RequestedPrecision`]-like object that specifies convergence criteria.
-                     )pbdoc")
+          A Dict[:class:`~libcasm.monte.SamplerComponent`,
+          :class:`~libcasm.monte.RequestedPrecision`]-like object that specifies
+          convergence criteria.
+          )pbdoc")
       .def_readwrite(
           "log_spacing",
-          &monte::CompletionCheckParams<monte::BasicStatistics>::log_spacing,
+          &monte::CompletionCheckParams<statistics_type>::log_spacing,
           R"pbdoc(
-          bool: If True, use logirithmic spacing for completiong checking; else use  linear spacing.
+          bool: If True, use logirithmic spacing for completiong checking; else \
+          use linear spacing.
 
-          The default value is False, for linear spacing between completion checks. For linear spacing, the n-th check will be taken when:
-
-          .. code-block:: Python
-
-              sample = round( check_begin + (check_period / checks_per_period) * n )
-
-          For "log" spacing, the n-th check will be taken when:
+          The default value is False, for linear spacing between completion checks.
+          For linear spacing, the n-th check will be taken when:
 
           .. code-block:: Python
 
-              sample = round( check_begin + check_period ^ ( (n + check_shift) /
-                              checks_per_period ) )
+              sample = check_begin + check_period * n
+
+          For log spacing, the n-th check will be taken when:
+
+          .. code-block:: Python
+
+              sample = check_begin + round( check_base ** (n + check_shift) )
+
+          However, if sample(n) - sample(n-1) > `check_period_max`, then subsequent
+          samples are taken every `check_period_max` samples.
+
+          For linear spacing, the default is to check for completion after `100`,
+          `200`, `300`, etc. samples are taken.
+
+          For log spacing, the default is to check for completion after `100`,
+          `1000`, `10000`, `20000`, `30000`, etc. samples are taken.
 
           )pbdoc")
       .def_readwrite(
           "check_begin",
-          &monte::CompletionCheckParams<monte::BasicStatistics>::check_begin,
+          &monte::CompletionCheckParams<statistics_type>::check_begin,
           R"pbdoc(
-                     float: Completion check beginning. Default =`0.0`.
-                     )pbdoc")
+          int: Earliest number of samples to begin completion checking. Default=``100``.
+          )pbdoc")
       .def_readwrite(
           "check_period",
-          &monte::CompletionCheckParams<monte::BasicStatistics>::check_period,
+          &monte::CompletionCheckParams<statistics_type>::check_period,
           R"pbdoc(
-                     float: Completion check period. Default =`10.0`.
-                     )pbdoc")
-      .def_readwrite("checks_per_period",
-                     &monte::CompletionCheckParams<
-                         monte::BasicStatistics>::checks_per_period,
+          int: The linear completion checking period. Default=``100``.
+          )pbdoc")
+      .def_readwrite("check_base",
+                     &monte::CompletionCheckParams<statistics_type>::check_base,
                      R"pbdoc(
-                     float: Completion checks per period. Default =`1.0`.
-                     )pbdoc")
+          float: The logarithmic completion checking base. Default=``10``.
+          )pbdoc")
       .def_readwrite(
           "check_shift",
-          &monte::CompletionCheckParams<monte::BasicStatistics>::check_shift,
+          &monte::CompletionCheckParams<statistics_type>::check_shift,
           R"pbdoc(
-                     float: Completion check shift. Default =`1.0`.
-                     )pbdoc")
+          float: The shift for the logarithmic spacing exponent. Default=``2``.
+          )pbdoc")
+      .def_readwrite(
+          "check_period_max",
+          &monte::CompletionCheckParams<statistics_type>::check_period_max,
+          R"pbdoc(
+          float: The maximum check spacing for logarithmic check spacing. \
+          Default=``10000``.
+          )pbdoc")
       .def_static(
           "from_dict",
           [](const nlohmann::json &data,
              StateSamplingFunctionMap const &sampling_functions) {
             jsonParser json{data};
-            InputParser<monte::CompletionCheckParams<monte::BasicStatistics>>
-                parser(json, sampling_functions);
+            InputParser<monte::CompletionCheckParams<statistics_type>> parser(
+                json, sampling_functions);
             std::runtime_error error_if_invalid{
                 "Error in libcasm.monte.CompletionCheckParams.from_dict"};
             report_and_throw_if_invalid(parser, CASM::log(), error_if_invalid);
@@ -2204,7 +2266,7 @@ PYBIND11_MODULE(_monte, m) {
           "Construct a CompletionCheckParams from a Python dict.",
           py::arg("data"), py::arg("sampling_functions"));
 
-  py::class_<monte::CompletionCheckResults<monte::BasicStatistics>>(
+  py::class_<monte::CompletionCheckResults<statistics_type>>(
       m, "CompletionCheckResults",
       R"pbdoc(
       Results of completion checks
@@ -2213,76 +2275,70 @@ PYBIND11_MODULE(_monte, m) {
            R"pbdoc(
           Default constructor only.
           )pbdoc")
-      .def_readwrite(
-          "params",
-          &monte::CompletionCheckResults<monte::BasicStatistics>::params,
-          R"pbdoc(
-                     :class:`~libcasm.monte.CompletionCheckParams`: Completion check parameters
-                     )pbdoc")
-      .def_readwrite(
-          "count",
-          &monte::CompletionCheckResults<monte::BasicStatistics>::count,
-          R"pbdoc(
+      .def_readwrite("params",
+                     &monte::CompletionCheckResults<statistics_type>::params,
+                     R"pbdoc(
+          :class:`~libcasm.monte.CompletionCheckParams`: Completion check parameters
+          )pbdoc")
+      .def_readwrite("count",
+                     &monte::CompletionCheckResults<statistics_type>::count,
+                     R"pbdoc(
                      Optional[int]: Number of steps or passes
                      )pbdoc")
-      .def_readwrite(
-          "time", &monte::CompletionCheckResults<monte::BasicStatistics>::time,
-          R"pbdoc(
-                     Optional[int]: Simulated time
-                     )pbdoc")
-      .def_readwrite(
-          "clocktime",
-          &monte::CompletionCheckResults<monte::BasicStatistics>::clocktime,
-          R"pbdoc(
-           float: Elapsed clock time
-           )pbdoc")
-      .def_readwrite(
-          "n_samples",
-          &monte::CompletionCheckResults<monte::BasicStatistics>::n_samples,
-          R"pbdoc(
+      .def_readwrite("time",
+                     &monte::CompletionCheckResults<statistics_type>::time,
+                     R"pbdoc(
+          Optional[int]: Simulated time
+          )pbdoc")
+      .def_readwrite("clocktime",
+                     &monte::CompletionCheckResults<statistics_type>::clocktime,
+                     R"pbdoc(
+          float: Elapsed clock time
+          )pbdoc")
+      .def_readwrite("n_samples",
+                     &monte::CompletionCheckResults<statistics_type>::n_samples,
+                     R"pbdoc(
           int: Number of samples taken
           )pbdoc")
-      .def_readwrite("has_all_minimums_met",
-                     &monte::CompletionCheckResults<
-                         monte::BasicStatistics>::has_all_minimums_met,
-                     R"pbdoc(
-           bool: True if all cutoff check minimums have been met
-           )pbdoc")
-      .def_readwrite("has_any_maximum_met",
-                     &monte::CompletionCheckResults<
-                         monte::BasicStatistics>::has_any_maximum_met,
-                     R"pbdoc(
-           bool: True if any cutoff check maximums have been met
-           )pbdoc")
       .def_readwrite(
-          "n_samples_at_convergence_check",
-          &monte::CompletionCheckResults<
-              monte::BasicStatistics>::n_samples_at_convergence_check,
+          "has_all_minimums_met",
+          &monte::CompletionCheckResults<statistics_type>::has_all_minimums_met,
           R"pbdoc(
-           Optional[int]: Number of samples when the converence check was performed
-           )pbdoc")
+          bool: True if all cutoff check minimums have been met
+          )pbdoc")
+      .def_readwrite(
+          "has_any_maximum_met",
+          &monte::CompletionCheckResults<statistics_type>::has_any_maximum_met,
+          R"pbdoc(
+          bool: True if any cutoff check maximums have been met
+          )pbdoc")
+      .def_readwrite("n_samples_at_convergence_check",
+                     &monte::CompletionCheckResults<
+                         statistics_type>::n_samples_at_convergence_check,
+                     R"pbdoc(
+          Optional[int]: Number of samples when the converence check was performed
+          )pbdoc")
       .def_readwrite("equilibration_check_results",
                      &monte::CompletionCheckResults<
-                         monte::BasicStatistics>::equilibration_check_results,
+                         statistics_type>::equilibration_check_results,
                      R"pbdoc(
-           :class:`~libcasm.monte.EquilibrationCheckResults`: Results of equilibration check
-           )pbdoc")
+          :class:`~libcasm.monte.EquilibrationCheckResults`: Results of equilibration check
+          )pbdoc")
       .def_readwrite("convergence_check_results",
                      &monte::CompletionCheckResults<
-                         monte::BasicStatistics>::convergence_check_results,
+                         statistics_type>::convergence_check_results,
                      R"pbdoc(
-           :class:`~libcasm.monte.ConvergenceCheckResults`: Results of convergence check
-           )pbdoc")
+          :class:`~libcasm.monte.ConvergenceCheckResults`: Results of convergence check
+          )pbdoc")
       .def_readwrite(
           "is_complete",
-          &monte::CompletionCheckResults<monte::BasicStatistics>::is_complete,
+          &monte::CompletionCheckResults<statistics_type>::is_complete,
           R"pbdoc(
-           bool: Outcome of the completion check
-           )pbdoc")
-      .def(
-          "partial_reset",
-          &monte::CompletionCheckResults<monte::BasicStatistics>::partial_reset,
-          R"pbdoc(
+          bool: Outcome of the completion check
+          )pbdoc")
+      .def("partial_reset",
+           &monte::CompletionCheckResults<statistics_type>::partial_reset,
+           R"pbdoc(
           Reset for step by step updates
 
           Reset most values, but not:
@@ -2303,10 +2359,10 @@ PYBIND11_MODULE(_monte, m) {
           n_samples : int = 0
               Number of samples to reset to
           )pbdoc",
-          py::arg("count") = std::nullopt, py::arg("time") = std::nullopt,
-          py::arg("clocktime") = 0.0, py::arg("n_samples") = 0)
+           py::arg("count") = std::nullopt, py::arg("time") = std::nullopt,
+           py::arg("clocktime") = 0.0, py::arg("n_samples") = 0)
       .def("full_reset",
-           &monte::CompletionCheckResults<monte::BasicStatistics>::full_reset,
+           &monte::CompletionCheckResults<statistics_type>::full_reset,
            R"pbdoc(
           Reset for next run
 
@@ -2327,19 +2383,18 @@ PYBIND11_MODULE(_monte, m) {
            py::arg("n_samples") = 0)
       .def(
           "to_dict",
-          [](monte::CompletionCheckResults<monte::BasicStatistics> const &x) {
+          [](monte::CompletionCheckResults<statistics_type> const &x) {
             jsonParser json;
             to_json(x, json);
             return static_cast<nlohmann::json>(json);
           },
           "Represent the CompletionCheckResults as a Python dict.");
 
-  py::class_<monte::CompletionCheck<monte::BasicStatistics>>(m,
-                                                             "CompletionCheck",
-                                                             R"pbdoc(
+  py::class_<monte::CompletionCheck<statistics_type>>(m, "CompletionCheck",
+                                                      R"pbdoc(
       Implements completion checks
       )pbdoc")
-      .def(py::init<monte::CompletionCheckParams<monte::BasicStatistics>>(),
+      .def(py::init<monte::CompletionCheckParams<statistics_type>>(),
            R"pbdoc(
           Constructor
 
@@ -2348,17 +2403,21 @@ PYBIND11_MODULE(_monte, m) {
           params : :class:`~libcasm.monte.CompletionCheckParams`
               Data struture holding completion check parameters.
           )pbdoc")
-      .def("reset", &monte::CompletionCheck<monte::BasicStatistics>::reset,
+      .def("reset", &monte::CompletionCheck<statistics_type>::reset,
            R"pbdoc(
           Reset CompletionCheck for next run
           )pbdoc")
-      .def("results", &monte::CompletionCheck<monte::BasicStatistics>::results,
+      .def("params", &monte::CompletionCheck<statistics_type>::params,
+           R"pbdoc(
+          Get CompletionCheckParams
+          )pbdoc")
+      .def("results", &monte::CompletionCheck<statistics_type>::results,
            R"pbdoc(
           Get detailed results of the last check
           )pbdoc")
       .def(
           "count_check",
-          [](monte::CompletionCheck<monte::BasicStatistics> &x,
+          [](monte::CompletionCheck<statistics_type> &x,
              std::map<std::string, std::shared_ptr<monte::Sampler>> const
                  &samplers,
              monte::Sampler const &sample_weight, monte::CountType count,
@@ -2374,11 +2433,14 @@ PYBIND11_MODULE(_monte, m) {
           samplers: :class:`~libcasm.monte.SamplerMap`
               The samplers containing the sampled data.
           sample_weight : :class:`~libcasm.monte.Sampler`
-              Sample weights associated with observations. May have 0 samples, in which case the obsservations are treated as being equally weighted, otherwise must match the number of samples made by each sampler in `samplers`.
+              Sample weights associated with observations. May have 0 samples, in which
+              case the obsservations are treated as being equally weighted, otherwise
+              must match the number of samples made by each sampler in `samplers`.
           count : int
               Number of steps or passes
           method_log : :class:`~libcasm.monte.MethodLog`
-              The method log specifies where to write status updates and internally tracks the elapsed clock time.
+              The method log specifies where to write status updates and internally
+              tracks the elapsed clock time.
 
           Returns
           -------
@@ -2389,7 +2451,7 @@ PYBIND11_MODULE(_monte, m) {
           py::arg("method_log"))
       .def(
           "__call__",
-          [](monte::CompletionCheck<monte::BasicStatistics> &x,
+          [](monte::CompletionCheck<statistics_type> &x,
              std::map<std::string, std::shared_ptr<monte::Sampler>> const
                  &samplers,
              monte::Sampler const &sample_weight,
@@ -2421,13 +2483,16 @@ PYBIND11_MODULE(_monte, m) {
           samplers: :class:`~libcasm.monte.SamplerMap`
               The samplers containing the sampled data.
           sample_weight : :class:`~libcasm.monte.Sampler`
-              Sample weights associated with observations. May have 0 samples, in which case the obsservations are treated as being equally weighted, otherwise must match the number of samples made by each sampler in `samplers`.
+              Sample weights associated with observations. May have 0 samples, in which
+              case the obsservations are treated as being equally weighted, otherwise
+              must match the number of samples made by each sampler in `samplers`.
           count : Optional[int]
               Number of steps or passes
           time : Optional[float]
               Simulated time
           method_log : :class:`~libcasm.monte.MethodLog`
-              The method log specifies where to write status updates and internally tracks the elapsed clock time.
+              The method log specifies where to write status updates and internally
+              tracks the elapsed clock time.
 
           Returns
           -------
@@ -2438,7 +2503,7 @@ PYBIND11_MODULE(_monte, m) {
           py::arg("time"), py::arg("method_log"))
       .def(
           "count_and_time_check",
-          [](monte::CompletionCheck<monte::BasicStatistics> &x,
+          [](monte::CompletionCheck<statistics_type> &x,
              std::map<std::string, std::shared_ptr<monte::Sampler>> const
                  &samplers,
              monte::Sampler const &sample_weight, monte::CountType count,
@@ -2454,13 +2519,16 @@ PYBIND11_MODULE(_monte, m) {
           samplers: :class:`~libcasm.monte.SamplerMap`
               The samplers containing the sampled data.
           sample_weight : :class:`~libcasm.monte.Sampler`
-              Sample weights associated with observations. May have 0 samples, in which case the obsservations are treated as being equally weighted, otherwise must match the number of samples made by each sampler in `samplers`.
+              Sample weights associated with observations. May have 0 samples, in which
+              case the obsservations are treated as being equally weighted, otherwise
+              must match the number of samples made by each sampler in `samplers`.
           count : int
               Number of steps or passes
           time : float
               Simulated time
           method_log : :class:`~libcasm.monte.MethodLog`
-              The method log specifies where to write status updates and internally tracks the elapsed clock time.
+              The method log specifies where to write status updates and internally
+              tracks the elapsed clock time.
 
           Returns
           -------
@@ -2471,7 +2539,7 @@ PYBIND11_MODULE(_monte, m) {
           py::arg("time"), py::arg("method_log"))
       .def(
           "time_check",
-          [](monte::CompletionCheck<monte::BasicStatistics> &x,
+          [](monte::CompletionCheck<statistics_type> &x,
              std::map<std::string, std::shared_ptr<monte::Sampler>> const
                  &samplers,
              monte::Sampler const &sample_weight, monte::CountType time,
@@ -2486,11 +2554,14 @@ PYBIND11_MODULE(_monte, m) {
           samplers: :class:`~libcasm.monte.SamplerMap`
               The samplers containing the sampled data.
           sample_weight : :class:`~libcasm.monte.Sampler`
-              Sample weights associated with observations. May have 0 samples, in which case the observations are treated as being equally weighted, otherwise must match the number of samples made by each sampler in `samplers`.
+              Sample weights associated with observations. May have 0 samples, in which
+              case the observations are treated as being equally weighted, otherwise
+              must match the number of samples made by each sampler in `samplers`.
           time : float
               Simulated time
           method_log : :class:`~libcasm.monte.MethodLog`
-              The method log specifies where to write status updates and internally tracks the elapsed clock time.
+              The method log specifies where to write status updates and internally
+              tracks the elapsed clock time.
 
           Returns
           -------
@@ -2501,7 +2572,7 @@ PYBIND11_MODULE(_monte, m) {
           py::arg("method_log"))
       .def(
           "check",
-          [](monte::CompletionCheck<monte::BasicStatistics> &x,
+          [](monte::CompletionCheck<statistics_type> &x,
              std::map<std::string, std::shared_ptr<monte::Sampler>> const
                  &samplers,
              monte::Sampler const &sample_weight,
@@ -2516,9 +2587,12 @@ PYBIND11_MODULE(_monte, m) {
           samplers: :class:`~libcasm.monte.SamplerMap`
               The samplers containing the sampled data.
           sample_weight : :class:`~libcasm.monte.Sampler`
-              Sample weights associated with observations. May have 0 samples, in which case the obsservations are treated as being equally weighted, otherwise must match the number of samples made by each sampler in `samplers`.
+              Sample weights associated with observations. May have 0 samples, in which
+              case the obsservations are treated as being equally weighted, otherwise
+              must match the number of samples made by each sampler in `samplers`.
           method_log : :class:`~libcasm.monte.MethodLog`
-              The method log specifies where to write status updates and internally tracks the elapsed clock time.
+              The method log specifies where to write status updates and internally
+              tracks the elapsed clock time.
 
           Returns
           -------

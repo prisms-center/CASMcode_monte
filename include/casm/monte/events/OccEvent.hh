@@ -11,7 +11,7 @@ namespace monte {
 
 /// \brief Track the position of individual atoms, as if no periodic boundaries
 struct Atom {
-  xtal::UnitCell
+  Eigen::Vector3l
       translation;  ///< Current translation, as if no periodic boundary
   Index n_jumps;
 };
@@ -48,7 +48,7 @@ struct AtomLocation {
 struct AtomTraj {
   AtomLocation from;
   AtomLocation to;
-  xtal::UnitCell delta_ijk;
+  Eigen::Vector3l delta_ijk;
 };
 
 /// \brief Describes a Monte Carlo event that modifies occupation

@@ -136,6 +136,8 @@ enable_testing()
 add_executable(casm_unit_monte
   ${PROJECT_SOURCE_DIR}/unit/gtest_main_run_all.cpp
   ${PROJECT_SOURCE_DIR}/unit/monte/OccLocation_test.cpp
+  ${PROJECT_SOURCE_DIR}/unit/monte/basic_Ising_eigen_test.cpp
+  ${PROJECT_SOURCE_DIR}/unit/monte/complete_Ising_eigen_test.cpp
   ${PROJECT_SOURCE_DIR}/unit/monte/Sampling_test.cpp
 )
 target_link_libraries(casm_unit_monte

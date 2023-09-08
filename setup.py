@@ -6,6 +6,10 @@ setup(
     packages=[
         "libcasm",
         "libcasm.monte",
+        "libcasm.monte.events",
+        "libcasm.monte.calculators",
+        "libcasm.monte.methods",
+        "libcasm.monte.models",
     ],
     package_dir={"": "python"},
     cmake_install_dir="python/libcasm",
