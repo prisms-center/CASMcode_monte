@@ -1,3 +1,9 @@
+/// An implementation of an occupation Metropolis Monte Carlo
+/// main loop that makes use of the RunManager provided by
+/// casm/monte/run_management to implement sampling
+/// fixtures and results data structures and input/output
+/// methods.
+
 #ifndef CASM_monte_methods_occupation_metropolis
 #define CASM_monte_methods_occupation_metropolis
 
@@ -12,10 +18,10 @@
 #include "casm/monte/events/OccLocation.hh"
 #include "casm/monte/events/io/OccCandidate_stream_io.hh"
 #include "casm/monte/methods/metropolis.hh"
-#include "casm/monte/results/Results.hh"
-#include "casm/monte/results/ResultsAnalysisFunction.hh"
+#include "casm/monte/run_management/Results.hh"
+#include "casm/monte/run_management/ResultsAnalysisFunction.hh"
+#include "casm/monte/run_management/StateSampler.hh"
 #include "casm/monte/sampling/SamplingParams.hh"
-#include "casm/monte/state/StateSampler.hh"
 
 namespace CASM {
 namespace monte {
@@ -65,8 +71,8 @@ void occupation_metropolis(
 ///
 /// Required interface for `CalculatorType potential`:
 /// - `void set(CalculatorType &potential, State<ConfigType> const &state)`
-/// - `double CalculatorType::extensive_value()`
-/// - `double CalculatorType::occ_delta_extensive_value(
+/// - `double CalculatorType::per_supercell()`
+/// - `double CalculatorType::occ_delta_per_supercell(
 ///        std::vector<Index> const &linear_site_index,
 ///        std::vector<int> const &new_occ)`
 ///
@@ -77,7 +83,7 @@ void occupation_metropolis(
 ///
 /// State properties that are set:
 /// - scalar value `potential_energy`:
-///   The intensive potential energy (eV / unit cell).
+///   The per_unitcell potential energy (eV / unit cell).
 ///
 template <typename ConfigType, typename CalculatorType,
           typename ProposeOccEventFuntionType, typename GeneratorType,
@@ -96,9 +102,9 @@ void occupation_metropolis(
   }
   double n_unitcells = get_transformation_matrix_to_super(state).determinant();
   state.properties.scalar_values["potential_energy"] = 0.;
-  double &potential_energy_intensive =
+  double &potential_energy_per_unitcell =
       state.properties.scalar_values["potential_energy"];
-  potential_energy_intensive = potential.extensive_value() / n_unitcells;
+  potential_energy_per_unitcell = potential.per_supercell() / n_unitcells;
 
   // Used within the main loop:
   OccEvent event;
@@ -121,8 +127,8 @@ void occupation_metropolis(
       break;
     }
 
-    // Calculate change in potential energy (extensive) due to event
-    double delta_potential_energy = potential.occ_delta_extensive_value(
+    // Calculate change in potential energy (per_supercell) due to event
+    double delta_potential_energy = potential.occ_delta_per_supercell(
         event.linear_site_index, event.new_occ);
 
     // Accept or reject event
@@ -133,7 +139,7 @@ void occupation_metropolis(
     if (accept) {
       run_manager.increment_n_accept();
       occ_location.apply(event, get_occupation(state));
-      potential_energy_intensive += (delta_potential_energy / n_unitcells);
+      potential_energy_per_unitcell += (delta_potential_energy / n_unitcells);
     } else {
       run_manager.increment_n_reject();
     }

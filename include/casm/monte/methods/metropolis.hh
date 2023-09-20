@@ -14,7 +14,7 @@ namespace monte {
 /// - delta_potential_energy < 0.0,
 /// - or rand in [0,1) < exp(-delta_potential_energy * beta)
 ///
-/// \param delta_potential_energy The total (extensive) change in potential
+/// \param delta_potential_energy The total (per_supercell) change in potential
 ///     energy due to the proposed event
 /// \param beta Thermodynamic beta, equals 1.0 / (CASM::KB * temperature)
 /// \param random_number_generator Random number generator

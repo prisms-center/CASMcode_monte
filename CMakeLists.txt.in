@@ -236,4 +236,38 @@ if(DEFINED SKBUILD)
       _monte_methods PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
   endif()
 
+  ### libcasm.monte.models._monte_models_ising_cpp ###
+  pybind11_add_module(_monte_models_ising_cpp MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_models_ising_cpp.cpp")
+  target_link_libraries(_monte_models_ising_cpp PRIVATE
+    CASM::casm_global
+    CASM::casm_crystallography
+    casm_monte
+  )
+  install(TARGETS _monte_models_ising_cpp DESTINATION monte/models)
+  if(APPLE)
+    set_target_properties(
+      _monte_models_ising_cpp PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_models_ising_cpp PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
+  ### libcasm.monte.implementations._monte_implementations_ising_cpp ###
+  pybind11_add_module(_monte_implementations_ising_cpp MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_implementations_ising_cpp.cpp")
+  target_link_libraries(_monte_implementations_ising_cpp PRIVATE
+    CASM::casm_global
+    CASM::casm_crystallography
+    casm_monte
+  )
+  install(TARGETS _monte_implementations_ising_cpp DESTINATION monte/implementations)
+  if(APPLE)
+    set_target_properties(
+      _monte_implementations_ising_cpp PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_implementations_ising_cpp PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
 endif()

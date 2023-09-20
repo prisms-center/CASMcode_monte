@@ -77,6 +77,16 @@ ext_modules = [
         ["src/monte_methods.cpp"],
         **ext_modules_params,
     ),
+    Pybind11Extension(
+        "libcasm.monte.models._monte_models_ising_cpp",
+        ["src/monte_models_ising_cpp.cpp"],
+        **ext_modules_params,
+    ),
+    Pybind11Extension(
+        "libcasm.monte.implementations._monte_implementations_ising_cpp",
+        ["src/monte_implementations_ising_cpp.cpp"],
+        **ext_modules_params,
+    ),
 ]
 
 
@@ -88,6 +98,7 @@ setup(
         "libcasm.monte",
         "libcasm.monte.events",
         "libcasm.monte.calculators",
+        "libcasm.monte.implementations",
         "libcasm.monte.methods",
         "libcasm.monte.models",
     ],

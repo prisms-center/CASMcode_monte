@@ -1,3 +1,11 @@
+/// An implementation of a kinetic Monte Carlo main loop
+/// that makes use of the RunManager provided by
+/// casm/monte/run_management to implement sampling
+/// fixtures and results data structures and input/output
+/// methods and a data structure that allows sampling
+/// atomic displacements for kinetic coefficient
+/// calculations.
+
 #ifndef CASM_monte_methods_kinetic_monte_carlo
 #define CASM_monte_methods_kinetic_monte_carlo
 
@@ -26,11 +34,13 @@ struct KMCData {
   /// \brief This will be set to the total event rate at sampling time
   double total_rate;
 
-  /// \brief Current simulation time
+  /// \brief Current simulation time when sampling occurs
   ///
-  /// For time-based sampling this will be equal to the time the
-  /// For count-based sampling, this will be equal to the time the
-  /// event occurred.
+  /// For time-based sampling this will be equal to the sampling time
+  /// and not determined by the time any event occurred.
+  /// For count-based sampling, this will be equal to the time the n-th
+  /// (by step or pass) event occurred, where n is the step or pass when
+  /// sampling is due.
   double time;
 
   /// \brief Simulation time at last sample, by sampling fixture label
@@ -45,8 +55,9 @@ struct KMCData {
   /// When sampling, this will hold the atom name index for each column of the
   /// atom position matrices. Currently atom names only; does not distinguish
   /// atoms with different properties. Not set by monte::kinetic_monte_carlo,
-  /// this must be set beforehand. TODO: KMC with atoms that move to/from
-  /// resevoir will need to update this
+  /// this must be set beforehand.
+  ///
+  /// TODO: KMC with atoms that move to/from resevoir will need to update this
   std::vector<Index> atom_name_index_list;
 
   /// \brief Current atom positions

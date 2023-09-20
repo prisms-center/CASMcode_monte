@@ -26,8 +26,10 @@ class FixedConfigGenerator;
 
 struct SamplingParams;
 class Sampler;
+typedef std::map<std::string, std::shared_ptr<Sampler>> SamplerMap;
 struct SamplerComponent;
 struct RequestedPrecision;
+typedef std::map<SamplerComponent, RequestedPrecision> RequestedPrecisionMap;
 
 template <typename _ConfigType>
 struct State;
@@ -53,6 +55,10 @@ struct StateSampler;
 struct StateSamplingFunction;
 typedef std::map<std::string, StateSamplingFunction> StateSamplingFunctionMap;
 
+struct jsonStateSamplingFunction;
+typedef std::map<std::string, jsonStateSamplingFunction>
+    jsonStateSamplingFunctionMap;
+
 struct BasicStatistics;
 template <typename StatisticsType>
 using CalcStatisticsFunction = std::function<StatisticsType(
@@ -64,6 +70,15 @@ typedef std::function<IndividualEquilibrationCheckResult(
     Eigen::VectorXd const &observations, Eigen::VectorXd const &sample_weight,
     RequestedPrecision requested_precision)>
     EquilibrationCheckFunction;
+
+template <typename StatisticsType>
+struct IndividualConvergenceCheckResult;
+template <typename StatisticsType>
+using ConvergenceResultMap =
+    std::map<SamplerComponent,
+             IndividualConvergenceCheckResult<StatisticsType>>;
+typedef std::map<SamplerComponent, IndividualEquilibrationCheckResult>
+    EquilibrationResultMap;
 
 template <typename _ConfigType, typename _StatisticsType>
 struct Results;
@@ -99,6 +114,14 @@ template <typename ConfigType, typename StatisticsType, typename EngineType>
 class SamplingFixture;
 template <typename ConfigType, typename StatisticsType, typename EngineType>
 struct RunManager;
+
+template <typename PtrType>
+PtrType throw_if_null(PtrType ptr, std::string const &what) {
+  if (ptr == nullptr) {
+    throw std::runtime_error(what);
+  }
+  return ptr;
+}
 
 }  // namespace monte
 }  // namespace CASM

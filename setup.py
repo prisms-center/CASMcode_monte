@@ -8,6 +8,7 @@ setup(
         "libcasm.monte",
         "libcasm.monte.events",
         "libcasm.monte.calculators",
+        "libcasm.monte.implementations",
         "libcasm.monte.methods",
         "libcasm.monte.models",
     ],

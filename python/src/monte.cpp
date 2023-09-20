@@ -20,18 +20,20 @@
 #include "casm/monte/Conversions.hh"
 #include "casm/monte/MethodLog.hh"
 #include "casm/monte/RandomNumberGenerator.hh"
+#include "casm/monte/ValueMap.hh"
 #include "casm/monte/checks/EquilibrationCheck.hh"
 #include "casm/monte/checks/io/json/CompletionCheck_json_io.hh"
 #include "casm/monte/checks/io/json/ConvergenceCheck_json_io.hh"
 #include "casm/monte/checks/io/json/CutoffCheck_json_io.hh"
 #include "casm/monte/checks/io/json/EquilibrationCheck_json_io.hh"
+#include "casm/monte/definitions.hh"
+#include "casm/monte/io/json/ValueMap_json_io.hh"
+#include "casm/monte/run_management/StateSampler.hh"
 #include "casm/monte/sampling/Sampler.hh"
 #include "casm/monte/sampling/SamplingParams.hh"
+#include "casm/monte/sampling/StateSamplingFunction.hh"
 #include "casm/monte/sampling/io/json/Sampler_json_io.hh"
 #include "casm/monte/sampling/io/json/SamplingParams_json_io.hh"
-#include "casm/monte/state/StateSampler.hh"
-#include "casm/monte/state/ValueMap.hh"
-#include "casm/monte/state/io/json/ValueMap_json_io.hh"
 
 #define STRINGIFY(x) #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
@@ -47,18 +49,6 @@ using namespace CASM;
 typedef std::mt19937_64 engine_type;
 typedef monte::RandomNumberGenerator<engine_type> generator_type;
 typedef monte::BasicStatistics statistics_type;
-
-typedef std::map<std::string, std::shared_ptr<monte::Sampler>> SamplerMap;
-typedef std::map<std::string, monte::StateSamplingFunction>
-    StateSamplingFunctionMap;
-typedef std::map<monte::SamplerComponent, monte::RequestedPrecision>
-    RequestedPrecisionMap;
-typedef std::map<monte::SamplerComponent,
-                 monte::IndividualConvergenceCheckResult<statistics_type>>
-    ConvergenceResultMap;
-typedef std::map<monte::SamplerComponent,
-                 monte::IndividualEquilibrationCheckResult>
-    EquilibrationResultMap;
 
 monte::MethodLog make_MethodLog(std::string logfile_path,
                                 std::optional<double> log_frequency) {
@@ -136,18 +126,24 @@ monte::StateSamplingFunction make_state_sampling_function(
   }
 }
 
+monte::jsonStateSamplingFunction make_json_state_sampling_function(
+    std::string name, std::string description,
+    std::function<py::object()> function) {
+  if (function == nullptr) {
+    throw std::runtime_error(
+        "Error constructing jsonStateSamplingFunction: function == nullptr");
+  }
+  return monte::jsonStateSamplingFunction(
+      name, description, [=]() -> jsonParser {
+        nlohmann::json j = function();
+        return jsonParser(static_cast<nlohmann::json const &>(j));
+      });
+}
+
 }  // namespace CASMpy
 
 PYBIND11_DECLARE_HOLDER_TYPE(T, std::shared_ptr<T>);
-PYBIND11_MAKE_OPAQUE(std::map<std::string, bool>);
-PYBIND11_MAKE_OPAQUE(std::map<std::string, double>);
-PYBIND11_MAKE_OPAQUE(std::map<std::string, Eigen::VectorXd>);
-PYBIND11_MAKE_OPAQUE(std::map<std::string, Eigen::MatrixXd>);
-PYBIND11_MAKE_OPAQUE(CASMpy::SamplerMap);
-PYBIND11_MAKE_OPAQUE(CASMpy::StateSamplingFunctionMap);
-PYBIND11_MAKE_OPAQUE(CASMpy::RequestedPrecisionMap);
-PYBIND11_MAKE_OPAQUE(CASMpy::ConvergenceResultMap);
-PYBIND11_MAKE_OPAQUE(CASMpy::EquilibrationResultMap);
+#include "opaque_types.cc"
 
 PYBIND11_MODULE(_monte, m) {
   using namespace CASMpy;
@@ -164,6 +160,8 @@ PYBIND11_MODULE(_monte, m) {
 
     )pbdoc";
   py::module::import("libcasm.xtal");
+
+#include "local_bindings.cc"
 
   py::class_<monte::MethodLog>(m, "MethodLog", R"pbdoc(
       Logger for Monte Carlo method status
@@ -433,11 +431,6 @@ PYBIND11_MODULE(_monte, m) {
           R"pbdoc(
           The current indent string.
           )pbdoc");
-
-  py::bind_map<std::map<std::string, bool>>(m, "BooleanValueMap");
-  py::bind_map<std::map<std::string, double>>(m, "ScalarValueMap");
-  py::bind_map<std::map<std::string, Eigen::VectorXd>>(m, "VectorValueMap");
-  py::bind_map<std::map<std::string, Eigen::MatrixXd>>(m, "MatrixValueMap");
 
   py::class_<monte::ValueMap>(m, "ValueMap", R"pbdoc(
       Data structure for holding Monte Carlo data
@@ -1218,15 +1211,6 @@ PYBIND11_MODULE(_monte, m) {
           )pbdoc",
            py::arg("sample_index"));
 
-  py::bind_map<SamplerMap>(m, "SamplerMap",
-                           R"pbdoc(
-      SamplerMap stores :class:`~libcasm.monte.Sampler` by name of the sampled quantity
-
-      Notes
-      -----
-      SamplerMap is a Dict[str, :class:`~libcasm.monte.Sampler`]-like object.
-      )pbdoc");
-
   m.def("get_n_samples", monte::get_n_samples,
         R"pbdoc(
         Return the number of samples taken. Assumes the same value for all samplers in the :class:`~libcasm.monte.SamplerMap`.
@@ -1355,14 +1339,14 @@ PYBIND11_MODULE(_monte, m) {
           function : function
               A function with 0 arguments that returns an array of the proper size sampling the current state. Typically this is a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
 
-          component_names : Optional[List[str]]
+          component_names : Optional[List[str]] = None
               A name for each component of the resulting vector.
 
               Can be strings representing an indices (i.e "0", "1", "2", etc.) or can be a descriptive string (i.e. "Mg", "Va", "O", etc.). If None, indices for column-major ordering are used (i.e. "0,0", "1,0", ..., "m-1,n-1")
 
           )pbdoc",
            py::arg("name"), py::arg("description"), py::arg("shape"),
-           py::arg("function"), py::arg("component_names"))
+           py::arg("function"), py::arg("component_names") = std::nullopt)
       .def_readwrite("name", &monte::StateSamplingFunction::name,
                      R"pbdoc(
           str : Name of the sampled quantity.
@@ -1401,14 +1385,98 @@ PYBIND11_MODULE(_monte, m) {
           Equivalent to calling :py::attr:`~libcasm.monte.StateSamplingFunction.function`.
           )pbdoc");
 
-  py::bind_map<StateSamplingFunctionMap>(m, "StateSamplingFunctionMap",
-                                         R"pbdoc(
-      StateSamplingFunctionMap stores :class:`~libcasm.monte.StateSamplingFunction` by name of the sampled quantity.
+  py::class_<monte::jsonStateSamplingFunction>(m, "jsonStateSamplingFunction",
+                                               R"pbdoc(
+        A function that samples JSON data from a Monte Carlo state
 
-      Notes
-      -----
-      StateSamplingFunctionMap is a Dict[str, :class:`~libcasm.monte.StateSamplingFunction`]-like object.
-      )pbdoc");
+        Example usage:
+
+        .. code-block:: Python
+
+            from libcasm.clexmonte import SemiGrandCanonical
+            from libcasm.monte import (
+                Sampler, SamplerMap, StateSamplingFunction,
+                StateSamplingFunctionMap, jsonStateSamplingFunctionMap
+            )
+
+            # ... in Monte Carlo simulation setup ...
+            # calculation = SemiGrandCanonical(...)
+
+            # ... create sampling functions ...
+            json_sampling_functions = jsonStateSamplingFunctionMap()
+
+            def configuration_f():
+                return calculation.state.configuration.to_dict()
+
+            f = monte.jsonStateSamplingFunction(
+                name="configuration",
+                description="Configuration values",
+                function=configuration_json_f,
+            )
+            sampling_functions[f.name] = f
+
+            # ... create samplers to hold data ...
+            json_sampled_data = jsonSampledDataMap()
+            for name, f in json_sampling_functions.items():
+                json_sampled_data[name] = []
+
+            # ... in Monte Carlo simulation ...
+            # ... sample JSON data ...
+            for name, f in json_sampling_functions.items():
+                json_sampled_data[name].append(f())
+
+
+        Notes
+        -----
+        - Typically this holds a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
+        - jsonStateSamplingFunction can be used to sample quantities not easily converted to scalar, vector, matrix, etc.
+        - Data sampled by a jsonStateSamplingFunction can be stored in a :class:`~libcasm.monte.jsonSampledDataMap`.
+        - A call operator exists (:func:`~libcasm.monte.jsonStateSamplingFunction.__call__`) to call the function held by :class:`~libcasm.monte.jsonStateSamplingFunction`.
+        )pbdoc")
+      .def(py::init<>(&make_json_state_sampling_function),
+           R"pbdoc(
+
+          Parameters
+          ----------
+          name : str
+              Name of the sampled quantity.
+
+          description : str
+              Description of the function.
+
+          component_index : int
+              Index into the unrolled vector of a sampled quantity.
+
+          function : function
+              A function with 0 arguments that samples the current state and returns a Python object that is convertible to JSON. Typically this is a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
+
+          )pbdoc",
+           py::arg("name"), py::arg("description"), py::arg("function"))
+      .def_readwrite("name", &monte::jsonStateSamplingFunction::name,
+                     R"pbdoc(
+          str : Name of the sampled quantity.
+          )pbdoc")
+      .def_readwrite("description",
+                     &monte::jsonStateSamplingFunction::description,
+                     R"pbdoc(
+          str : Description of the function.
+          )pbdoc")
+      .def_readwrite("function", &monte::jsonStateSamplingFunction::function,
+                     R"pbdoc(
+          function : The function to be evaluated.
+
+          A function with 0 arguments that returns an array of the proper size sampling the current state. Typically this is a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
+          )pbdoc")
+      .def(
+          "__call__",
+          [](monte::jsonStateSamplingFunction const &f) -> jsonParser {
+            return f();
+          },
+          R"pbdoc(
+          Evaluates the JSON state sampling function
+
+          Equivalent to calling :py::attr:`~libcasm.monte.jsonStateSamplingFunction.function`.
+          )pbdoc");
 
   py::class_<monte::RequestedPrecision>(m, "RequestedPrecision",
                                         R"pbdoc(
@@ -1481,15 +1549,6 @@ PYBIND11_MODULE(_monte, m) {
           },
           "Construct RequestedPrecision from a Python dict.", py::arg("data"));
 
-  py::bind_map<RequestedPrecisionMap>(m, "RequestedPrecisionMap",
-                                      R"pbdoc(
-      RequestedPrecisionMap stores :class:`~libcasm.monte.RequestedPrecision` with :class:`~libcasm.monte.SamplerComponent` keys.
-
-      Notes
-      -----
-      RequestedPrecisionMap is a Dict[:class:`~libcasm.monte.SamplerComponent`, :class:`~libcasm.monte.RequestedPrecision`]-like object.
-      )pbdoc");
-
   py::class_<monte::IndividualEquilibrationCheckResult>(
       m, "IndividualEquilibrationResult",
       R"pbdoc(
@@ -1527,15 +1586,6 @@ PYBIND11_MODULE(_monte, m) {
             return static_cast<nlohmann::json>(json);
           },
           "Represent IndividualEquilibrationResult as a Python dict.");
-
-  py::bind_map<EquilibrationResultMap>(m, "EquilibrationResultMap",
-                                       R"pbdoc(
-      EquilibrationResultMap stores :class:`~libcasm.monte.IndividualEquilibrationResult` by :class:`~libcasm.monte.SamplerComponent`
-
-      Notes
-      -----
-      EquilibrationResultMap is a Dict[:class:`~libcasm.monte.SamplerComponent`, :class:`~libcasm.monte.IndividualEquilibrationResult`]-like object.
-      )pbdoc");
 
   py::class_<monte::EquilibrationCheckResults>(m, "EquilibrationCheckResults",
                                                R"pbdoc(
@@ -1902,15 +1952,6 @@ PYBIND11_MODULE(_monte, m) {
           "Represent the individual convergence check results as a Python "
           "dict.");
 
-  py::bind_map<ConvergenceResultMap>(m, "ConvergenceResultMap",
-                                     R"pbdoc(
-      ConvergenceResultMap stores :class:`~libcasm.monte.IndividualConvergenceResult` by :class:`~libcasm.monte.SamplerComponent`
-
-      Notes
-      -----
-      ConvergenceResultMap is a Dict[:class:`~libcasm.monte.SamplerComponent`, :class:`~libcasm.monte.IndividualConvergenceResult`]-like object.
-      )pbdoc");
-
   py::class_<monte::ConvergenceCheckResults<statistics_type>>(
       m, "ConvergenceCheckResults",
       R"pbdoc(
@@ -1999,7 +2040,7 @@ PYBIND11_MODULE(_monte, m) {
       "convergence_check",
       [](std::map<std::string, std::shared_ptr<monte::Sampler>> const &samplers,
          std::shared_ptr<monte::Sampler> const &sample_weight,
-         RequestedPrecisionMap const &requested_precision,
+         monte::RequestedPrecisionMap const &requested_precision,
          monte::CountType N_samples_for_equilibration,
          monte::CalcStatisticsFunction<statistics_type> calc_statistics_f)
           -> monte::ConvergenceCheckResults<statistics_type> {
@@ -2254,7 +2295,7 @@ PYBIND11_MODULE(_monte, m) {
       .def_static(
           "from_dict",
           [](const nlohmann::json &data,
-             StateSamplingFunctionMap const &sampling_functions) {
+             monte::StateSamplingFunctionMap const &sampling_functions) {
             jsonParser json{data};
             InputParser<monte::CompletionCheckParams<statistics_type>> parser(
                 json, sampling_functions);

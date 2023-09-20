@@ -1,1 +1,1 @@
-"""Example model implementations"""
+"""Model implementations"""

@@ -1,3 +1,6 @@
+/// A basic data structure and main loop implementation
+/// for occupation Metropolis Monte Carlo
+
 #ifndef CASM_monte_methods_basic_occupation_metropolis
 #define CASM_monte_methods_basic_occupation_metropolis
 
@@ -5,8 +8,8 @@
 #include "casm/monte/checks/io/json/CompletionCheck_json_io.hh"
 #include "casm/monte/definitions.hh"
 #include "casm/monte/methods/metropolis.hh"
+#include "casm/monte/run_management/StateSampler.hh"
 #include "casm/monte/sampling/Sampler.hh"
-#include "casm/monte/state/StateSampler.hh"
 
 namespace CASM {
 namespace monte {
@@ -19,14 +22,17 @@ struct BasicOccupationMetropolisData {
 
   /// \brief Constructor
   ///
-  /// \param sampling_functions The sampling functions to use
+  /// \param _sampling_functions The sampling functions to use
+  /// \param _json_sampling_functions The JSON sampling functions to use
   /// \param n_steps_per_pass Number of steps per pass.
   /// \param completion_check_params Controls when the run finishes
   BasicOccupationMetropolisData(
       StateSamplingFunctionMap const &_sampling_functions,
+      jsonStateSamplingFunctionMap const &_json_sampling_functions,
       CountType _n_steps_per_pass,
       CompletionCheckParams<statistics_type> const &_completion_check_params)
       : sampling_functions(_sampling_functions),
+        json_sampling_functions(_json_sampling_functions),
         sample_weight({}),
         n_steps_per_pass(_n_steps_per_pass),
         completion_check(_completion_check_params) {
@@ -35,6 +41,11 @@ struct BasicOccupationMetropolisData {
       this->samplers.emplace(
           f.name, std::make_shared<monte::Sampler>(f.shape, f.component_names));
     }
+    for (auto const &pair : json_sampling_functions) {
+      auto const &f = pair.second;
+      this->json_sampled_data.emplace(f.name, std::vector<jsonParser>());
+    }
+
     n_pass = 0;
     n_accept = 0;
     n_reject = 0;
@@ -46,7 +57,16 @@ struct BasicOccupationMetropolisData {
   /// \brief Holds sampled data
   SamplerMap samplers;
 
-  /// \brief Sample weights remain empty (unweighted)
+  /// \brief The json sampling functions to use
+  jsonStateSamplingFunctionMap json_sampling_functions;
+
+  /// \brief Holds sampled JSON data
+  jsonSampledDataMap json_sampled_data;
+
+  /// \brief Sample weights
+  ///
+  /// Sample weights may remain empty (unweighted). Included for compatibility
+  /// with statistics calculators.
   Sampler sample_weight;
 
   /// \brief Number of passes. One pass is equal to one Monte Carlo step
@@ -81,7 +101,12 @@ struct BasicOccupationMetropolisData {
 
   /// \brief Reset attributes set during `run`
   void reset() {
-    samplers.clear();
+    for (auto &pair : samplers) {
+      pair.second->clear();
+    }
+    for (auto &pair : json_sampled_data) {
+      pair.second.clear();
+    }
     sample_weight.clear();
     n_pass = 0;
     n_accept = 0;
@@ -96,9 +121,8 @@ jsonParser &to_json(BasicOccupationMetropolisData<StatisticsType> const &data,
 
 /// \brief Write nothing to run status logfile and nothing to stream
 template <typename StatisticsType>
-void write_no_status(
-    BasicOccupationMetropolisData<StatisticsType> const &data,
-    MethodLog &method_log);
+void write_no_status(BasicOccupationMetropolisData<StatisticsType> const &data,
+                     MethodLog &method_log);
 
 /// \brief Write run status logfile and stream
 template <typename StatisticsType>
@@ -133,7 +157,7 @@ template <typename StatisticsType, typename EngineType,
                        MethodLog &)>
 void basic_occupation_metropolis(
     BasicOccupationMetropolisData<StatisticsType> &data, double temperature,
-    PotentialOccDeltaExtensiveValueF potential_occ_delta_extensive_value_f,
+    PotentialOccDeltaExtensiveValueF potential_occ_delta_per_supercell_f,
     ProposeEventF propose_event_f, ApplyEventF apply_event_f,
     int sample_period = 1, std::optional<MethodLog> method_log = std::nullopt,
     std::shared_ptr<EngineType> random_engine = nullptr,
@@ -158,9 +182,8 @@ jsonParser &to_json(BasicOccupationMetropolisData<StatisticsType> const &data,
 
 /// \brief Write nothing to run status logfile and nothing to stream
 template <typename StatisticsType>
-void write_no_status(
-    BasicOccupationMetropolisData<StatisticsType> const &data,
-    MethodLog &method_log) {
+void write_no_status(BasicOccupationMetropolisData<StatisticsType> const &data,
+                     MethodLog &method_log) {
   method_log.log.begin_lap();
   return;
 }
@@ -298,8 +321,10 @@ void default_write_completion_check_status(
 
 /// \brief Run an occupation metropolis Monte Carlo calculation
 ///
+/// \param data Holds basic occupation Metropolis Monte Carlo run data and
+///     results
 /// \param temperature The temperature used for the Metropolis algorithm.
-/// \param potential_occ_delta_extensive_value_f A function which calculates
+/// \param potential_occ_delta_per_supercell_f A function which calculates
 ///     the change in the potential due to a proposed occupation event. The
 ///     expected signature is ``double f(OccEvent const &)``.
 /// \param propose_event_f A function, which proposes an event (of type
@@ -309,9 +334,6 @@ void default_write_completion_check_status(
 /// \param apply_event_f A function, which applies an accepted event to update
 ///     the current state. The expected signature is
 ///     ``void(OccEvent const &)``.
-/// \param sampling_functions The sampling functions to use
-/// \param n_steps_per_pass Number of steps per pass.
-/// \param completion_check_params Controls when the run finishes
 /// \param sample_period Number of passes per sample. One pass is one Monte
 ///     Carlo step per site with variable occupation.
 /// \param method_log Method log, for writing status updates. If None, default
@@ -332,7 +354,7 @@ template <typename StatisticsType, typename EngineType,
           typename ApplyEventF, typename WriteStatusF>
 void basic_occupation_metropolis(
     BasicOccupationMetropolisData<StatisticsType> &data, double temperature,
-    PotentialOccDeltaExtensiveValueF potential_occ_delta_extensive_value_f,
+    PotentialOccDeltaExtensiveValueF potential_occ_delta_per_supercell_f,
     ProposeEventF propose_event_f, ApplyEventF apply_event_f, int sample_period,
     std::optional<MethodLog> method_log,
     std::shared_ptr<EngineType> random_engine, WriteStatusF write_status_f) {
@@ -354,7 +376,6 @@ void basic_occupation_metropolis(
   // # used in main loop
   Index n_pass_next_sample = sample_period;
   CountType n_step = 0;
-  bool accept;
   double delta_potential_energy;
 
   // ### Main loop ####
@@ -363,8 +384,8 @@ void basic_occupation_metropolis(
     // Propose an event
     OccEvent const &event = propose_event_f(random_number_generator);
 
-    // Calculate change in potential energy (extensive) due to event
-    delta_potential_energy = potential_occ_delta_extensive_value_f(event);
+    // Calculate change in potential energy (per_supercell) due to event
+    delta_potential_energy = potential_occ_delta_per_supercell_f(event);
 
     // Accept and apply or reject event
     if (metropolis_acceptance(delta_potential_energy, beta,
@@ -389,6 +410,10 @@ void basic_occupation_metropolis(
         auto const &f = pair.second;
         data.samplers.at(f.name)->push_back(f());
       }
+      for (auto const &pair : data.json_sampling_functions) {
+        auto const &f = pair.second;
+        data.json_sampled_data.at(f.name).push_back(f());
+      }
       // # write status if due
       if (method_log->log_frequency.has_value() &&
           method_log->log.lap_time() >= method_log->log_frequency.value()) {
@@ -398,7 +423,6 @@ void basic_occupation_metropolis(
   }
 
   write_status_f(data, *method_log);
-
 }
 
 }  // namespace methods

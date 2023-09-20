@@ -1,1 +1,1 @@
-"""Example Monte Carlo calculator implementations"""
+"""Monte Carlo calculator implementations"""

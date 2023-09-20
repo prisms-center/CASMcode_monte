@@ -1,3 +1,9 @@
+/// An implementation of an N-Fold Way occupation Monte Carlo
+/// main loop that makes use of the RunManager provided by
+/// casm/monte/run_management to implement sampling
+/// fixtures and results data structures and input/output
+/// methods.
+
 #ifndef CASM_monte_methods_nfold
 #define CASM_monte_methods_nfold
 
@@ -13,6 +19,9 @@ namespace CASM {
 namespace monte {
 
 /// \brief Data that can be used by sampling functions
+///
+/// Notes:
+/// - Allows sampling `expected_acceptance_rate`
 template <typename ConfigType, typename EngineType>
 struct NfoldData {
   /// \brief This will be set to the current sampling
@@ -24,11 +33,12 @@ struct NfoldData {
   monte::StateSampler<ConfigType, EngineType> const *state_sampler;
 
   /// \brief Total number of events that could be selected at any time
+  ///     This is set before running and remains constant.
   double n_events_possible;
 
   /// \brief This will be set to the expected metropolis algorithm acceptance
-  /// rate
-  ///     given the current event acceptance probabilities
+  ///     rate given the current event acceptance probabilities using
+  ///     total_rate / n_events_possible.
   double expected_acceptance_rate;
 };
 

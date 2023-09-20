@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 
+#include "casm/casm_io/json/jsonParser.hh"
 #include "casm/global/eigen.hh"
 #include "casm/monte/definitions.hh"
 
@@ -188,6 +189,9 @@ std::map<std::string, std::shared_ptr<Sampler>>::const_iterator find_or_throw(
 /// (else 0)
 CountType get_n_samples(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers);
+
+/// \brief Holds sampled JSON data
+typedef std::map<std::string, std::vector<jsonParser>> jsonSampledDataMap;
 
 }  // namespace monte
 }  // namespace CASM

@@ -26,6 +26,8 @@ from ._monte import (
     SamplingParams,
     StateSamplingFunction,
     StateSamplingFunctionMap,
+    jsonStateSamplingFunction,
+    jsonStateSamplingFunctionMap,
     ValueMap,
     all_minimums_met,
     any_maximum_met,

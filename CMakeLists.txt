@@ -79,11 +79,10 @@ ENDIF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 # create libcasm_monte
 set(
   libcasm_monte_HEADERS
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/RunManager.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/BasicStatistics.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/MethodLog.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/SamplingFixture.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/definitions.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/ValueMap.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/RandomNumberGenerator.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/Conversions.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/BasicStructureTools.hh
@@ -101,31 +100,31 @@ set(
   ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/io/json/ConvergenceCheck_json_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/io/json/CompletionCheck_json_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/io/json/EquilibrationCheck_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/io/json/ValueMap_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/StateSampler.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/FixedConfigGenerator.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/IncrementalConditionsStateGenerator.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/ConfigGenerator.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/RunData.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/State.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/RunManager.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/SamplingFixture.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/StateGenerator.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/Results.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/StateModifyingFunction.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/ResultsAnalysisFunction.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/ResultsIO.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/jsonResultsIO.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/RunData_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/jsonResultsIO_impl.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/RequestedPrecisionConstructor.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/Sampler.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/SamplingParams.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/StateSamplingFunction.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/io/json/SamplingParams_json_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/io/json/Sampler_json_io.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/models/basic_ising_eigen.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/StateSampler.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/FixedConfigGenerator.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/IncrementalConditionsStateGenerator.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/ConfigGenerator.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/RunData.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/State.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/StateGenerator.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/StateModifyingFunction.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/ValueMap.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/io/json/ValueMap_json_io.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/io/json/RunData_json_io.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/results/Results.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/results/ResultsAnalysisFunction.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/results/io/ResultsIO.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/results/io/json/jsonResultsIO.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/results/io/json/jsonResultsIO_impl.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/calculators/LocalCalculatorTemplate.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/models/ising_eigen.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/calculators/complete_semigrand_canonical.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/calculators/CalculatorTemplate.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/calculators/basic_semigrand_canonical.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/events/OccEvent.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/events/OccEventProposal.hh
@@ -142,10 +141,10 @@ set(
   ${PROJECT_SOURCE_DIR}/src/casm/monte/checks/EquilibrationCheck.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/checks/io/json/EquilibrationCheck_json_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/checks/io/json/CutoffCheck_json_io.cc
+  ${PROJECT_SOURCE_DIR}/src/casm/monte/io/json/ValueMap_json_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/RequestedPrecisionConstructor.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/SamplingParams_json_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/Sampler_json_io.cc
-  ${PROJECT_SOURCE_DIR}/src/casm/monte/state/io/json/ValueMap_json_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/events/OccCandidate.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/events/OccLocation.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/events/io/OccCandidate_json_io.cc
@@ -302,6 +301,40 @@ if(DEFINED SKBUILD)
   else()
     set_target_properties(
       _monte_methods PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
+  ### libcasm.monte.models._monte_models_ising_cpp ###
+  pybind11_add_module(_monte_models_ising_cpp MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_models_ising_cpp.cpp")
+  target_link_libraries(_monte_models_ising_cpp PRIVATE
+    CASM::casm_global
+    CASM::casm_crystallography
+    casm_monte
+  )
+  install(TARGETS _monte_models_ising_cpp DESTINATION monte/models)
+  if(APPLE)
+    set_target_properties(
+      _monte_models_ising_cpp PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_models_ising_cpp PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
+  ### libcasm.monte.implementations._monte_implementations_ising_cpp ###
+  pybind11_add_module(_monte_implementations_ising_cpp MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_implementations_ising_cpp.cpp")
+  target_link_libraries(_monte_implementations_ising_cpp PRIVATE
+    CASM::casm_global
+    CASM::casm_crystallography
+    casm_monte
+  )
+  install(TARGETS _monte_implementations_ising_cpp DESTINATION monte/implementations)
+  if(APPLE)
+    set_target_properties(
+      _monte_implementations_ising_cpp PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_implementations_ising_cpp PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
   endif()
 
 endif()
