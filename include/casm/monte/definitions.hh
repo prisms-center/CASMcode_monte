@@ -2,6 +2,7 @@
 #define CASM_monte_Definitions
 
 #include <map>
+#include <memory>
 #include <string>
 
 #include "casm/global/definitions.hh"
