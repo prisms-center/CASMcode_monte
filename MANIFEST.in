@@ -9,7 +9,7 @@ prune python/doc/_build
 prune python/doc/reference/libcasm/_autosummary
 graft python/examples
 recursive-include python/libcasm *.in
-recursive-include python/src *.cpp
+recursive-include python/src *.cc *.cpp
 recursive-include python/tests *.py
 graft python/tests/data
 include python/pyproject.toml
