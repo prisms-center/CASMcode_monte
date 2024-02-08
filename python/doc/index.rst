@@ -1,6 +1,12 @@
-.. image:: _static/logo.svg
+.. image:: _static/logo_outline.svg
   :alt: CASM logo
   :width: 600
+  :class: only-light
+
+.. image:: _static/logo_dark_outline.svg
+  :alt: CASM logo
+  :width: 600
+  :class: only-dark
 
 libcasm-monte
 =============
@@ -17,7 +23,7 @@ The libcasm-monte package provides useful building blocks for Monte Carlo simula
 About CASM
 ==========
 
-The libcasm-clexulator package is part of the CASM_ open source software package, which is designed to perform first-principles statistical mechanical studies of multi-component crystalline solids.
+The libcasm-monte package is part of the CASM_ open source software package, which is designed to perform first-principles statistical mechanical studies of multi-component crystalline solids.
 
 CASM is developed by the Van der Ven group, originally at the University of Michigan and currently at the University of California Santa Barbara.
 

@@ -244,7 +244,7 @@ if(DEFINED SKBUILD)
     CASM::casm_crystallography
     casm_monte
   )
-  install(TARGETS _monte_models_ising_cpp DESTINATION monte/models)
+  install(TARGETS _monte_models_ising_cpp DESTINATION monte/models/ising_cpp)
   if(APPLE)
     set_target_properties(
       _monte_models_ising_cpp PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
@@ -261,7 +261,7 @@ if(DEFINED SKBUILD)
     CASM::casm_crystallography
     casm_monte
   )
-  install(TARGETS _monte_implementations_ising_cpp DESTINATION monte/implementations)
+  install(TARGETS _monte_implementations_ising_cpp DESTINATION monte/implementations/ising_cpp)
   if(APPLE)
     set_target_properties(
       _monte_implementations_ising_cpp PROPERTIES INSTALL_RPATH "@loader_path/../../lib")

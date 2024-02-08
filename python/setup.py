@@ -78,12 +78,12 @@ ext_modules = [
         **ext_modules_params,
     ),
     Pybind11Extension(
-        "libcasm.monte.models._monte_models_ising_cpp",
+        "libcasm.monte.models.ising_cpp._monte_models_ising_cpp",
         ["src/monte_models_ising_cpp.cpp"],
         **ext_modules_params,
     ),
     Pybind11Extension(
-        "libcasm.monte.implementations._monte_implementations_ising_cpp",
+        "libcasm.monte.implementations.ising_cpp._monte_implementations_ising_cpp",
         ["src/monte_implementations_ising_cpp.cpp"],
         **ext_modules_params,
     ),
@@ -98,9 +98,13 @@ setup(
         "libcasm.monte",
         "libcasm.monte.events",
         "libcasm.monte.calculators",
+        "libcasm.monte.calculators.complete_semigrand_canonical_py",
         "libcasm.monte.implementations",
+        "libcasm.monte.implementations.ising_cpp",
         "libcasm.monte.methods",
         "libcasm.monte.models",
+        "libcasm.monte.models.ising_cpp",
+        "libcasm.monte.models.ising_py",
     ],
     install_requires=[
         "pybind11",
