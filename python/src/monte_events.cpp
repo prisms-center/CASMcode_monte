@@ -37,6 +37,13 @@ using namespace CASM;
 typedef std::mt19937_64 engine_type;
 typedef monte::RandomNumberGenerator<engine_type> generator_type;
 
+std::shared_ptr<monte::Conversions> make_monte_conversions(
+    xtal::BasicStructure const &prim,
+    Eigen::Matrix3l const &transformation_matrix_to_super) {
+  return std::make_shared<monte::Conversions>(prim,
+                                              transformation_matrix_to_super);
+}
+
 monte::OccCandidateList make_OccCandidateList(
     monte::Conversions const &convert,
     std::optional<std::vector<monte::OccCandidate>> candidates) {
@@ -76,6 +83,351 @@ PYBIND11_MODULE(_monte_events, m) {
   py::bind_vector<std::vector<monte::AtomTraj>>(m, "AtomTrajVector");
   py::bind_vector<std::vector<monte::Mol>>(m, "MolVector");
   py::bind_vector<std::vector<monte::OccTransform>>(m, "OccTransformVector");
+
+  py::class_<monte::Conversions, std::shared_ptr<monte::Conversions>>(
+      m, "Conversions", R"pbdoc(
+    Data structure used for index conversions
+
+    Notes
+    -----
+    The following shorthand is used for member function names:
+
+    - `l`, :math:`l`: Linear site index in a particular supercell
+    - `b`, :math:`b`: :class:`~libcasm.xtal.Prim` sublattice index
+    - `unitl`, :math:`l'`: Linear site index in a non-primitive unit cell. When a
+      non-primitive unit cell is used to construct a supercell and determines the
+      appropriate symmetry for a problem, conversions between :math:`l`, :math:`b`,
+      and :math:`l'` may all be useful.
+    - `ijk`, :math:`(i,j,k)`: Integer unit cell indices (fractional coordinates with
+      respect to the :class:`~libcasm.xtal.Prim` lattice vectors)
+    - `bijk`, :math:`(b, i, j, k)`: Integral site coordinates (sublattice index and
+      integer unit cell indices)
+    - `asym`, :math:`a`: Asymmetric unit orbit index (value is the same for all
+      sites which are symmetrically equivalent)
+    - `occ_index`, :math:`s`: Index into occupant list for a particular site
+    - `species_index`: Index into the molecule list for a particular
+      :class:`~libcasm.xtal.Prim`. If there are orientational variants,
+      `species_index` should correspond to `orientation_index`.
+
+    )pbdoc")
+      .def(py::init<>(&make_monte_conversions),
+           R"pbdoc(
+         Constructor
+
+         Parameters
+         ----------
+         xtal_prim : libcasm.xtal.Prim
+             A :class:`~libcasm.xtal.Prim`
+
+         transformation_matrix_to_super: array_like, shape=(3,3), dtype=int
+             The transformation matrix, :math:`T`, relating the superstructure lattice vectors, :math:`S`, to the prim lattice vectors, :math:`P`, according to :math:`S = P T`, where :math:`S` and :math:`P` are shape=(3,3) matrices with lattice vectors as columns.
+
+         )pbdoc",
+           py::arg("xtal_prim"), py::arg("transformation_matrix_to_super"))
+      //
+      .def_static(
+          "make_with_custom_asym",
+          [](xtal::BasicStructure const &xtal_prim,
+             Eigen::Matrix3l const &transformation_matrix_to_super,
+             std::vector<Index> const &b_to_asym) {
+            return std::make_shared<monte::Conversions>(
+                xtal_prim, transformation_matrix_to_super, b_to_asym);
+          },
+          R"pbdoc(
+        Construct a Conversions object with lower symmetry than the :class:`~libcasm.xtal.Prim`.
+
+        Parameters
+        ----------
+        xtal_prim : libcasm.xtal.Prim
+            A :class:`~libcasm.xtal.Prim`
+
+        transformation_matrix_to_super: array_like, shape=(3,3), dtype=int
+            The transformation matrix, :math:`T`, relating the superstructure lattice vectors, :math:`S`, to the prim lattice vectors, :math:`P`, according to :math:`S = P T`, where :math:`S` and :math:`P` are shape=(3,3) matrices with lattice vectors as columns.
+
+        b_to_asym: List[int]
+            Specifies the asymmetric unit orbit index corresponding to each sublattice in the prim. Asymmetric unit orbit indices are distinct indices `(0, 1, ...)` indicating that sites with the same index map onto each other via symmetry operations.
+
+            This option allows specifying lower symmetry than the prim factor group
+             (but same periodicity) to determine the asymmetric unit.
+
+        )pbdoc",
+          py::arg("xtal_prim"), py::arg("transformation_matrix_to_super"),
+          py::arg("b_to_asym"))
+      .def_static(
+          "make_with_custom_unitcell",
+          [](xtal::BasicStructure const &xtal_prim,
+             std::vector<xtal::Molecule> const &species_list,
+             Eigen::Matrix3l const &transformation_matrix_to_super,
+             Eigen::Matrix3l const &unit_transformation_matrix_to_super,
+             std::vector<Index> const &unitl_to_asym) {
+            return std::make_shared<monte::Conversions>(
+                xtal_prim, species_list, transformation_matrix_to_super,
+                unit_transformation_matrix_to_super, unitl_to_asym);
+          },
+          R"pbdoc(
+        Construct a Conversions object for a system with an asymmetric unit which does not fit in the primitive cell.
+
+        Parameters
+        ----------
+        xtal_prim : libcasm.xtal.Prim
+            A :class:`~libcasm.xtal.Prim`
+
+        transformation_matrix_to_super: array_like, shape=(3,3), dtype=int
+            The transformation matrix, :math:`T`, relating the superstructure lattice vectors, :math:`S`, to the prim lattice vectors, :math:`P`, according to :math:`S = P T`, where :math:`S` and :math:`P` are shape=(3,3) matrices with lattice vectors as columns.
+
+        species_list: List[:class:`~libcasm.xtal.Occupant`]
+            List of all distinct :class:`~libcasm.xtal.Occupant`, including each orientation.
+
+        unit_transformation_matrix_to_super: array_like, shape=(3,3), dtype=int
+            This defines a sub-supercell lattice, :math:`U = P T_{unit}`, where :math:`U` is the sub-supercell lattice column matrix, :math:`P` is the prim lattice column matrix, :math:`T_{unit}` = unit_transformation_matrix_to_super. The sub-supercell :math:`U` must tile into the supercell :math:`S` (i.e. :math:`S = U \tilde{T}`', where :math:`\tilde{T}` is an integer matrix). This option allows specifying an asymmetric unit which does not fit in the primitive cell.
+
+        unitl_to_asym: List[int]
+           This specifies the asymmetric unit orbit index corresponding to each site in the sub-supercell :math:`U`. Asymmetric unit orbit indices are distinct indices `(0, 1, ...)` indicating that sites with the same index map onto each other via symmetry operations.
+
+        )pbdoc",
+          py::arg("xtal_prim"), py::arg("species_list"),
+          py::arg("transformation_matrix_to_super"),
+          py::arg("unit_transformation_matrix_to_super"),
+          py::arg("unitl_to_asym"))
+      .def(
+          "lat_column_mat",
+          [](monte::Conversions const &conversions) {
+            return conversions.lat_column_mat();
+          },
+          R"pbdoc(
+         :class:`~libcasm.xtal.Prim` lattice vectors, as a column vector matrix, :math:`P`.
+         )pbdoc")
+      .def(
+          "l_size",
+          [](monte::Conversions const &conversions) {
+            return conversions.l_size();
+          },
+          R"pbdoc(
+         Number of sites in the supercell.
+         )pbdoc")
+      .def(
+          "l_to_b",
+          [](monte::Conversions const &conversions, Index l) {
+            return conversions.l_to_b(l);
+          },
+          R"pbdoc(
+        Get the sublattice index, :math:`b`, from the linear site index, :math:`l`.
+        )pbdoc",
+          py::arg("l"))
+      .def(
+          "l_to_ijk",
+          [](monte::Conversions const &conversions, Index l) {
+            return conversions.l_to_ijk(l);
+          },
+          R"pbdoc(
+        Get the unit cell indices, :math:`(i,j,k)` from the linear site index, :math:`l`.
+        )pbdoc",
+          py::arg("l"))
+      .def(
+          "l_to_bijk",
+          [](monte::Conversions const &conversions, Index l) {
+            return conversions.l_to_bijk(l);
+          },
+          R"pbdoc(
+        Get the integral site coordinates, :math:`(b,i,j,k)` from the linear site index, :math:`l`.
+        )pbdoc",
+          py::arg("l"))
+      .def(
+          "l_to_unitl",
+          [](monte::Conversions const &conversions, Index l) {
+            return conversions.l_to_unitl(l);
+          },
+          R"pbdoc(
+        Get the non-primitive unit cell sublattice index, :math:`l'`, from the linear site index, :math:`l`.
+        )pbdoc",
+          py::arg("l"))
+      .def(
+          "l_to_asym",
+          [](monte::Conversions const &conversions, Index l) {
+            return conversions.l_to_asym(l);
+          },
+          R"pbdoc(
+        Get the asymmetric unit index, :math:`a`, from the linear site index, :math:`l`.
+        )pbdoc",
+          py::arg("l"))
+      .def(
+          "l_to_cart",
+          [](monte::Conversions const &conversions, Index l) {
+            return conversions.l_to_cart(l);
+          },
+          R"pbdoc(
+        Get the Cartesian coordinate, :math:`r_{cart}`, from the linear site index, :math:`l`.
+        )pbdoc",
+          py::arg("l"))
+      .def(
+          "l_to_frac",
+          [](monte::Conversions const &conversions, Index l) {
+            return conversions.l_to_frac(l);
+          },
+          R"pbdoc(
+        Get the fractional coordinate, :math:`r_{frac}`, relative to the :class:`~libcasm.xtal.Prim` lattice vectors, :math:`P`, from the linear site index, :math:`l`.
+        )pbdoc",
+          py::arg("l"))
+      .def(
+          "l_to_basis_cart",
+          [](monte::Conversions const &conversions, Index l) {
+            return conversions.l_to_basis_cart(l);
+          },
+          R"pbdoc(
+        Get the Cartesian coordinate, :math:`r_{cart}`, in the primitive unit cell, of the sublattice that the linear site index, :math:`l`, belongs to.
+        )pbdoc",
+          py::arg("l"))
+      .def(
+          "l_to_basis_frac",
+          [](monte::Conversions const &conversions, Index l) {
+            return conversions.l_to_basis_frac(l);
+          },
+          R"pbdoc(
+        Get the fractional coordinate, :math:`r_{frac}`, in the primitive unit cell, of the sublattice that the linear site index, :math:`l`, belongs to.
+        )pbdoc",
+          py::arg("l"))
+      .def("bijk_to_l", &monte::Conversions::bijk_to_l,
+           R"pbdoc(
+        Get the linear site index, :math:`l`, from the integral site coordinates, :math:`(b,i,j,k)`.
+        )pbdoc",
+           py::arg("bijk"))
+      .def("bijk_to_unitl", &monte::Conversions::bijk_to_unitl,
+           R"pbdoc(
+        Get the non-primitive unit cell sublattice index, :math:`l'`, from the integral site coordinates, :math:`(b,i,j,k)`.
+        )pbdoc",
+           py::arg("bijk"))
+      .def("bijk_to_asym", &monte::Conversions::bijk_to_asym,
+           R"pbdoc(
+        Get the asymmetric unit index, :math:`a`, from the integral site coordinates, :math:`(b,i,j,k)`.
+        )pbdoc",
+           py::arg("bijk"))
+      .def("unitl_size", &monte::Conversions::unitl_size,
+           R"pbdoc(
+        Number of sites in the unit cell.
+        )pbdoc")
+      .def("unitl_to_b", &monte::Conversions::unitl_to_b,
+           R"pbdoc(
+        Get the sublattice index, :math:`b`, from the non-primitive unit cell sublattice index, :math:`l'`.
+        )pbdoc",
+           py::arg("unitl"))
+      .def("unitl_to_bijk", &monte::Conversions::unitl_to_b,
+           R"pbdoc(
+        Get the integral site coordinates, :math:`(b,i,j,k)`, from the non-primitive unit cell sublattice index, :math:`l'`.
+        )pbdoc",
+           py::arg("unitl"))
+      .def("unitl_to_asym", &monte::Conversions::unitl_to_b,
+           R"pbdoc(
+        Get the asymmetric unit index, :math:`a`, from the non-primitive unit cell sublattice index, :math:`l'`.
+        )pbdoc",
+           py::arg("unitl"))
+      .def("asym_size", &monte::Conversions::asym_size,
+           R"pbdoc(
+        Number of sites in the asymmetric unit.
+        )pbdoc")
+      .def("asym_to_b", &monte::Conversions::asym_to_b,
+           R"pbdoc(
+        Get the sublattice index, :math:`b`, from the asymmetric unit index, :math:`a`.
+        )pbdoc",
+           py::arg("asym"))
+      .def("asym_to_unitl", &monte::Conversions::asym_to_unitl,
+           R"pbdoc(
+        Get the non-primitive unit cell sublattice index, :math:`l'`, from the asymmetric unit index, :math:`a`.
+        )pbdoc",
+           py::arg("asym"))
+      .def("unit_transformation_matrix_to_super",
+           &monte::Conversions::unit_transformation_matrix_to_super,
+           R"pbdoc(
+        Get the possibly non-primitive unit cell transformation matrix. See :func:`~libcasm.monte.Conversions.make_with_custom_unitcell`.
+        )pbdoc")
+      .def("transformation_matrix_to_super",
+           &monte::Conversions::transformation_matrix_to_super,
+           R"pbdoc(
+        Get the transformation matrix from the prim to the superlattice vectors. See :class:`~libcasm.monte.Conversions`.
+        )pbdoc")
+      .def("unitcell_index_converter",
+           &monte::Conversions::unitcell_index_converter,
+           R"pbdoc(
+        Get the :class:`~libcasm.xtal.UnitCellIndexConverter` for this supercell.
+        )pbdoc")
+      .def("unit_site_index_converter",
+           &monte::Conversions::unit_index_converter,
+           R"pbdoc(
+        Get the :class:`~libcasm.xtal.SiteIndexConverter` for the possibly non-primitive unit cell.
+        )pbdoc")
+      .def("site_index_converter", &monte::Conversions::index_converter,
+           R"pbdoc(
+        Get the :class:`~libcasm.xtal.SiteIndexConverter` for the supercell.
+        )pbdoc")
+      .def("occ_size", &monte::Conversions::occ_size,
+           R"pbdoc(
+        Get the number of occupants allowed on a site by its asymmetric unit index, :math:`a`.
+        )pbdoc",
+           py::arg("asym"))
+      .def(
+          "occ_to_species_index",
+          [](monte::Conversions const &conversions, Index asym,
+             Index occ_index) {
+            return conversions.species_index(asym, occ_index);
+          },
+          R"pbdoc(
+        Get the `species_index` of an occupant from the occupant index and asymmetric unit index, :math:`a`, of the site it is occupying.
+        )pbdoc",
+          py::arg("asym"), py::arg("occ_index"))
+      .def(
+          "species_to_occ_index",
+          [](monte::Conversions const &conversions, Index asym,
+             Index species_index) {
+            return conversions.occ_index(asym, species_index);
+          },
+          R"pbdoc(
+        Get the `occ_index` of an occupant from the species index and asymmetric unit index, :math:`a`, of the site it is occupying.
+        )pbdoc",
+          py::arg("asym"), py::arg("species_index"))
+      .def("species_allowed", &monte::Conversions::species_allowed,
+           R"pbdoc(
+        Return True is a species, specified by `species_index`, is allowed on the sites with specified asymmetric unit index, :math:`a`.
+        )pbdoc",
+           py::arg("asym"), py::arg("species_index"))
+      .def("species_size", &monte::Conversions::species_size,
+           R"pbdoc(
+        The number of species (including orientation variants if applicable).
+        )pbdoc")
+      .def(
+          "species_name_to_index",
+          [](monte::Conversions const &conversions, std::string species_name) {
+            return conversions.species_index(species_name);
+          },
+          R"pbdoc(
+        Get the `species_index` from the species name.
+        )pbdoc",
+          py::arg("species_name"))
+      .def(
+          "species_index_to_occupant",
+          [](monte::Conversions const &conversions, Index species_index) {
+            return conversions.species_to_mol(species_index);
+          },
+          R"pbdoc(
+        Get the :class:`~libcasm.xtal.Occupant` from the species index.
+        )pbdoc",
+          py::arg("species_index"))
+      .def(
+          "species_index_to_name",
+          [](monte::Conversions const &conversions, Index species_index) {
+            return conversions.species_name(species_index);
+          },
+          R"pbdoc(
+        Get the species name from the `species_index`.
+        )pbdoc",
+          py::arg("species_index"))
+      .def(
+          "species_index_to_atoms_size",
+          [](monte::Conversions const &conversions, Index species_index) {
+            return conversions.species_name(species_index);
+          },
+          R"pbdoc(
+        Get the number of atomic components in an occupant, by `species_index`.
+        )pbdoc",
+          py::arg("species_index"));
 
   py::class_<monte::Atom>(m, "Atom", R"pbdoc(
       Track the position of individual atoms, as if no periodic boundaries

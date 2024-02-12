@@ -5,6 +5,7 @@ from ._monte_events import (
     AtomTraj,
     AtomTrajVector,
     AtomVector,
+    Conversions,
     IntVector,
     LongVector,
     Mol,

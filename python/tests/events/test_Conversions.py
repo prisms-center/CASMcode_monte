@@ -1,6 +1,6 @@
 import numpy as np
 
-import libcasm.monte as mc
+import libcasm.monte.events as mcevents
 import libcasm.xtal as xtal
 import libcasm.xtal.prims as xtal_prims
 
@@ -14,7 +14,9 @@ def test_constructor_1():
             [0, 0, 3],
         ]
     )
-    convert = mc.Conversions(xtal_prim=xtal_prim, transformation_matrix_to_super=T)
+    convert = mcevents.Conversions(
+        xtal_prim=xtal_prim, transformation_matrix_to_super=T
+    )
     assert convert.l_size() == 27
 
 
@@ -47,7 +49,9 @@ def test_constructor_2():
             [0, 0, 3],
         ]
     )
-    convert = mc.Conversions(xtal_prim=xtal_prim, transformation_matrix_to_super=T)
+    convert = mcevents.Conversions(
+        xtal_prim=xtal_prim, transformation_matrix_to_super=T
+    )
     assert convert.l_size() == 54
 
     f = convert.site_index_converter()

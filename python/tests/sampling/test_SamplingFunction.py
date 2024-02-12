@@ -1,9 +1,10 @@
 import libcasm.monte as monte
+import libcasm.monte.sampling as sampling
 
 
 def insert_sampling_functions(
-    function_map: monte.StateSamplingFunctionMap,
-    functions: list[monte.StateSamplingFunction],
+    function_map: sampling.StateSamplingFunctionMap,
+    functions: list[sampling.StateSamplingFunction],
 ):
     for f in functions:
         function_map[f.name] = f
@@ -21,7 +22,7 @@ def make_random_sampling_function(
     def f():
         return [mean + rng.random_real(amp) - amp / 2.0]
 
-    return monte.StateSamplingFunction(
+    return sampling.StateSamplingFunction(
         name=name,
         description=description,
         shape=[],
@@ -37,7 +38,7 @@ def test_SamplingFunction_1(tmp_path):
     random_engine = monte.RandomNumberEngine()
 
     # make sampling functions:
-    sampling_functions = monte.StateSamplingFunctionMap()
+    sampling_functions = sampling.StateSamplingFunctionMap()
 
     insert_sampling_functions(
         sampling_functions,
@@ -57,46 +58,46 @@ def test_SamplingFunction_1(tmp_path):
     quantities = ["e", "v"]
 
     # completion check params
-    completion_check_params = monte.CompletionCheckParams()
+    completion_check_params = sampling.CompletionCheckParams()
     completion_check_params.cutoff_params.min_sample = 100
 
     # requested precision of quantity "e"
     e_abs_precision = 0.001
-    e_key = monte.SamplerComponent(
+    e_key = sampling.SamplerComponent(
         sampler_name="e",
         component_name="",
         component_index=0,
     )
-    requested_precision = monte.RequestedPrecision(abs=e_abs_precision)
+    requested_precision = sampling.RequestedPrecision(abs=e_abs_precision)
     completion_check_params.requested_precision[e_key] = requested_precision
 
     # requested precision of quantity "v"
     v_abs_precision = 0.01
-    v_key = monte.SamplerComponent(
+    v_key = sampling.SamplerComponent(
         sampler_name="v",
         component_name="",
         component_index=0,
     )
-    requested_precision = monte.RequestedPrecision(abs=v_abs_precision)
+    requested_precision = sampling.RequestedPrecision(abs=v_abs_precision)
     completion_check_params.requested_precision[v_key] = requested_precision
 
     # ~~~ method ~~~
 
     # completion check
-    completion_check = monte.CompletionCheck(completion_check_params)
+    completion_check = sampling.CompletionCheck(completion_check_params)
 
     # make samplers - for all requested quantities
-    samplers = monte.SamplerMap()
+    samplers = sampling.SamplerMap()
     for quantity_name in quantities:
         if quantity_name in sampling_functions:
             f = sampling_functions[quantity_name]
-            samplers[f.name] = monte.Sampler(
+            samplers[f.name] = sampling.Sampler(
                 shape=f.shape,
                 component_names=f.component_names,
             )
 
     # this is required, but can be left with 0 samples to indicate unweighted
-    sample_weight = monte.Sampler(shape=[])
+    sample_weight = sampling.Sampler(shape=[])
 
     # method log also tracks elapsed clocktime
     method_log = monte.MethodLog(str(tmp_path / "log.txt"))
@@ -118,7 +119,7 @@ def test_SamplingFunction_1(tmp_path):
 
     # ~~~ tests ~~~
 
-    assert monte.get_n_samples(samplers) >= 100
+    assert sampling.get_n_samples(samplers) >= 100
     assert results.is_complete
 
     # equilibration check results

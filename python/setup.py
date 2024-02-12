@@ -4,7 +4,7 @@ __version__ = "2.0a1"
 
 # Available at setup time due to pyproject.toml
 from pybind11.setup_helpers import Pybind11Extension, build_ext
-from setuptools import Extension, setup
+from setuptools import setup
 
 # If on macosx, target 10.15 (ignored otherwise)
 os.environ["MACOSX_DEPLOYMENT_TARGET"] = "10.15"
@@ -83,8 +83,13 @@ ext_modules = [
         **ext_modules_params,
     ),
     Pybind11Extension(
-        "libcasm.monte.implementations.ising_cpp._monte_implementations_ising_cpp",
-        ["src/monte_implementations_ising_cpp.cpp"],
+        "libcasm.monte.calculators.semigrand_canonical_ising_cpp._monte_calculators_sgc_ising_cpp",
+        ["src/monte_calculators_sgc_ising_cpp.cpp"],
+        **ext_modules_params,
+    ),
+    Pybind11Extension(
+        "libcasm.monte.sampling._monte_sampling",
+        ["src/monte_sampling.cpp"],
         **ext_modules_params,
     ),
 ]
@@ -98,13 +103,13 @@ setup(
         "libcasm.monte",
         "libcasm.monte.events",
         "libcasm.monte.calculators",
-        "libcasm.monte.calculators.complete_semigrand_canonical_py",
-        "libcasm.monte.implementations",
-        "libcasm.monte.implementations.ising_cpp",
+        "libcasm.monte.calculators.semigrand_canonical_ising_cpp",
+        "libcasm.monte.calculators.semigrand_canonical_py",
         "libcasm.monte.methods",
         "libcasm.monte.models",
         "libcasm.monte.models.ising_cpp",
         "libcasm.monte.models.ising_py",
+        "libcasm.monte.sampling",
     ],
     install_requires=[
         "pybind11",

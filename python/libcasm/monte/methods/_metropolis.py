@@ -1,5 +1,7 @@
 import math
+
 from libcasm.monte import RandomNumberGenerator
+
 
 def metropolis_acceptance(
     delta_potential_energy: float,

@@ -21,7 +21,7 @@ Performing completion checks
 
 Example usage:
 
-.. code-block
+.. code-block:: Python
 
     import libcasm.monte as monte
 
@@ -121,7 +121,7 @@ Examples
 
 Run for a user-specified number of steps:
 
-.. code-block
+.. code-block:: Python
 
     import libcasm.monte as monte
     params = monte.CompletionCheckParams()
@@ -144,7 +144,7 @@ Set a limit for the maximum elapsed clock time (in seconds):
 .. note::
     Because checking the clock time at every Monte Carlo step slows down calculations excessively, clock time limits are only checked after the number of samples changes, and the actual clock time at which a simulation is stopped may longer than the limit set.
 
-.. code-block
+.. code-block:: Python
 
     import libcasm.monte as monte
     params = monte.CompletionCheckParams()
@@ -251,7 +251,7 @@ partitioning method is used, but with weighted observations calculated using:
 
 where:
 
-.. code-block::
+.. code-block:: Python
 
     W = np.sum(sample_weight)
 

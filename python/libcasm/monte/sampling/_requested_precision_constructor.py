@@ -1,12 +1,9 @@
 from typing import Optional
 
+import libcasm.monte.sampling._monte_sampling as _sampling
+
 from ._completion_check_params import (
     CompletionCheckParams,
-)
-from ._monte import (
-    RequestedPrecision,
-    SamplerComponent,
-    StateSamplingFunctionMap,
 )
 
 
@@ -15,17 +12,17 @@ class RequstedPrecisionConstructor:
 
     Parameters
     ----------
-    sampling_functions: :class:`~libcasm.monte.StateSamplingFunctionMap`
+    sampling_functions: _sampling.StateSamplingFunctionMap`
         State sampling function dictionary, which specifies the
         quantities that may be converged.
-    completion_check_params: :class:`~libcasm.monte.CompletionCheckParams`
+    completion_check_params: _sampling.CompletionCheckParams`
         Completion check parameters to set requested_precision.
 
     """
 
     def __init__(
         self,
-        sampling_functions: StateSamplingFunctionMap,
+        sampling_functions: _sampling.StateSamplingFunctionMap,
         completion_check_params: CompletionCheckParams,
     ):
         self.sampling_functions = sampling_functions
@@ -89,19 +86,19 @@ class RequstedPrecisionConstructor:
             component_index = list(range(len(f.component_names)))
 
         for i in component_index:
-            key = SamplerComponent(
+            key = _sampling.SamplerComponent(
                 sampler_name=quantity,
                 component_name=f.component_names[i],
                 component_index=i,
             )
-            req = RequestedPrecision(abs=abs, rel=rel)
+            req = _sampling.RequestedPrecision(abs=abs, rel=rel)
             self.completion_check_params.requested_precision[key] = req
 
         return self
 
 
 def converge(
-    sampling_functions: StateSamplingFunctionMap,
+    sampling_functions: _sampling.StateSamplingFunctionMap,
     completion_check_params: CompletionCheckParams,
 ):
     """Helper for setting completion_check_params.requested_precision
@@ -122,14 +119,14 @@ def converge(
 
     Parameters
     ----------
-    sampling_functions: :class:`~libcasm.monte.StateSamplingFunctionMap`
+    sampling_functions: _sampling.StateSamplingFunctionMap`
         State sampling function dictionary
-    completion_check_params: :class:`~libcasm.monte.CompletionCheckParams`
+    completion_check_params: CompletionCheckParams
         Completion check parameters to set requested_precision
 
     Returns
     -------
-    rpc: :class:`~libcasm.monte.RequstedPrecisionConstructor`
+    rpc: RequstedPrecisionConstructor
         A RequestedPrecisionConstructor
     """
     return RequstedPrecisionConstructor(

@@ -320,21 +320,38 @@ if(DEFINED SKBUILD)
       _monte_models_ising_cpp PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
   endif()
 
-  ### libcasm.monte.implementations._monte_implementations_ising_cpp ###
-  pybind11_add_module(_monte_implementations_ising_cpp MODULE
-                      "${PROJECT_SOURCE_DIR}/python/src/monte_implementations_ising_cpp.cpp")
-  target_link_libraries(_monte_implementations_ising_cpp PRIVATE
+  ### libcasm.monte.calculators.semigrand_canonical_ising_cpp._monte_calculators_sgc_ising_cpp ###
+  pybind11_add_module(_monte_calculators_sgc_ising_cpp MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_calculators_sgc_ising_cpp.cpp")
+  target_link_libraries(_monte_calculators_sgc_ising_cpp PRIVATE
     CASM::casm_global
     CASM::casm_crystallography
     casm_monte
   )
-  install(TARGETS _monte_implementations_ising_cpp DESTINATION monte/implementations/ising_cpp)
+  install(TARGETS _monte_calculators_sgc_ising_cpp DESTINATION monte/calculators/semigrand_canonical_ising_cpp)
   if(APPLE)
     set_target_properties(
-      _monte_implementations_ising_cpp PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+      _monte_calculators_sgc_ising_cpp PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
   else()
     set_target_properties(
-      _monte_implementations_ising_cpp PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+      _monte_calculators_sgc_ising_cpp PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
   endif()
+
+  ### libcasm.monte.sampling._monte_sampling ###
+  pybind11_add_module(_monte_sampling MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_sampling.cpp")
+  target_link_libraries(_monte_sampling PRIVATE
+    CASM::casm_global
+    casm_monte
+  )
+  install(TARGETS _monte_sampling DESTINATION monte/sampling)
+  if(APPLE)
+    set_target_properties(
+      _monte_sampling PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_sampling PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
 
 endif()

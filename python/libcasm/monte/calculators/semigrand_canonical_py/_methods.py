@@ -4,51 +4,46 @@ import copy
 import json
 import math
 import os
-from typing import Optional, Protocol, TypeVar
+from typing import Any, Callable, Optional, Protocol, TypeVar
 
 import numpy as np
 
 import libcasm.casmglobal as casmglobal
+import libcasm.monte.events as mcevents
 from libcasm.monte import (
-    CompletionCheck,
-    CompletionCheckParams,
-    CompletionCheckResults,
     MethodLog,
     RandomNumberEngine,
     RandomNumberGenerator,
+    ValueMap,
+)
+from libcasm.monte.sampling import (
+    CompletionCheck,
+    CompletionCheckParams,
     Sampler,
     SamplerMap,
     StateSamplingFunction,
     StateSamplingFunctionMap,
-    ValueMap,
     get_n_samples,
     scalar_as_vector,
 )
 
-from libcasm.monte.events import (
-    IntVector,
-    OccEvent,
-    LongVector,
-)
-
-
 ### Protocols specify the types of classes
 ### that will work with SemiGrandCanonicalCalculator
 
-class ConfigurationType(Protocol):
-    """Monte Carlo configuration
 
-    Attributes
-    ----------
-    n_variable_sites: int
-        The total number of sites in the Monte Carlo configuration
-        with variable occupation
-    n_unitcells: int
-        The number of unit cells in the Monte Carlo configuration
+class ConfigurationType(Protocol):
+    """Protocol for a Monte Carlo configuration class
+
+    This ConfigurationType defines expected methods and attributes of a Monte Carlo
+    configuration that will work with SemiGrandCanonicalCalculator
     """
 
     n_variable_sites: int
+    """ The total number of sites in the Monte Carlo configuration with variable \
+    occupation """
+
     n_unitcells: int
+    """ The number of unit cells in the Monte Carlo configuration"""
 
     def to_dict(self) -> dict:
         """Construct a configuration dict"""
@@ -56,26 +51,33 @@ class ConfigurationType(Protocol):
 
 
 class StateType(Protocol):
-    """Monte Carlo state, including configuration and thermodynamic conditions
+    """Protocol for a Monte Carlo state class
 
-    Attributes
-    ----------
-    configuration: ConfigurationType
-        Current Monte Carlo configuration
-    conditions: :class:`~libcasm.monte.ValueMap`
-        Current thermodynamic conditions, as a ValueMap
-    properties: :class:`~libcasm.monte.ValueMap`
-        Current calculated properties, as a ValueMap, if applicable
-
+    This StateType defines expected methods and attributes of a Monte Carlo
+    state, including configuration and thermodynamic conditions, that will work with
+    SemiGrandCanonicalCalculator
     """
+
     configuration: ConfigurationType
+    """Current Monte Carlo configuration"""
+
     conditions: ValueMap
+    """ Current thermodynamic conditions, as a ValueMap """
+
     properties: ValueMap
+    """ Current calculated properties, as a ValueMap """
 
 
-T = TypeVar('T')
+T = TypeVar("T")
+
+
 class PropertyCalculatorType(Protocol[T]):
-    """Calculates properties of state of type T"""
+    """Protocol for a Monte Carlo property calculator class
+
+    This PropertyCalculatorType defines expected methods and attributes of a Monte Carlo
+    calculator which returns properties of a Monte Carlo state with type T and that
+    will work with SemiGrandCanonicalCalculator.
+    """
 
     def set_state(self, state: StateType) -> None:
         """Set current state being calculated"""
@@ -91,79 +93,84 @@ class PropertyCalculatorType(Protocol[T]):
 
     def occ_delta_per_supercell(
         self,
-        linear_site_index: LongVector,
-        new_occ: IntVector,
+        linear_site_index: mcevents.LongVector,
+        new_occ: mcevents.IntVector,
     ) -> T:
         """Calculate change in per supercell property value"""
         ...
 
+
 class OccEventGeneratorType(Protocol):
-    """Proposes and applies events"""
+    """Protocol for a Monte Carlo event generator class
+
+    This OccEventGeneratorType defines expected methods and attributes of a Monte Carlo
+    class that proposes and applies events and that will work with
+    SemiGrandCanonicalCalculator.
+    """
 
     def set_state(self, state: StateType) -> None:
         """Set current state events are proposed for and applied to"""
         ...
 
-    def propose_event_f(self, rng: RandomNumberGenerator) -> OccEvent:
+    def propose_event_f(self, rng: RandomNumberGenerator) -> mcevents.OccEvent:
         """Propose an event"""
         ...
 
-    def apply_event_f(self, e: OccEvent) -> None:
+    def apply_event_f(self, e: mcevents.OccEvent) -> None:
         """Apply an event"""
         ...
 
 
 class SystemType(Protocol):
-    """A compatible semi-grand canonical system implementation
+    """Protocol for a Monte Carlo system class
 
-    Attributes
-    ----------
-    formation_energy_calculator: PropertyCalculatorType[float]
-        The formation energy calculator, parameterized and copyable.
-    param_composition_calculator: PropertyCalculatorType[np.ndarray]
-        The parametric composition calculator, parameterized and copyable. For
-        a given Monte Carlo state, this is expected to calculate the
-        compositions conjugate to the exchange potentials provided by
-        ``state.conditions.vector_values["exchange_potential"]``.
+    This SystemType defines expected methods and attributes of a Monte Carlo
+    system class that holds calculators that will work with
+    SemiGrandCanonicalCalculator.
     """
 
     formation_energy_calculator: PropertyCalculatorType[float]
+    """ The formation energy calculator, parameterized and copyable. """
+
     param_composition_calculator: PropertyCalculatorType[np.ndarray]
+    """ The parametric composition calculator, parameterized and copyable.
+        
+    For a given Monte Carlo state, this is expected to calculate the compositions 
+    conjugate to the exchange potentials provided by
+    ``state.conditions.vector_values["exchange_potential"]``.
+    """
 
 
 ### \end Protocols
 
 
-
 class SemiGrandCanonicalConditions:
-    """Semi-grand canonical ensemble thermodynamic conditions
-
-    Attributes
-    ----------
-    temperature: float
-        The temperature, :math:`T`.
-    exchange_potential: np.ndarray
-        The semi-grand canonical exchange potential, conjugate to the
-        parametric composition that will be calculated by the `param_composition_calculator`
-        of the system under consideration.
-
-    Parameters
-    ----------
-    temperature: float
-        The temperature, :math:`T`.
-    exchange_potential: np.ndarray
-        The semi-grand canonical exchange potential, conjugate to the
-        parametric composition that will be calculated by the `param_composition_calculator`
-        of the system under consideration.
-    """
+    """Semi-grand canonical ensemble thermodynamic conditions"""
 
     def __init__(
         self,
         temperature: float,
         exchange_potential: np.ndarray,
     ):
-        self.temperature = temperature
-        self.exchange_potential = exchange_potential
+        """
+        Parameters
+        ----------
+        temperature: float
+            The temperature, :math:`T`.
+        exchange_potential: np.ndarray
+            The semi-grand canonical exchange potential, conjugate to the parametric
+            composition that will be calculated by the `param_composition_calculator`
+            of the system under consideration.
+        """
+        self.temperature: float = temperature
+        """ The temperature, :math:`T`. """
+
+        self.exchange_potential: np.ndarray = exchange_potential
+        """ 
+        The semi-grand canonical exchange potential, conjugate to the parametric 
+        composition that will be calculated by the `param_composition_calculator`
+        of the system under consideration.
+        """
 
     @staticmethod
     def from_values(values: ValueMap) -> SemiGrandCanonicalConditions:
@@ -204,60 +211,69 @@ class SemiGrandCanonicalPotential:
 
         E_sgc = E_formation - n_unitcells * (exchange_potential @ param_composition)
 
-    Attributes
-    ----------
-    system: SystemType
-        Holds parameterized calculators, without specifying at a particular state.
-        This is a shared object.
-    formation_energy_calculator: PropertyCalculatorType[float]
-        The formation energy calculator, set to calculate using the current state
-        during `run`.
-    param_composition_calculator: PropertyCalculatorType[np.ndarray]
-        The parametric composition calculator, set to calculate using the current state
-        during `run`. This is expected to calculate the compositions conjugate to the
-        the exchange potentials provided by
-        ``state.conditions.vector_values["exchange_potential"]``.
-    state: :class:`~libcasm.monte.basic_run_typing.StateType`
-        The current state during `run`. This is set from the input parameter. The
-        `state.configuration` attribute must be a
-        :class:`~libcasm.monte.basic_run_typing.ConfigurationType` usable by the
-        potential, formation energy, and parametric composition calculators. The
-        `state.conditions` attribute must be convertible to a
-        :class:`~libcasm.monte.calculators.complete_semigrand_canonical.SemiGrandCanonicalConditions`
-        instance.
-    conditions: \
-    :class:`~libcasm.monte.calculators.complete_semigrand_canonical.SemiGrandCanonicalConditions`
-        The current state's conditions, set during `run`.
-
-    Parameters
-    ----------
-    system: SystemType
-        Holds parameterized calculators, without specifying at a particular state. In
-        particular, must provide:
-
-        - formation_energy_calculator: PropertyCalculatorType[float]
-            - A formation energy calculator
-        - param_composition_calculator: PropertyCalculatorType[np.ndarray]
-            - A parametric composition calculator
-
-        The provided calculators must be able to calculate properties using the
-        configuration type provided to the Monte Carlo calculator
-        :func:`~libcasm.monte.calculators.complete_semigrand_canonical
-        .SemiGrandCanonicalConditions.run` method as part of the `state` parameter.
-
     """
 
     def __init__(
         self,
         system: SystemType,
     ):
+        """
+        Parameters
+        ----------
+        system: SystemType
+            Holds parameterized calculators, without specifying at a particular state.
+            In particular, `system` must provide:
+
+            - formation_energy_calculator: PropertyCalculatorType[float]
+            - A formation energy calculator
+            - param_composition_calculator: PropertyCalculatorType[np.ndarray]
+            - A parametric composition calculator
+
+            The provided calculators must be able to calculate properties using the
+            configuration type provided to the Monte Carlo calculator run method as
+            part of the `state` parameter.
+
+        """
         self.system = system
+        """
+        SystemType: Holds parameterized calculators, without specifying at a \
+        particular state. This is a shared object.
+        """
+
         self.formation_energy_calculator = copy.deepcopy(
             system.formation_energy_calculator
         )
-        self.param_composition_calculator = copy.deepcopy(system.param_composition_calculator)
+        """
+        PropertyCalculatorType[float]: The formation energy calculator, set to \
+        calculate using the current state during `run`.
+        """
+
+        self.param_composition_calculator = copy.deepcopy(
+            system.param_composition_calculator
+        )
+        """
+        PropertyCalculatorType[np.ndarray]: The parametric composition calculator, set \
+        to calculate using the current state during `run`.
+        
+        This is expected to calculate the compositions conjugate to the the exchange 
+        potentials provided by ``state.conditions.vector_values["exchange_potential"]``.
+        """
+
         self.state = None
+        """
+        StateType: The current state during `run`. 
+        
+        This is set from the input parameter. The `state.configuration` attribute must 
+        be a :class:`ConfigurationType` usable by the
+        potential, formation energy, and parametric composition calculators. The
+        `state.conditions` attribute must be convertible to a
+        :class:`SemiGrandCanonicalConditions` instance.
+        """
+
         self.conditions = None
+        """
+        SemiGrandCanonicalConditions: The current state's conditions, set during `run`.
+    """
 
     def set_state(self, state: StateType, conditions: SemiGrandCanonicalConditions):
         """Set the current Monte Carlo state"""
@@ -284,28 +300,8 @@ class SemiGrandCanonicalPotential:
 
     def occ_delta_per_supercell(
         self,
-        linear_site_index: LongVector,
-        new_occ: IntVector,
-    ):
-        # de_potential = e_potential_final - e_potential_init
-        #   = (e_formation_final - n_unitcells * mu @ x_final) -
-        #     (e_formation_init - n_unitcells * mu @ x_init)
-        #   = de_formation - n_unitcells * mu * dx
-
-        dE_f = self.formation_energy_calculator.occ_delta_per_supercell(
-            linear_site_index, new_occ
-        )
-        mu_exchange = self.conditions.exchange_potential
-        Ndx = self.param_composition_calculator.occ_delta_per_supercell(
-            linear_site_index, new_occ
-        )
-
-        return dE_f - mu_exchange @ Ndx
-
-    def occ_delta_per_supercell(
-        self,
-        linear_site_index: LongVector,
-        new_occ: IntVector,
+        linear_site_index: mcevents.LongVector,
+        new_occ: mcevents.IntVector,
     ):
         # de_potential = e_potential_final - e_potential_init
         #   = (e_formation_final - n_unitcells * mu @ x_final) -
@@ -328,11 +324,11 @@ class SemiGrandCanonicalData:
 
     Attributes
     ----------
-    sampling_functions: :class:`~libcasm.monte.StateSamplingFunctionMap`
+    sampling_functions: StateSamplingFunctionMap
         The sampling functions to use
-    samplers: :class:`~libcasm.monte.SamplerMap`
+    samplers: SamplerMap
         Holds sampled data
-    sample_weight: :class:`~libcasm.monte.Sampler`
+    sample_weight: Sampler
         Sample weights remain empty (unweighted). Included for compatibility
         with statistics calculators.
     n_pass: int
@@ -344,7 +340,7 @@ class SemiGrandCanonicalData:
         The number of acceptances during `run`
     n_reject: int
         The number of rejections during `run`
-    completion_check: :class:`~libcasm.monte.CompletionCheck`
+    completion_check: CompletionCheck
         The completion checker used during `run`
     """
 
@@ -371,24 +367,24 @@ class SemiGrandCanonicalData:
     def acceptance_rate(self) -> float:
         _n_accept = float(self.n_accept)
         _n_reject = float(self.n_reject)
-        _total = _n_accept + _n_reject;
+        _total = _n_accept + _n_reject
         return _n_accept / _total
 
-    def acceptance_rate(self) -> float:
+    def rejection_rate(self) -> float:
         _n_accept = float(self.n_accept)
         _n_reject = float(self.n_reject)
-        _total = _n_accept + _n_reject;
+        _total = _n_accept + _n_reject
         return _n_reject / _total
 
     def reset(self):
         """Reset attributes set during `run`"""
         for name, sampler in self.samplers.items():
             sampler.clear()
-        self.sample_weight.clear();
-        self.n_pass = int(0);
-        self.n_accept = int(0);
-        self.n_reject = int(0);
-        self.completion_check.reset();
+        self.sample_weight.clear()
+        self.n_pass = int(0)
+        self.n_accept = int(0)
+        self.n_reject = int(0)
+        self.completion_check.reset()
 
     def to_dict(self) -> dict:
         """Convert to dict, excluding samplers
@@ -422,13 +418,11 @@ def default_write_status(
     method_log: MethodLog,
 ) -> None:
     """Write status to log file and screen
-    
+
     Parameters
     ----------
     mc_calculator: Any
         The Monte Carlo calculator to write status for.
-        
-    :return: 
     """
 
     ### write status ###
@@ -472,6 +466,7 @@ def default_write_status(
     )
 
     results = data.completion_check.results()
+
     def finish():
         """Things to do when finished"""
         method_log.reset()
@@ -530,30 +525,24 @@ class SemiGrandCanonicalCalculator:
     system: SystemType
         Holds parameterized calculators, without specifying at a particular state.
         This is a shared object.
-    potential: \
-    :class:`~libcasm.monte.calculators.complete_semigrand_canonical.SemiGrandCanonicalPotential`
+    potential: SemiGrandCanonicalPotential
         The semi-grand canonical energy calculator, set to calculate using the
         `formation_energy_calculator` and `param_composition_calculator` during `run`.
     formation_energy_calculator: PropertyCalculatorType
         The formation energy calculator, set to calculate using the current state
         during `run`.
-    param_composition_calculator: \
-    :class:`~libcasm.monte.basic_run_typing.PropertyCalculatorType`
+    param_composition_calculator: PropertyCalculatorType
         The parametric composition calculator, set to calculate using the current state
         during `run`. This is expected to calculate the compositions conjugate to the
-        the exchange potentials provided by
+        exchange potentials provided by
         ``state.conditions.vector_values["exchange_potential"]``.
-    data: \
-    :class:`~libcasm.monte.calculators.complete_semigrand_canonical.SemiGrandCanonicalData`
-        Monte Carlo data
+    data: SemiGrandCanonicalData
         Holds semi-grand canonical Metropolis Monte Carlo run data and results
     state: StateType
         The current state during `run`. This is set from the input parameter. The
-        `state.configuration` attribute must be a
-        :class:`~libcasm.monte.basic_run_typing.ConfigurationType` usable by the
-        potential, formation energy, and parametric composition calculators.
-    conditions: \
-    :class:`~libcasm.monte.calculators.complete_semigrand_canonical.SemiGrandCanonicalConditions`
+        `state.configuration` attribute must be a :class:`ConfigurationType` usable by
+        the potential, formation energy, and parametric composition calculators.
+    conditions: SemiGrandCanonicalConditions
         The current state's conditions, set during `run`.
 
     Parameters
@@ -570,9 +559,8 @@ class SemiGrandCanonicalCalculator:
             - Must be copy-able
 
         The provided calculators must be able to calculate properties using the
-        configuration type provided to the Monte Carlo calculator
-        :func:`~libcasm.monte.calculators.complete_semigrand_canonical.
-        SemiGrandCanonicalConditions.run` method as part of the `state` parameter.
+        configuration type provided to the Monte Carlo calculator run method as part of
+        the `state` parameter.
 
     """
 
@@ -601,8 +589,6 @@ class SemiGrandCanonicalCalculator:
         # SemiGrandCanonicalConditions, set during `run`
         self.conditions = None
 
-
-
     def run(
         self,
         state: StateType,
@@ -612,7 +598,7 @@ class SemiGrandCanonicalCalculator:
         sample_period: int = 1,
         method_log: Optional[MethodLog] = None,
         random_engine: Optional[RandomNumberEngine] = None,
-        write_status_f=default_write_status,
+        write_status_f: Callable = default_write_status,
     ):
         """Run a semi-grand canonical Monte Carlo calculation
 
@@ -624,32 +610,26 @@ class SemiGrandCanonicalCalculator:
             Initial Monte Carlo state, including configuration and conditions. The
             configuration type must be supported by the calculators provided by
             the `system` constructor parameter. The `conditions` must be
-            convertible to :class:`~libcasm.monte.calculators.complete_semigrand_canonical.
-            SemiGrandCanonicalConditions`. This is mutated during the calculation.
-        sampling_functions: :class:`~libcasm.monte.StateSamplingFunctionMap`
+            convertible to :class:`SemiGrandCanonicalConditions`. This is mutated
+            during the calculation.
+        sampling_functions: StateSamplingFunctionMap
             The sampling functions to use
-        completion_check_params: :class:`~libcasm.monte.CompletionCheckParams`
+        completion_check_params: CompletionCheckParams
             Controls when the run finishes
         event_generator: OccEventGeneratorType
             An OccEventGeneratorType, that can propose a new event and apply an accepted
             event. For example, an
-            :class:`~libcasm.monte.models.basic_ising_py.IsingSemiGrandCanonicalEventGenerator`
+            :class:`~libcasm.monte.models.ising_py.IsingSemiGrandCanonicalEventGenerator`
             instance.
         sample_period: int = 1
             Number of passes per sample. One pass is one Monte Carlo step per site.
-        method_log: Optional[:class:`~libcasm.monte.MethodLog`] = None,
+        method_log: Optional[MethodLog] = None,
             Method log, for writing status updates. If None, default
             writes to "status.json" every 10 minutes.
-        random_engine: Optional[:class:`~libcasm.monte.RandomNumberEngine`] = None
+        random_engine: Optional[RandomNumberEngine] = None
             Random number engine. Default constructs a new engine.
         write_status_f: function
             Function with signature
-            ``def f(mc_calculator: SemiGrandCanonicalCalculator, method_log: MethodLog) -> None``
-             accepting *this as the first argument, that writes status updates,
-             after a new sample has been taken and due according to
-             ``method_log->log_frequency``. Default writes the current
-             completion check results to `method_log->logfile_path` and
-             prints a summary of the current state and sampled data to stdout.
 
         """
         ### Setup ####
@@ -657,7 +637,8 @@ class SemiGrandCanonicalCalculator:
         # set state
         self.state = state
         self.conditions = SemiGrandCanonicalConditions.from_values(
-            self.state.conditions)
+            self.state.conditions
+        )
         temperature = self.conditions.temperature
         n_steps_per_pass = self.state.configuration.n_variable_sites
 
@@ -668,27 +649,31 @@ class SemiGrandCanonicalCalculator:
         self.potential.set_state(self.state, self.conditions)
         self.formation_energy_calculator = self.potential.formation_energy_calculator
         self.param_composition_calculator = self.potential.param_composition_calculator
-        def dpotential_f(e: OccEvent) -> float:
+
+        def dpotential_f(e: mcevents.OccEvent) -> float:
             return self.potential.occ_delta_per_supercell(
-                e.linear_site_index, e.new_occ)
+                e.linear_site_index, e.new_occ
+            )
 
         # set event generator
         event_generator = copy.deepcopy(event_generator)
         event_generator.set_state(
             state=self.state,
         )
-        def propose_event_f(rng: RandomNumberGenerator) -> OccEvent:
+
+        def propose_event_f(rng: RandomNumberGenerator) -> mcevents.OccEvent:
             return event_generator.propose(rng)
 
-        def apply_event_f(e: OccEvent):
+        def apply_event_f(e: mcevents.OccEvent):
             event_generator.apply(e)
 
         # construct Monte Carlo data structure
         self.data = SemiGrandCanonicalData(
-            sampling_functions, n_steps_per_pass, completion_check_params)
+            sampling_functions, n_steps_per_pass, completion_check_params
+        )
 
         ### Setup next steps ###  (equal to basic_occupation_metropolis)
-        data = self.data;
+        data = self.data
         beta = 1.0 / (casmglobal.KB * temperature)
 
         # construct RandomNumberGenerator
@@ -714,7 +699,6 @@ class SemiGrandCanonicalCalculator:
             count=data.n_pass,
             method_log=method_log,
         ):
-
             # Propose an event
             event = propose_event_f(random_number_generator)
 
@@ -749,15 +733,16 @@ class SemiGrandCanonicalCalculator:
                     data.samplers[name].append(f())
 
                 # write status if due
-                if (method_log.log_frequency() is not None and
-                        method_log.lap_time() >= method_log.log_frequency()):
+                if (
+                    method_log.log_frequency() is not None
+                    and method_log.lap_time() >= method_log.log_frequency()
+                ):
                     write_status_f(self, method_log)
 
         ### Finish ####
         write_status_f(self, method_log)
 
         return
-
 
 
 def make_param_composition_f(mc_calculator):

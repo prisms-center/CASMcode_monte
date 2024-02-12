@@ -1,9 +1,9 @@
 from typing import Callable, Optional
 
-import libcasm.monte._monte as _monte
+import libcasm.monte.sampling._monte_sampling as _sampling
 
 
-class CompletionCheckParams(_monte.CompletionCheckParams):
+class CompletionCheckParams(_sampling.CompletionCheckParams):
     """Parameters that determine if a simulation is complete
 
     CompletionCheckParams allow:
@@ -92,8 +92,8 @@ class CompletionCheckParams(_monte.CompletionCheckParams):
 
     def __init__(
         self,
-        requested_precision: Optional[_monte.RequestedPrecisionMap] = None,
-        cutoff_params: Optional[_monte.CutoffCheckParams] = None,
+        requested_precision: Optional[_sampling.RequestedPrecisionMap] = None,
+        cutoff_params: Optional[_sampling.CutoffCheckParams] = None,
         equilibration_check_f: Optional[Callable] = None,
         calc_statistics_f: Optional[Callable] = None,
         log_spacing: bool = False,
@@ -103,15 +103,15 @@ class CompletionCheckParams(_monte.CompletionCheckParams):
         check_shift: Optional[float] = None,
         check_period_max: Optional[int] = None,
     ):
-        _monte.CompletionCheckParams.__init__(self)
+        _sampling.CompletionCheckParams.__init__(self)
         if cutoff_params is None:
-            cutoff_params = _monte.CutoffCheckParams()
+            cutoff_params = _sampling.CutoffCheckParams()
         if equilibration_check_f is None:
-            equilibration_check_f = _monte.default_equilibration_check
+            equilibration_check_f = _sampling.default_equilibration_check
         if calc_statistics_f is None:
-            calc_statistics_f = _monte.BasicStatisticsCalculator()
+            calc_statistics_f = _sampling.BasicStatisticsCalculator()
         if requested_precision is None:
-            requested_precision = _monte.RequestedPrecisionMap()
+            requested_precision = _sampling.RequestedPrecisionMap()
 
         if log_spacing is False:
             self.check_begin = 100

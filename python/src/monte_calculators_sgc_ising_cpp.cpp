@@ -53,24 +53,33 @@ typedef SemiGrandCanonicalCalculator<system_type, event_generator_type>
 }  // namespace CASMpy
 
 PYBIND11_DECLARE_HOLDER_TYPE(T, std::shared_ptr<T>);
-#include "opaque_types.cc"
+// #include "opaque_types.cc"
+PYBIND11_MAKE_OPAQUE(CASM::monte::SamplerMap);
+PYBIND11_MAKE_OPAQUE(CASM::monte::StateSamplingFunctionMap);
+PYBIND11_MAKE_OPAQUE(CASM::monte::jsonStateSamplingFunctionMap);
+PYBIND11_MAKE_OPAQUE(CASM::monte::RequestedPrecisionMap);
+PYBIND11_MAKE_OPAQUE(
+    CASM::monte::ConvergenceResultMap<CASM::monte::BasicStatistics>);
+PYBIND11_MAKE_OPAQUE(CASM::monte::EquilibrationResultMap);
 
-PYBIND11_MODULE(_monte_implementations_ising_cpp, m) {
+PYBIND11_MODULE(_monte_calculators_sgc_ising_cpp, m) {
   using namespace CASMpy;
 
   m.doc() = R"pbdoc(
         Ising model semi-grand canonical Monte Carlo
 
-        libcasm.monte.implementations._monte_implementations_ising_cpp
-        --------------------------------------------------------------
+        libcasm.monte.calculators._monte_calculators_sgc_ising_cpp
+        ----------------------------------------------------------
 
-        An Ising model semi-grand canonical Monte Carlo calculator, with implementation in C++
+        An Ising model semi-grand canonical Monte Carlo calculator, with implementation
+        in C++
     )pbdoc";
   py::module::import("libcasm.monte");
   py::module::import("libcasm.monte.events");
   py::module::import("libcasm.monte.models.ising_cpp");
+  py::module::import("libcasm.monte.sampling");
 
-#include "local_bindings.cc"
+  // #include "local_bindings.cc"
 
   py::class_<sgc::conditions_type, std::shared_ptr<sgc::conditions_type>>(
       m, "SemiGrandCanonicalConditions",
@@ -149,7 +158,7 @@ PYBIND11_MODULE(_monte_implementations_ising_cpp, m) {
 
           Parameters
           ----------
-          system: IsingSemiGrandCanonicalSystem
+          system: libcasm.monte.models.ising_cpp.IsingSemiGrandCanonicalSystem
               Holds parameterized formation energy and parametric composition
               calculators, without specifying at a particular state.
           )pbdoc",
@@ -160,7 +169,7 @@ PYBIND11_MODULE(_monte_implementations_ising_cpp, m) {
 
           Parameters
           ----------
-          state: IsingState
+          state: libcasm.monte.models.ising_cpp.IsingState
               The state the potential is calculated for.
           conditions: IsingSemiGrandCanonicalConditions
               The conditions the potential is calculated for.
@@ -218,7 +227,7 @@ PYBIND11_MODULE(_monte_implementations_ising_cpp, m) {
 
           Parameters
           ----------
-          occ_event: :monte:`~libcasm.monte.events.OccEvent`
+          occ_event: libcasm.monte.events.OccEvent
               Event proposed
 
           Returns
@@ -249,13 +258,13 @@ PYBIND11_MODULE(_monte_implementations_ising_cpp, m) {
 
           Parameters
           ----------
-          sampling_functions: :class:`~libcasm.monte.StateSamplingFunctionMap`
+          sampling_functions: libcasm.monte.sampling.StateSamplingFunctionMap
               The sampling functions to use
-          json_sampling_functions: :class:`~libcasm.monte.jsonStateSamplingFunctionMap`
+          json_sampling_functions: libcasm.monte.sampling.jsonStateSamplingFunctionMap
               The JSON sampling functions to use
           n_steps_per_pass: int
               Number of steps per pass
-          completion_check_param: :class:`~libcasm.monte.CompletionCheckParams`
+          completion_check_param: libcasm.monte.sampling.CompletionCheckParams
               The completion check parameters.
 
           )pbdoc",
@@ -346,7 +355,7 @@ PYBIND11_MODULE(_monte_implementations_ising_cpp, m) {
 
           Parameters
           ----------
-          system: IsingSemiGrandCanonicalSystem
+          system: libcasm.monte.models.ising_cpp.IsingSemiGrandCanonicalSystem
               Holds parameterized formation energy and parametric composition
               calculators, without specifying at a particular state.
           )pbdoc",
@@ -405,6 +414,7 @@ PYBIND11_MODULE(_monte_implementations_ising_cpp, m) {
           - param_composition
           - formation_energy
           - potential_energy
+
           )pbdoc")
       .def(
           "default_json_sampling_functions",
@@ -422,6 +432,7 @@ PYBIND11_MODULE(_monte_implementations_ising_cpp, m) {
 
           Includes:
           - configuration
+
           )pbdoc")
       .def(
           "run",
@@ -451,31 +462,36 @@ PYBIND11_MODULE(_monte_implementations_ising_cpp, m) {
 
           Parameters
           ----------
-          state: IsingState
+          state: libcasm.monte.models.ising_cpp.IsingState
               Initial Monte Carlo state, including configuration and conditions. Is
               modified by the method.
-          sampling_functions: :class:`~libcasm.monte.StateSamplingFunctionsMap`
+          sampling_functions: libcasm.monte.sampling.StateSamplingFunctionMap
               The sampling functions to use
-          json_sampling_functions: \
-          :class:`~libcasm.monte.jsonStateSamplingFunctionsMap`
+          json_sampling_functions: libcasm.monte.sampling.jsonStateSamplingFunctionMap
               The JSON sampling functions to use
-          completion_check_params: \
-          :class:`~libcasm.monte.jsonStateSamplingFunctionsMap`
+          completion_check_params: libcasm.monte.sampling.CompletionCheckParams
               Controls when the run finishes
-          event_generator: \
-          :class:`~libcasm.monte.jsonStateSamplingFunctionsMap`
+          event_generator: libcasm.monte.sampling.jsonStateSamplingFunctionMap
               An event generator which proposes new events and applies accepted events.
           sample_period: int = 1
               Number of passes per sample. One pass is one Monte Carlo step per site
               with variable occupation.
-          method_log:
+          method_log: libcasm.monte.MethodLog
               Method log, for writing status updates. If None, default writes to
               a "status.json" file in the current working directory every 10 minutes.
-          random_engine:
+          random_engine: libcasm.monte.RandomEngine
               Random number engine. Default constructs a new engine.
           write_status_f: Optional[function] = write_status_f
-              Function with signature \
-              ``def f(mc_calculator: SemiGrandCanonicalCalculator, method_log: MethodLog) -> None``
+              Function with signature
+
+              .. code-block:: Python
+
+                  def f(
+                      mc_calculator: SemiGrandCanonicalCalculator,
+                      method_log: MethodLog,
+                  ) -> None:
+                      ...
+
               accepting `self` as the first argument, that writes status updates,
               after a new sample has been taken and due according to
               ``method_log.log_frequency()``. Default writes the current completion
@@ -487,6 +503,7 @@ PYBIND11_MODULE(_monte_implementations_ising_cpp, m) {
           data: SemiGrandCanonicalData
               Data structure containing simulation results, including sampled data,
               completion check results, etc.
+
           )pbdoc",
           py::arg("state"), py::arg("sampling_functions"),
           py::arg("json_sampling_functions"),

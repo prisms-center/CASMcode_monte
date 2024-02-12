@@ -1,16 +1,16 @@
 import numpy as np
 import pytest
 
-import libcasm.monte as monte
+import libcasm.monte.sampling as sampling
 
 
 def test_Sampler_scalar_1():
-    sampler = monte.Sampler(
+    sampler = sampling.Sampler(
         shape=[],
         component_names=["x"],
         capacity_increment=10000,
     )
-    assert isinstance(sampler, monte.Sampler)
+    assert isinstance(sampler, sampling.Sampler)
     assert sampler.n_components() == 1
     assert sampler.n_samples() == 0
     assert sampler.component_names() == ["x"]
@@ -25,7 +25,7 @@ def test_Sampler_scalar_1():
 
     # check scalar_as_vector
     for i in range(100):
-        sampler.append(monte.scalar_as_vector(0.3))
+        sampler.append(sampling.scalar_as_vector(0.3))
     assert sampler.n_components() == 1
     assert sampler.n_samples() == 100
     sampler.clear()
@@ -57,12 +57,12 @@ def test_Sampler_scalar_1():
 
 
 def test_Sampler_vector_1():
-    sampler = monte.Sampler(
+    sampler = sampling.Sampler(
         shape=[2],
         component_names=["x1", "x2"],
         capacity_increment=10000,
     )
-    assert isinstance(sampler, monte.Sampler)
+    assert isinstance(sampler, sampling.Sampler)
     assert sampler.n_components() == 2
     assert sampler.n_samples() == 0
     assert sampler.component_names() == ["x1", "x2"]
@@ -77,7 +77,7 @@ def test_Sampler_vector_1():
 
     # check matrix_as_vector (rename array_as_vector?)
     for i in range(100):
-        sampler.append(monte.matrix_as_vector([0.3, 0.5]))
+        sampler.append(sampling.matrix_as_vector([0.3, 0.5]))
     assert sampler.n_components() == 2
     assert sampler.n_samples() == 100
     sampler.clear()
@@ -109,7 +109,7 @@ def test_Sampler_vector_1():
 
 
 def test_Sampler_matrix_1():
-    sampler = monte.Sampler(
+    sampler = sampling.Sampler(
         shape=[2, 2],
         component_names=["x1,y1", "x2,y1", "x1,y2", "x2,y2"],
         capacity_increment=10000,
@@ -121,7 +121,7 @@ def test_Sampler_matrix_1():
             [0.3, 0.4],
         ]
     )
-    assert isinstance(sampler, monte.Sampler)
+    assert isinstance(sampler, sampling.Sampler)
     assert sampler.n_components() == 4
     assert sampler.n_samples() == 0
     assert sampler.component_names() == ["x1,y1", "x2,y1", "x1,y2", "x2,y2"]
@@ -137,7 +137,7 @@ def test_Sampler_matrix_1():
 
     # check matrix_as_vector (rename array_as_vector?)
     for i in range(100):
-        sampler.append(monte.matrix_as_vector(x))
+        sampler.append(sampling.matrix_as_vector(x))
     assert sampler.n_components() == 4
     assert sampler.n_samples() == 100
     sampler.clear()
@@ -145,7 +145,7 @@ def test_Sampler_matrix_1():
 
     # check values
     for i in range(100):
-        sampler.append(monte.matrix_as_vector(x))
+        sampler.append(sampling.matrix_as_vector(x))
     assert sampler.n_components() == 4
     assert sampler.n_samples() == 100
     values = sampler.values()
@@ -161,7 +161,7 @@ def test_Sampler_matrix_1():
     # add lots of values
     assert sampler.sample_capacity() == 10000
     for i in range(n):
-        sampler.append(monte.matrix_as_vector(x))
+        sampler.append(sampling.matrix_as_vector(x))
     assert sampler.n_components() == 4
     assert sampler.n_samples() == n
     values = sampler.values()
@@ -182,7 +182,7 @@ def test_Sampler_ndarray_1():
         "x1,y1,z1",
     ]
 
-    sampler = monte.Sampler(
+    sampler = sampling.Sampler(
         shape=[2, 2, 2],
         component_names=component_names,
         capacity_increment=10000,
@@ -200,7 +200,7 @@ def test_Sampler_ndarray_1():
             ],
         ]
     )
-    assert isinstance(sampler, monte.Sampler)
+    assert isinstance(sampler, sampling.Sampler)
     assert sampler.n_components() == 8
     assert sampler.n_samples() == 0
     assert sampler.component_names() == component_names
@@ -231,17 +231,17 @@ def test_Sampler_ndarray_1():
 
 def test_default_component_names():
     # scalar
-    names = monte.default_component_names([])
+    names = sampling.default_component_names([])
     assert names == ["0"]
 
     # vector
-    names = monte.default_component_names([3])
+    names = sampling.default_component_names([3])
     assert names == ["0", "1", "2"]
 
     # matrix
-    names = monte.default_component_names([2, 3])
+    names = sampling.default_component_names([2, 3])
     assert names == ["0,0", "1,0", "0,1", "1,1", "0,2", "1,2"]
 
     # >2 dimensions not supported by this
     with pytest.raises(Exception):
-        names = monte.default_component_names([1, 2, 3])
+        names = sampling.default_component_names([1, 2, 3])

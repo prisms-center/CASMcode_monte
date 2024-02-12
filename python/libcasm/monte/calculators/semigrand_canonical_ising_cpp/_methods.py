@@ -1,6 +1,11 @@
+import json
+import math
 from typing import Any
+
 import numpy as np
+
 import libcasm.monte as monte
+import libcasm.monte.sampling as sampling
 
 
 def custom_default_write_status(
@@ -13,14 +18,12 @@ def custom_default_write_status(
     ----------
     mc_calculator: Any
         The Monte Carlo calculator to write status for.
-
-    :return:
     """
     ### write status ###
     data = mc_calculator.data
     completion_check = data.completion_check
     n_pass = data.n_pass
-    n_samples = monte.get_n_samples(data.samplers)
+    n_samples = sampling.get_n_samples(data.samplers)
     n_variable_sites = mc_calculator.state.configuration.n_variable_sites
     param_composition_calculator = mc_calculator.param_composition_calculator
     formation_energy_calculator = mc_calculator.formation_energy_calculator
@@ -57,6 +60,7 @@ def custom_default_write_status(
     )
 
     results = data.completion_check.results()
+
     def finish():
         """Things to do when finished"""
         method_log.reset()
@@ -130,7 +134,7 @@ def custom_make_param_composition_f(mc_calculator):
         # captures a reference to mc_calculator
         return mc_calculator.param_composition_calculator.per_unitcell()
 
-    return monte.StateSamplingFunction(
+    return sampling.StateSamplingFunction(
         name="param_composition",
         description="Parametric composition",
         shape=[
@@ -152,13 +156,14 @@ def custom_make_formation_energy_f(mc_calculator):
         mc_calculator.formation_energy_calculator.per_unitcell()
 
     """
+
     def f():
         # captures a reference to mc_calculator
-        return monte.scalar_as_vector(
+        return sampling.scalar_as_vector(
             mc_calculator.formation_energy_calculator.per_unitcell()
         )
 
-    return monte.StateSamplingFunction(
+    return sampling.StateSamplingFunction(
         name="formation_energy",
         description="Intensive formation energy",
         shape=[],  # scalar
@@ -177,11 +182,12 @@ def custom_make_potential_energy_f(mc_calculator):
         mc_calculator.potential.per_unitcell()
 
     """
+
     def f():
         # captures a reference to mc_calculator
-        return monte.scalar_as_vector(mc_calculator.potential.per_unitcell())
+        return sampling.scalar_as_vector(mc_calculator.potential.per_unitcell())
 
-    return monte.StateSamplingFunction(
+    return sampling.StateSamplingFunction(
         name="potential_energy",
         description="Intensive potential energy",
         shape=[],  # scalar
@@ -200,11 +206,12 @@ def custom_make_configuration_json_f(mc_calculator):
         mc_calculator.state.configuration.to_dict()
 
     """
+
     def f():
         # captures a reference to mc_calculator
         return mc_calculator.state.configuration.to_dict()
 
-    return monte.jsonStateSamplingFunction(
+    return sampling.jsonStateSamplingFunction(
         name="configuration",
         description="Configuration as JSON",
         function=f,

@@ -38,6 +38,16 @@ typedef IsingSemiGrandCanonicalEventGenerator<engine_type>
     sgc_event_generator_type;
 typedef IsingSemiGrandCanonicalSystem sgc_system_type;
 
+state_type make_ising_state(
+    configuration_type const &configuration, monte::ValueMap const &conditions,
+    std::optional<monte::ValueMap> properties = std::nullopt) {
+  if (properties.has_value()) {
+    return state_type(configuration, conditions, properties.value());
+  } else {
+    return state_type(configuration, conditions);
+  }
+}
+
 }  // namespace CASMpy
 
 PYBIND11_DECLARE_HOLDER_TYPE(T, std::shared_ptr<T>);
@@ -179,7 +189,7 @@ PYBIND11_MODULE(_monte_models_ising_cpp, m) {
       Ising model state, including configuration and conditions
 
       )pbdoc")
-      .def(py::init<configuration_type, monte::ValueMap, monte::ValueMap>(),
+      .def(py::init(&make_ising_state),
            R"pbdoc(
           Constructor
 
@@ -187,13 +197,13 @@ PYBIND11_MODULE(_monte_models_ising_cpp, m) {
           ----------
           configuration: IsingConfiguration
               Monte Carlo configuration.
-          conditions: :class:`~libcasm.monte.ValueMap`
+          conditions: libcasm.monte.ValueMap
               Thermodynamic conditions.
-          properties: :class:`~libcasm.monte.ValueMap`
+          properties: Optional[libcasm.monte.ValueMap] = None
               Properties of the Monte Carlo configuration, if applicable.
           )pbdoc",
            py::arg("configuration"), py::arg("conditions"),
-           py::arg("properties") = monte::ValueMap())
+           py::arg("properties") = std::nullopt)
       .def_readwrite("configuration", &state_type::configuration,
                      R"pbdoc(
           IsingConfiguration: Monte Carlo configuration
@@ -326,15 +336,22 @@ PYBIND11_MODULE(_monte_models_ising_cpp, m) {
            py::arg("use_nlist") = true, py::arg("state") = nullptr)
       .def("set_state", &IsingFormationEnergy::set_state,
            R"pbdoc(
-          Set the state the formation energy is calculated for.
-          )pbdoc")
+          """Set the state the formation energy is calculated for
+
+          Parameters
+          ----------
+          state: IsingState
+              The state for which the formation energy is calculated
+          """
+          )pbdoc",
+           py::arg("state"))
       .def("per_supercell", &IsingFormationEnergy::per_supercell,
            R"pbdoc(
-          Calculates Ising model formation energy (per supercell)
+          Calculates and returns the Ising model formation energy (per supercell)
           )pbdoc")
       .def("per_unitcell", &IsingFormationEnergy::per_unitcell,
            R"pbdoc(
-          Calculates Ising model formation energy (per unitcell)
+          Calculates and returns the Ising model formation energy (per unitcell)
           )pbdoc")
       .def("occ_delta_per_supercell",
            &IsingFormationEnergy::occ_delta_per_supercell,
@@ -364,7 +381,72 @@ PYBIND11_MODULE(_monte_models_ising_cpp, m) {
 
   py::class_<IsingParamComposition>(m, "IsingParamComposition",
                                     R"pbdoc(
-      Calculate parametric composition of IsingConfiguration
+      Calculates the parametric composition of an IsingState
+
+      .. rubric:: Notes
+
+      The composition of a crystal with sites that may be occupied by :math:`s`
+      different species can be described using :math:`s` concentration variables,
+      :math:`n_1, n_2, \dots, n_s`, where :math:`n_i = N_i/N_u` is the concentration
+      per unitcell of species :math:`i`, :math:`N_i` is the total number of
+      species :math:`i`, and :math:`N_u` is the total number of unit cells. For a
+      crystal with a fixed number of sites, the species concentration variables,
+      :math:`n_i`, are not independent.
+
+      As described in :cite:t:`puchala2023casm`, the composition can also be represented
+      using :math:`k` independent parametric composition variables,
+      :math:`x_1, x_2, \dots, x_k`. The parametric composition variables describe the
+      composition after making a change of basis from the :math:`s`-dimensional space
+      the non-independent species concentration variables, :math:`n_1, n_2, \dots, n_s`
+      reside in to a :math:`k`-dimensional subspace that the allowed compositions are
+      restricted to.
+
+      The relationship between these different representations of the composition can
+      be written as
+
+      .. math::
+
+          \vec{n} = \vec{n}_0 + \mathbf{Q} \vec{x},
+
+      where:
+
+      - :math:`\vec{n} = (n_0, n_1, \dots, n_s)^{\top}` is the vector of species
+        concentrations, calculated on a per unitcell basis using :math:`n_i = N_i/N_u`
+        with :math:`N_i` being the total number of species :math:`i` and :math:`N_u`
+        being the total number of unit cells,
+      - :math:`\vec{n}_0`, is a point in the subspace of allowed compositions chosen as
+        the origin of the parametric composition axes,
+      - :math:`\mathbf{Q} = \left(\vec{q}_0, \vec{q}_1, \dots\right)` is the
+        :math:`s \times k` matrix formed by collecting :math:`k` independent parametric
+        composition axes, :math:`\vec{q}_i`, chosen to span the :math:`k`-dimensional
+        space of allowed compositions,
+      - and :math:`\vec{x} = (x_0, x_1, \dots, x_k)^{\top}` is the vector of independent
+        composition variables, which can be called the parametric composition.
+
+
+      The parametric composition can be calculated from the species concentration
+      using
+
+      .. math::
+
+          \vec{x} = \mathbf{R}^{\top}\left(\vec{n} - \vec{n}_0 \right),
+
+      where:
+
+      - :math:`\mathbf{R} = \left(\vec{r}_1, \vec{r}_2, \dots, \vec{r}_k \right)` is the
+        :math:`s \times k` matrix formed by the vectors :math:`\vec{r}_i` which form
+        the dual-spanning basis that satisfies
+        :math:`\vec{r}^{\top}_i \vec{q}_j = \delta_{ij}`.
+
+
+      The matrix :math:`\mathbf{R}` is related to :math:`Q^{+}`, the left pseudoinverse
+      of :math:`Q`, according to
+
+      .. math::
+
+          \mathbf{R}^{\top} = Q^{+} = \left(\mathbf{Q}^{\top}\mathbf{Q}\right)^{-1}\mathbf{Q}^{\top}.
+
+
 
       )pbdoc")
       .def(py::init<state_type const *>(), R"pbdoc(
@@ -384,20 +466,24 @@ PYBIND11_MODULE(_monte_models_ising_cpp, m) {
       .def("n_independent_compositions",
            &IsingParamComposition::n_independent_compositions,
            R"pbdoc(
-           int: Return the number of independent compositions (size of composition vector)
+           Return the number of independent compositions (the size of the \
+           parametric composition vector :math:`\vec{x}`)
            )pbdoc")
       .def("per_supercell", &IsingParamComposition::per_supercell,
            R"pbdoc(
-          Calculates parametric composition (per supercell, n_unitcells * x)
+          Calculates and returns :math:`N\vec{x}`, the parametric composition per \
+          supercell
           )pbdoc")
       .def("per_unitcell", &IsingParamComposition::per_unitcell,
            R"pbdoc(
-          Calculates parametric composition (per unitcell, x)
+          Calculates and returns :math:`\vec{x}`, the parametric composition per \
+          unitcell
           )pbdoc")
       .def("occ_delta_per_supercell",
            &IsingParamComposition::occ_delta_per_supercell,
            R"pbdoc(
-          Calculate the change in parametric composition due to changing 1 or more sites
+          Calculates and returns :math:`N \cdot d\vec{x}`, the change in parametric \
+          composition per supercell due to changing 1 or more sites
 
           Parameters
           ----------
@@ -409,7 +495,7 @@ PYBIND11_MODULE(_monte_models_ising_cpp, m) {
           Returns
           -------
           Ndx: np.ndarray[dtype=float]
-              The change in parametric composition (per_supercell, , n_unitcells * dx).
+              The change in parametric composition per supercell, :math:`N \cdot d\vec{x}`.
           )pbdoc",
            py::arg("linear_site_index"), py::arg("new_occ"))
       .def("__copy__",

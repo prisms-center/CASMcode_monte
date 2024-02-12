@@ -19,6 +19,8 @@ The libcasm-monte package provides useful building blocks for Monte Carlo simula
 - Supercell index conversions
 - Generic event definitions, construction, and selection
 
+The methods used are described in :cite:t:`puchala2023casm`.
+
 
 About CASM
 ==========
@@ -45,6 +47,7 @@ Documentation
     Installation <installation>
     Usage <usage>
     Reference <reference/libcasm/index>
+    Bibliography <bibliography>
 
 
 libcasm-monte is available on GitHub_.

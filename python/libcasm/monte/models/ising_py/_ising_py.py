@@ -18,16 +18,6 @@ class IsingConfiguration:
     Simple configuration supports single site unit cells and supercells without
     off-diagonal transformation matrix components.
 
-    Attributes
-    ----------
-    shape: tuple
-        Dimensions of the supercell, i.e. (10, 10) for a 10x10 2D supercell
-    n_sites:
-        Total number of sites in the supercell
-    n_variable_sites:
-        Number of variable sites in the supercell
-    n_unitcells:
-        Number of unit cells in the supercell, which is equal to n_variable_sites.
     """
 
     def __init__(
@@ -36,16 +26,24 @@ class IsingConfiguration:
         fill_value: int = 1,
     ):
         # (l, m): dimensions of supercell
-        self.shape = shape
+        self.shape: tuple = shape
+        """tuple: Dimensions of the supercell, i.e. (10, 10) for a 10x10 2D supercell
+        """
 
         # sites: np.array, dtype=int32, with integer site occupation, col-major order
         self._occupation = np.full(
             shape=self.shape, fill_value=fill_value, dtype=np.int32, order="F"
         )
 
-        self.n_sites = self._occupation.size
-        self.n_variable_sites = self._occupation.size
-        self.n_unitcells = self._occupation.size
+        self.n_sites: int = self._occupation.size
+        """ Total number of sites in the supercell """
+
+        self.n_variable_sites: int = self._occupation.size
+        """ Number of variable sites in the supercell """
+
+        self.n_unitcells: int = self._occupation.size
+        """ Number of unit cells in the supercell, which is equal to n_variable_sites. 
+        """
 
     def occupation(self) -> npt.NDArray[np.int32]:
         """Get the current occupation (as a read-only view)"""
@@ -129,12 +127,12 @@ class IsingState:
 class IsingSemiGrandCanonicalEventGenerator:
     """Propose and apply semi-grand canonical Ising model events
 
-    Attributes
+    .. rubric:: Constructor
+
+    Parameters
     ----------
-    state: IsingState
+    state: Optional[IsingState] = None
         The current state for which events are proposed and applied
-    occ_event: monte.events.OccEvent
-        The current proposed event
     """
 
     def __init__(
@@ -147,7 +145,11 @@ class IsingSemiGrandCanonicalEventGenerator:
         e.linear_site_index.append(0)
         e.new_occ.clear()
         e.new_occ.append(1)
-        self.occ_event = e
+        self.occ_event: OccEvent = e
+        """ The current proposed event """
+
+        self.state: Optional[IsingState] = None
+        """ The current state for which events are proposed and applied """
 
         if state is not None:
             self.set_state(state)
@@ -156,12 +158,12 @@ class IsingSemiGrandCanonicalEventGenerator:
         self,
         state: IsingState,
     ):
-        """Set the current Monte Carlo state and occupant locations
+        """Set the state for which events are proposed and applied
 
         Parameters
         ----------
         state: IsingState
-            The current state for which events are proposed and applied
+            The state for which events are proposed and applied
         """
         self.state = state
 
@@ -171,7 +173,18 @@ class IsingSemiGrandCanonicalEventGenerator:
         self,
         random_number_generator: RandomNumberGenerator,
     ) -> OccEvent:
-        """Propose a Monte Carlo occupation event, by setting self.occ_event"""
+        """Propose a Monte Carlo occupation event
+
+        Parameters
+        ----------
+        random_number_generator: RandomNumberGenerator
+            The random number generator used to propose an event
+
+        Returns
+        -------
+        occ_event: OccEvent
+            The current proposed event. This is also stored in ``self.occ_event``.
+        """
         self.occ_event.linear_site_index[0] = random_number_generator.random_int(
             self._max_linear_site_index
         )
@@ -182,19 +195,31 @@ class IsingSemiGrandCanonicalEventGenerator:
 
     def apply(
         self,
-        e: OccEvent,
-    ) -> None:
-        """Update the occupation of the current state, using self.occ_event"""
+        occ_event: OccEvent,
+    ):
+        """Update the occupation of the current state
+
+        Parameters
+        ----------
+        occ_event: OccEvent
+            The event which is applied to update the occupation of the current state
+
+        """
         self.state.configuration.set_occ(
-            e.linear_site_index[0], e.new_occ[0]
+            occ_event.linear_site_index[0], occ_event.new_occ[0]
         )
 
 
 class IsingFormationEnergy:
-    """Calculates formation energy for the Ising model
+    """Calculates the formation energy of an IsingState
 
-    Currently implements Ising model on square lattice. Could add other lattice types or
-    anisotropic bond energies.
+    .. rubric:: Notes
+
+    - This methods implements the isotropic Ising model on square lattice.
+    - This method could be extended to add other lattice types or anisotropic bond
+      energies.
+
+    .. rubric:: Constructor
 
     Parameters
     ----------
@@ -217,27 +242,43 @@ class IsingFormationEnergy:
         lattice_type: int = 1,
         state: Optional[IsingState] = None,
     ):
-        self.J = J
+        self.J: float = J
+        """ The Ising model interaction energy """
 
         if lattice_type not in [1]:
             raise Exception("Unsupported lattice_type")
-        self.lattice_type = lattice_type
+        self.lattice_type: int = lattice_type
+        """ The Ising model lattice type 
+        
+        One of:
 
-        self.state = None
+        - 1: 2-dimensional square lattice, using IsingConfiguration
+        
+        """
+
+        self.state: Optional[IsingState] = None
+        """ The Monte Carlo state to calculate the formation energy for """
+
         if state is not None:
             self.set_state(state)
 
         self._original_value = IntVector()
 
-    def set_state(self, state) -> None:
-        """Set the state the formation energy is calculated for"""
+    def set_state(self, state: IsingState):
+        """Set the state the formation energy is calculated for
+
+        Parameters
+        ----------
+        state: IsingState
+            The state for which the formation energy is calculated
+        """
         if self.lattice_type == 1:
             if not isinstance(state.configuration, IsingConfiguration):
                 raise Exception("IsingConfiguration is required for lattice_type == 1")
         self.state = state
 
     def per_supercell(self) -> float:
-        """Calculates Ising model formation energy (per supercell) for self.state"""
+        """Calculates and returns the Ising model formation energy (per supercell)"""
 
         # formation energy, E_formation = -\sum_{NN} J s_i s_j
         config = self.state.configuration
@@ -259,7 +300,7 @@ class IsingFormationEnergy:
             raise Exception("Invalid lattice_type")
 
     def per_unitcell(self) -> float:
-        """Calculates Ising model formation energy (per unitcell) for self.state"""
+        """Calculates and returns the Ising model formation energy (per unitcell)"""
         # formation energy, e_formation = (-\sum_{NN} J s_i s_j) / n_unitcells
         return self.per_supercell() / self.state.configuration.n_unitcells
 
@@ -320,7 +361,8 @@ class IsingFormationEnergy:
         linear_site_index: LongVector,
         new_occ: IntVector,
     ) -> float:
-        """Calculate the change in Ising model energy due to changing 1 or more sites
+        """Calculate and returns the change in Ising model energy (per supercell) due \
+        to changing 1 or more sites
 
         Parameters
         ----------
@@ -365,11 +407,24 @@ class IsingFormationEnergy:
 
 
 class IsingParamComposition:
-    """Calculate parametric composition from np.ndarray of +1/-1 site occupation
+    """Calculates the parametric composition of an IsingState
 
-    Notes:
-    - This assumes state.configuration.occupation() has values +1/-1
-    - The parametric composition is x=1 if all sites are +1, 0 if all sites are -1
+    .. rubric:: Notes
+
+    - This assumes ``state.configuration.occupation()`` has values +1/-1
+    - This method defines the parametric composition, :math:`x`, as:
+
+      - :math:`x=1`, if all sites are +1,
+      - :math:`x=0`,  if all sites are -1
+
+    .. rubric:: Constructor
+
+    Parameters
+    ----------
+    state: Optional[IsingState] = None
+        The state for which the parametric composition is calculated. May also be set
+        using :func:`~IsingParamComposition.set_state`.
+
     """
 
     def __init__(
@@ -382,20 +437,27 @@ class IsingParamComposition:
 
     def set_state(
         self,
-        state: Optional[IsingState] = None,
+        state: IsingState,
     ):
-        """Set self.state"""
+        """Set the state the parametric composition is calculated for.
+
+        Parameters
+        ----------
+        state: IsingState]
+            The state the parametric composition is calculated for. May also be set
+            using :func:`~IsingParamComposition.set_state`.
+
+        """
         self.state = state
         if not isinstance(state.configuration, IsingConfiguration):
-            raise Exception(
-                "IsingConfiguration is required for IsingParamComposition"
-            )
+            raise Exception("IsingConfiguration is required for IsingParamComposition")
 
     def n_independent_compositions(self):
+        """Returns the number of independent composition variables"""
         return 1
 
     def per_supercell(self) -> npt.NDArray[np.double]:
-        """Return parametric composition (per_supercell)"""
+        """Calculates and returns the parametric composition (per_supercell)"""
         config = self.state.configuration
         n_variable_sites = config.n_variable_sites
         return np.array(
@@ -403,7 +465,7 @@ class IsingParamComposition:
         )
 
     def per_unitcell(self) -> npt.NDArray[np.double]:
-        """Return parametric composition"""
+        """Calculates and returns the parametric composition (per_unitcell)"""
         return self.per_supercell() / self.state.configuration.n_unitcells
 
     def occ_delta_per_supercell(
@@ -411,13 +473,14 @@ class IsingParamComposition:
         linear_site_index: LongVector,
         new_occ: IntVector,
     ) -> npt.NDArray[np.double]:
-        """Return change in parametric composition (per_supercell)"""
+        """Calculate and returns the change in parametric composition (per supercell) \
+        due to changing 1 or more sites"""
         config = self.state.configuration
         Ndx = np.array([0.0], dtype=np.double)
         for i in range(len(linear_site_index)):
             _index = linear_site_index[i]
             _value = new_occ[i]
-            Ndx[0] += (_value-config.occ(_index))
+            Ndx[0] += _value - config.occ(_index)
 
         return Ndx
 

@@ -1,14 +1,16 @@
-"""Test C++ implemented property calculators with Python implemented Monte Carlo loop"""
+"""Test Python implemented property calculators with Python implemented Monte Carlo \
+loop
+"""
 import json
 import pathlib
 
-import numpy as np
-
 import libcasm.monte as monte
-import libcasm.monte.calculators.complete_semigrand_canonical_py as sgc
-import libcasm.monte.models.ising_cpp as ising
+import libcasm.monte.calculators.semigrand_canonical_py as sgc
+import libcasm.monte.models.ising_py as ising
+import libcasm.monte.sampling as sampling
 
-def test_ising_basic_semigrand_canonical_mixed():
+
+def test_ising_semigrand_canonical_py():
     # construct a SemiGrandCanonicalCalculator
     mc_calculator = sgc.SemiGrandCanonicalCalculator(
         system=ising.IsingSemiGrandCanonicalSystem(
@@ -21,7 +23,7 @@ def test_ising_basic_semigrand_canonical_mixed():
     )
 
     # construct sampling functions
-    sampling_functions = monte.StateSamplingFunctionMap()
+    sampling_functions = sampling.StateSamplingFunctionMap()
     for f in [
         sgc.make_param_composition_f(mc_calculator),
         sgc.make_formation_energy_f(mc_calculator),
@@ -35,10 +37,12 @@ def test_ising_basic_semigrand_canonical_mixed():
         configuration=ising.IsingConfiguration(
             shape=shape,
         ),
-        conditions=monte.ValueMap.from_dict({
-            "temperature": 2000.0,
-            "exchange_potential": [0.0],
-        }),
+        conditions=monte.ValueMap.from_dict(
+            {
+                "temperature": 2000.0,
+                "exchange_potential": [0.0],
+            }
+        ),
     )
 
     # set the initial occupation explicitly here (default is all +1)
@@ -49,14 +53,14 @@ def test_ising_basic_semigrand_canonical_mixed():
     event_generator = ising.IsingSemiGrandCanonicalEventGenerator()
 
     # completion check params
-    completion_check_params = monte.CompletionCheckParams()
+    completion_check_params = sampling.CompletionCheckParams()
     completion_check_params.cutoff_params.min_sample = 100
     completion_check_params.log_spacing = False
     completion_check_params.check_begin = 100
     completion_check_params.check_period = 10
 
     # Set requested precision
-    monte.converge(sampling_functions, completion_check_params).set_precision(
+    sampling.converge(sampling_functions, completion_check_params).set_precision(
         "potential_energy", abs=0.001
     ).set_precision("param_composition", abs=0.001)
 
@@ -82,7 +86,7 @@ def test_ising_basic_semigrand_canonical_mixed():
 
     print(json.dumps(results.to_dict(), indent=2))
 
-    assert monte.get_n_samples(samplers) >= 100
+    assert sampling.get_n_samples(samplers) >= 100
     assert results.is_complete
 
     # equilibration check results
@@ -99,4 +103,3 @@ def test_ising_basic_semigrand_canonical_mixed():
     converge_results = results.convergence_check_results.individual_results
     for key, req in completion_check_params.requested_precision.items():
         assert converge_results[key].stats.calculated_precision < req.abs_precision
-
