@@ -1,6 +1,6 @@
-"""CASM Monte Carlo models
+CASM Monte Carlo Overview
+=========================
 
-## CASM Monte Carlo implementation overview
 
 CASM Monte Carlo implementations consist of two parts: a "model" and a "calculator".
 
@@ -21,14 +21,29 @@ canonical Monte Carlo calculations using the CASM cluster expansion model. CASM 
 expect or require a standard interface to allow any model to work with any calculator.
 
 Generally, it is expected that one or more calculators are built for a particular model
-re-using generic Monte Carlo methods as building blocks. The
-:mod:`libcasm.monte.sampling` package provides data structures and methods for
-sampling data and checking for convergence. The :mod:`libcasm.monte.events` package
-provides data structures and methods to help specify, propose, and apply Monte Carlo
-events.
+re-using generic Monte Carlo methods the libcasm-monte package provides as building
+blocks.
+
+The libcasm-monte package includes:
+
+- :mod:`libcasm.monte`: Provides random number generation, logging, and the
+  :class:`ValueMap` data structure used throughout :mod:`libcasm.monte`.
+- :mod:`libcasm.monte.sampling`: Provides data structures and methods for sampling data
+  and checking for convergence of Monte Carlo calculations.
+- :mod:`libcasm.monte.events`: Provides data structures and methods to help specify,
+  propose, and apply Monte Carlo events that update the discrete occupation variables.
+- :mod:`libcasm.monte.methods`: Provides data structures and methods for implementing
+  Monte Carlo methods, such as the Metropolis algorithm.
+- :mod:`libcasm.monte.ising_cpp`: An example Ising model and a semi-grand canonical
+  calculator, implemented in C++ using CASM::monte with a Python interface using
+  libcasm-monte. Provided for tutorial and testing purposes.
+- :mod:`libcasm.monte.ising_py`: Ising model and a semi-grand canonical calculator,
+  fully implemented in Python using libcasm-monte. Provided for tutorial and testing
+  purposes.
 
 
-## CASM Monte Carlo model components
+CASM Monte Carlo models
+-----------------------
 
 In a CASM model the following types are implemented:
 
@@ -40,17 +55,19 @@ In a CASM model the following types are implemented:
   by property calculators, such as neighbor lists, order parameter definitions, and
   cluster expansion basis sets.
 
-Examples of existing models:
+Existing models:
+
 - libcasm.clexmonte: The standard CASM cluster expansion Hamiltonian model
   implementation, using CASM data structures for configurations and CASM clexulators
   for evaluating energies
-- libcasm.monte.models.ising_cpp: An example C++ Ising model implementation for
-  tutorial and testing purposes
-- libcasm.monte.models.Ising_py: An example Python Ising model implementation for
-  tutorial and testing purposes
+- libcasm.monte.ising_cpp: An example Ising model, implemented in C++ using CASM::monte
+  with a Python interface using libcasm-monte.
+- libcasm.monte.ising_py: An example Ising model, fully implemented in Python using
+  libcasm-monte.
 
 
-## CASM Monte Carlo calculator components
+CASM Monte Carlo calculators
+----------------------------
 
 In a CASM calculator the following types are implemented:
 
@@ -59,8 +76,10 @@ In a CASM calculator the following types are implemented:
   calculator
 - a ConditionsType data structure, to represent thermodynamic conditions
 - a PotentialType property calculator, which calculates a thermodynamic potential
+- a EventGeneratorType, which proposes and applies events
 
 Existing calculator packages:
+
 - libcasm.clexmonte.canonical: The standard CASM canonical Monte Carlo implementation
   using the Metropolis algorithm
 - libcasm.clexmonte.semigrand_canonical: The standard CASM semigrand-canonical Monte
@@ -71,12 +90,9 @@ Existing calculator packages:
 - libcasm.clexmonte.flex: A flexible CASM Monte Carlo implementation that allows
   including a additional terms to the potential to enable umbrella sampling, special
   quasi-random structure (SQS) generation, and other approaches.
-- libcasm.monte.calculators: The standard CASM canonical Monte Carlo implementation
-- libcasm.clexmonte.canonical: The standard CASM canonical Monte Carlo implementation
+- libcasm.monte.ising_cpp.semigrand_canonical: An example semi-grand canonical Monte
+  Carlo calculator for the Ising model, implemented in C++ using CASM::monte
+  with a Python interface using libcasm-monte.
+- libcasm.monte.ising_py.semigrand_canonical: An example semi-grand canonical Monte
+  Carlo calculator for the Ising model, fully implemented in Python using libcasm-monte.
 
-- libcasm.monte.models.ising_cpp: An example C++ Ising model implementation for
-  tutorial and testing purposes
-- libcasm.monte.models.Ising_py: An example Python Ising model implementation for
-  tutorial and testing purposes
-
-"""

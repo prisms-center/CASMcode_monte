@@ -8,8 +8,8 @@ from typing import Optional
 import numpy as np
 import numpy.typing as npt
 
-from libcasm.monte import RandomNumberGenerator, ValueMap
-from libcasm.monte.events import IntVector, LongVector, OccEvent
+from libcasm.monte import ValueMap
+from libcasm.monte.events import IntVector, LongVector
 
 
 class IsingConfiguration:
@@ -122,92 +122,6 @@ class IsingState:
         self.configuration = configuration
         self.conditions = conditions
         self.properties = ValueMap()
-
-
-class IsingSemiGrandCanonicalEventGenerator:
-    """Propose and apply semi-grand canonical Ising model events
-
-    .. rubric:: Constructor
-
-    Parameters
-    ----------
-    state: Optional[IsingState] = None
-        The current state for which events are proposed and applied
-    """
-
-    def __init__(
-        self,
-        state: Optional[IsingState] = None,
-    ):
-        # construct occ_event
-        e = OccEvent()
-        e.linear_site_index.clear()
-        e.linear_site_index.append(0)
-        e.new_occ.clear()
-        e.new_occ.append(1)
-        self.occ_event: OccEvent = e
-        """ The current proposed event """
-
-        self.state: Optional[IsingState] = None
-        """ The current state for which events are proposed and applied """
-
-        if state is not None:
-            self.set_state(state)
-
-    def set_state(
-        self,
-        state: IsingState,
-    ):
-        """Set the state for which events are proposed and applied
-
-        Parameters
-        ----------
-        state: IsingState
-            The state for which events are proposed and applied
-        """
-        self.state = state
-
-        self._max_linear_site_index = self.state.configuration.n_variable_sites - 1
-
-    def propose(
-        self,
-        random_number_generator: RandomNumberGenerator,
-    ) -> OccEvent:
-        """Propose a Monte Carlo occupation event
-
-        Parameters
-        ----------
-        random_number_generator: RandomNumberGenerator
-            The random number generator used to propose an event
-
-        Returns
-        -------
-        occ_event: OccEvent
-            The current proposed event. This is also stored in ``self.occ_event``.
-        """
-        self.occ_event.linear_site_index[0] = random_number_generator.random_int(
-            self._max_linear_site_index
-        )
-        self.occ_event.new_occ[0] = -self.state.configuration.occ(
-            self.occ_event.linear_site_index[0]
-        )
-        return self.occ_event
-
-    def apply(
-        self,
-        occ_event: OccEvent,
-    ):
-        """Update the occupation of the current state
-
-        Parameters
-        ----------
-        occ_event: OccEvent
-            The event which is applied to update the occupation of the current state
-
-        """
-        self.state.configuration.set_occ(
-            occ_event.linear_site_index[0], occ_event.new_occ[0]
-        )
 
 
 class IsingFormationEnergy:
@@ -417,6 +331,9 @@ class IsingParamComposition:
       - :math:`x=1`, if all sites are +1,
       - :math:`x=0`,  if all sites are -1
 
+    - For details on the definition of the parametric composition, see
+      :cite:t:`puchala2023casm`.
+
     .. rubric:: Constructor
 
     Parameters
@@ -485,13 +402,13 @@ class IsingParamComposition:
         return Ndx
 
 
-class IsingSemiGrandCanonicalSystem:
+class IsingSystem:
     """Holds methods and data for calculating Ising system properties"""
 
     def __init__(
         self,
         formation_energy_calculator: IsingFormationEnergy,
-        param_composition_calculator: IsingParamComposition,
+        param_composition_calculator: Optional[IsingParamComposition] = None,
     ):
         self.formation_energy_calculator = formation_energy_calculator
         self.param_composition_calculator = param_composition_calculator

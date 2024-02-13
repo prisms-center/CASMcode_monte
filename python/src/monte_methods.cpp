@@ -64,7 +64,7 @@ PYBIND11_MODULE(_monte_methods, m) {
                     monte::CountType,
                     monte::CompletionCheckParams<statistics_type> const &>(),
            R"pbdoc(
-          Constructor
+          .. rubric:: Constructor
 
           Parameters
           ----------

@@ -99,7 +99,7 @@ PYBIND11_MODULE(_monte, m) {
       )pbdoc")
       .def(py::init<>(&make_MethodLog),
            R"pbdoc(
-          Constructor
+          .. rubric:: Constructor
 
           Parameters
           ----------
@@ -373,7 +373,9 @@ PYBIND11_MODULE(_monte, m) {
       )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
-          ValueMap only has a default constructor
+          .. rubric:: Constructor
+
+          Default constructor only.
           )pbdoc")
       .def_readwrite("boolean_values", &monte::ValueMap::boolean_values,
                      R"pbdoc(
@@ -439,7 +441,10 @@ PYBIND11_MODULE(_monte, m) {
       )pbdoc")
       .def(py::init<>(&make_random_number_engine),
            R"pbdoc(
-           Construct a pseudo-random number engine using std::random_device to seed.
+           .. rubric:: Constructor
+
+           Default constructor only. Constructs a pseudo-random number engine
+           using std::random_device to seed.
            )pbdoc")
       .def(
           "seed",
@@ -481,7 +486,7 @@ PYBIND11_MODULE(_monte, m) {
       )pbdoc")
       .def(py::init<>(&make_random_number_generator),
            R"pbdoc(
-          Constructs a pseudo-random number generator using a shared :class:`~libcasm.monte.RandomNumberEngine`.
+          .. rubric:: Constructor
 
           Parameters
           ----------

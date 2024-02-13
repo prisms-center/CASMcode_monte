@@ -1,23 +1,23 @@
 #include "casm/misc/CASM_Eigen_math.hh"
 #include "casm/misc/CASM_math.hh"
-#include "casm/monte/calculators/basic_semigrand_canonical.hh"
-#include "casm/monte/models/ising_eigen.hh"
+#include "casm/monte/ising_cpp/basic_semigrand_canonical.hh"
+#include "casm/monte/ising_cpp/model.hh"
 #include "gtest/gtest.h"
 #include "testdir.hh"
 
 using namespace CASM;
-using namespace CASM::monte::models::ising_eigen;
-using namespace CASM::monte::calculators::basic_semigrand_canonical;
+using namespace CASM::monte::ising_cpp;
+using namespace CASM::monte::ising_cpp::basic_semigrand_canonical;
 
 typedef SemiGrandCanonicalConditions conditions_type;
 typedef IsingState state_type;
 typedef std::mt19937_64 engine_type;
-typedef IsingSemiGrandCanonicalEventGenerator<engine_type> event_generator_type;
+typedef SemiGrandCanonicalEventGenerator<engine_type> event_generator_type;
 typedef event_generator_type::random_number_generator_type
     random_number_generator_type;
 typedef IsingFormationEnergy formation_energy_f_type;
 typedef IsingParamComposition param_composition_f_type;
-typedef IsingSemiGrandCanonicalSystem system_type;
+typedef IsingSystem system_type;
 typedef SemiGrandCanonicalPotential<system_type> potential_type;
 typedef SemiGrandCanonicalCalculator<system_type, event_generator_type>
     calculator_type;

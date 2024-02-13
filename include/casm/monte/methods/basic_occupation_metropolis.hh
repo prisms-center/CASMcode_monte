@@ -66,7 +66,7 @@ struct BasicOccupationMetropolisData {
   /// \brief Sample weights
   ///
   /// Sample weights may remain empty (unweighted). Included for compatibility
-  /// with statistics calculators.
+  /// with statistics ising_cpp.
   Sampler sample_weight;
 
   /// \brief Number of passes. One pass is equal to one Monte Carlo step

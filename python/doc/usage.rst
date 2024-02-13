@@ -3,4 +3,5 @@ Usage
 
 .. toctree::
 
-    Completion checks <usage/completion_check>
+    CASM Monte Carlo Overview <usage/overview>
+    Completion Checks <usage/completion_check>

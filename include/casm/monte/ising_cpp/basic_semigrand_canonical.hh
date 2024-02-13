@@ -1,3 +1,6 @@
+#ifndef CASM_monte_ising_cpp_basic_semigrand_canonical
+#define CASM_monte_ising_cpp_basic_semigrand_canonical
+
 /// This file contains an example semi-grand canonical calculator
 ///
 /// Notes:
@@ -18,6 +21,7 @@
 #include "casm/monte/checks/io/json/CompletionCheck_json_io.hh"
 #include "casm/monte/events/OccEvent.hh"
 #include "casm/monte/io/json/ValueMap_json_io.hh"
+#include "casm/monte/ising_cpp/model.hh"
 #include "casm/monte/methods/basic_occupation_metropolis.hh"
 #include "casm/monte/methods/metropolis.hh"
 #include "casm/monte/run_management/StateSampler.hh"
@@ -25,7 +29,7 @@
 
 namespace CASM {
 namespace monte {
-namespace calculators {
+namespace ising_cpp {
 namespace basic_semigrand_canonical {
 
 /// \brief Semi-grand canonical ensemble thermodynamic conditions
@@ -121,7 +125,7 @@ class SemiGrandCanonicalPotential {
         formation_energy_calculator(system->formation_energy_calculator),
         param_composition_calculator(system->param_composition_calculator) {}
 
-  /// \brief Holds parameterized calculators, without specifying at a particular
+  /// \brief Holds parameterized ising_cpp, without specifying at a particular
   ///     state
   std::shared_ptr<system_type> system;
 
@@ -259,6 +263,63 @@ void default_write_status(SemiGrandCanonicalCalculatorType const &mc_calculator,
   default_finish_write_status(*mc_calculator.data, method_log);
 }
 
+/// \brief Propose and apply semi-grand canonical Ising model events
+template <typename EngineType>
+class SemiGrandCanonicalEventGenerator {
+ public:
+  typedef IsingState state_type;
+  typedef EngineType engine_type;
+  typedef RandomNumberGenerator<engine_type> random_number_generator_type;
+
+  /// \brief Constructor
+  SemiGrandCanonicalEventGenerator()
+      : state(nullptr), m_max_linear_site_index(0) {
+    occ_event.linear_site_index.clear();
+    occ_event.linear_site_index.push_back(0);
+    occ_event.new_occ.clear();
+    occ_event.new_occ.push_back(1);
+  }
+
+  /// \brief The current state for which events are proposed and applied. Can be
+  ///     nullptr, but must be set for use.
+  state_type *state;
+
+  /// \brief The current proposed event
+  OccEvent occ_event;
+
+ private:
+  Index m_max_linear_site_index;
+
+ public:
+  /// \brief Set the current Monte Carlo state and occupant locations
+  ///
+  /// \param _state The current state for which events are proposed and applied.
+  ///     Throws if nullptr.
+  void set_state(state_type *_state) {
+    this->state =
+        throw_if_null(_state,
+                      "Error in SemiGrandCanonicalEventGenerator::set_state: "
+                      "_state==nullptr");
+
+    m_max_linear_site_index = this->state->configuration.n_sites - 1;
+  }
+
+  /// \brief Propose a Monte Carlo occupation event, by setting this->occ_event
+  OccEvent const &propose(
+      random_number_generator_type &random_number_generator) {
+    this->occ_event.linear_site_index[0] =
+        random_number_generator.random_int(m_max_linear_site_index);
+    this->occ_event.new_occ[0] =
+        -this->state->configuration.occ(this->occ_event.linear_site_index[0]);
+    return this->occ_event;
+  }
+
+  /// \brief Update the occupation of the current state, using this->occ_event
+  void apply(OccEvent const &e) {
+    this->state->configuration.set_occ(e.linear_site_index[0], e.new_occ[0]);
+  }
+};
+
 /// \brief A semi-grand canonical Monte Carlo calculator
 template <typename SystemType, typename EventGeneratorType>
 class SemiGrandCanonicalCalculator {
@@ -290,7 +351,7 @@ class SemiGrandCanonicalCalculator {
         formation_energy_calculator(&potential.formation_energy_calculator),
         param_composition_calculator(&potential.param_composition_calculator) {}
 
-  /// \brief Holds parameterized calculators, without specifying at a particular
+  /// \brief Holds parameterized ising_cpp, without specifying at a particular
   /// state
   std::shared_ptr<system_type> system;
 
@@ -370,7 +431,7 @@ class SemiGrandCanonicalCalculator {
     double temperature = this->conditions->temperature;
     CountType n_steps_per_pass = this->state->configuration.n_variable_sites;
 
-    // set potential, pointers to other calculators, define dpotential method
+    // set potential, pointers to other ising_cpp, define dpotential method
     this->potential.set_state(this->state, this->conditions);
     auto dpotential_f = [=](OccEvent const &e) {
       return this->potential.occ_delta_per_supercell(e);
@@ -566,6 +627,8 @@ jsonStateSamplingFunction make_configuration_json_f(
 }
 
 }  // namespace basic_semigrand_canonical
-}  // namespace calculators
+}  // namespace ising_cpp
 }  // namespace monte
 }  // namespace CASM
+
+#endif

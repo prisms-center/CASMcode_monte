@@ -1,13 +1,11 @@
+"""Ising model, semi-grand canonical Monte Carlo (Python implementation)"""
+
 from ._methods import (
-    ConfigurationType,
-    OccEventGeneratorType,
-    PropertyCalculatorType,
     SemiGrandCanonicalCalculator,
     SemiGrandCanonicalConditions,
     SemiGrandCanonicalData,
+    SemiGrandCanonicalEventGenerator,
     SemiGrandCanonicalPotential,
-    StateType,
-    SystemType,
     default_write_status,
     make_formation_energy_f,
     make_param_composition_f,

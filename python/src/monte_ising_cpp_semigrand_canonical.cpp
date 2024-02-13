@@ -11,8 +11,8 @@
 
 // CASM
 #include "casm/casm_io/json/jsonParser.hh"
-#include "casm/monte/calculators/basic_semigrand_canonical.hh"
-#include "casm/monte/models/ising_eigen.hh"
+#include "casm/monte/ising_cpp/basic_semigrand_canonical.hh"
+#include "casm/monte/ising_cpp/model.hh"
 
 #define STRINGIFY(x) #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
@@ -30,7 +30,7 @@ typedef monte::RandomNumberGenerator<engine_type> generator_type;
 typedef monte::BasicStatistics statistics_type;
 
 // used for ising_cpp:
-using namespace CASM::monte::models::ising_eigen;
+using namespace CASM::monte::ising_cpp;
 typedef IsingState state_type;
 typedef IsingFormationEnergy formation_energy_f_type;
 typedef IsingParamComposition param_composition_f_type;
@@ -38,13 +38,13 @@ typedef IsingParamComposition param_composition_f_type;
 // semi-grand canonical
 namespace sgc {
 
-using namespace CASM::monte::calculators::basic_semigrand_canonical;
+using namespace CASM::monte::ising_cpp::basic_semigrand_canonical;
 
 typedef SemiGrandCanonicalConditions conditions_type;
-typedef IsingSemiGrandCanonicalSystem system_type;
+typedef IsingSystem system_type;
 typedef SemiGrandCanonicalPotential<system_type> potential_type;
 typedef SemiGrandCanonicalData data_type;
-typedef IsingSemiGrandCanonicalEventGenerator<engine_type> event_generator_type;
+typedef SemiGrandCanonicalEventGenerator<engine_type> event_generator_type;
 typedef SemiGrandCanonicalCalculator<system_type, event_generator_type>
     calculator_type;
 
@@ -62,13 +62,13 @@ PYBIND11_MAKE_OPAQUE(
     CASM::monte::ConvergenceResultMap<CASM::monte::BasicStatistics>);
 PYBIND11_MAKE_OPAQUE(CASM::monte::EquilibrationResultMap);
 
-PYBIND11_MODULE(_monte_calculators_sgc_ising_cpp, m) {
+PYBIND11_MODULE(_monte_ising_cpp_semigrand_canonical, m) {
   using namespace CASMpy;
 
   m.doc() = R"pbdoc(
         Ising model semi-grand canonical Monte Carlo
 
-        libcasm.monte.calculators._monte_calculators_sgc_ising_cpp
+        libcasm.monte.ising_cpp._monte_calculators_sgc_ising_cpp
         ----------------------------------------------------------
 
         An Ising model semi-grand canonical Monte Carlo calculator, with implementation
@@ -76,7 +76,7 @@ PYBIND11_MODULE(_monte_calculators_sgc_ising_cpp, m) {
     )pbdoc";
   py::module::import("libcasm.monte");
   py::module::import("libcasm.monte.events");
-  py::module::import("libcasm.monte.models.ising_cpp");
+  py::module::import("libcasm.monte.ising_cpp");
   py::module::import("libcasm.monte.sampling");
 
   // #include "local_bindings.cc"
@@ -89,7 +89,7 @@ PYBIND11_MODULE(_monte_calculators_sgc_ising_cpp, m) {
       )pbdoc")
       .def(py::init<double, Eigen::Ref<Eigen::VectorXd const>>(),
            R"pbdoc(
-          Constructor
+          .. rubric:: Constructor
 
           Parameters
           ----------
@@ -154,13 +154,13 @@ PYBIND11_MODULE(_monte_calculators_sgc_ising_cpp, m) {
 
       )pbdoc")
       .def(py::init<std::shared_ptr<sgc::system_type>>(), R"pbdoc(
-          Constructor
+          .. rubric:: Constructor
 
           Parameters
           ----------
-          system: libcasm.monte.models.ising_cpp.IsingSemiGrandCanonicalSystem
+          system: libcasm.monte.ising_cpp.IsingSystem
               Holds parameterized formation energy and parametric composition
-              calculators, without specifying at a particular state.
+              ising_cpp, without specifying at a particular state.
           )pbdoc",
            py::arg("system"))
       .def("set_state", &sgc::potential_type::set_state,
@@ -169,9 +169,9 @@ PYBIND11_MODULE(_monte_calculators_sgc_ising_cpp, m) {
 
           Parameters
           ----------
-          state: libcasm.monte.models.ising_cpp.IsingState
+          state: libcasm.monte.ising_cpp.IsingState
               The state the potential is calculated for.
-          conditions: IsingSemiGrandCanonicalConditions
+          conditions: SemiGrandCanonicalConditions
               The conditions the potential is calculated for.
           )pbdoc")
       .def("per_supercell", &sgc::potential_type::per_supercell,
@@ -254,7 +254,7 @@ PYBIND11_MODULE(_monte_calculators_sgc_ising_cpp, m) {
                monte::jsonStateSamplingFunctionMap const &, monte::CountType,
                monte::CompletionCheckParams<monte::BasicStatistics> const &>(),
            R"pbdoc(
-          Constructor
+          .. rubric:: Constructor
 
           Parameters
           ----------
@@ -292,7 +292,7 @@ PYBIND11_MODULE(_monte_calculators_sgc_ising_cpp, m) {
           Sample weights
 
           Sample weights may remain empty (unweighted). Included for compatibility
-          with statistics calculators.
+          with statistics ising_cpp.
           )pbdoc")
       .def_readwrite("n_pass", &sgc::data_type::n_pass,
                      R"pbdoc(
@@ -345,24 +345,80 @@ PYBIND11_MODULE(_monte_calculators_sgc_ising_cpp, m) {
              return std::make_shared<sgc::data_type>(*self);
            });
 
+  py::class_<sgc::event_generator_type>(m, "SemiGrandCanonicalEventGenerator",
+                                        R"pbdoc(
+      Propose and apply semi-grand canonical Ising model events
+
+      )pbdoc")
+      .def(py::init<>(),
+           R"pbdoc(
+          .. rubric:: Constructor
+
+          Default constructor only.
+           )pbdoc")
+      .def("set_state", &sgc::event_generator_type::set_state,
+           R"pbdoc(
+          Set the current Monte Carlo state used to propose and apply events.
+          )pbdoc",
+           py::arg("state"))
+      .def("propose", &sgc::event_generator_type::propose,
+           py::return_value_policy::reference_internal,
+           R"pbdoc(
+          Propose a semi-grand canonical event (1 site to flip signs)
+
+          Parameters
+          ----------
+          random_number_generator: class:`~libcasm.monte.RandomNumberGenerator`
+              The random number generator used to propose events.
+
+          Returns
+          -------
+          occ_event: class:`~libcasm.monte.events.OccEvent`
+              The proposed Monte Carlo event.
+          )pbdoc",
+           py::arg("random_number_generator"))
+      .def("apply", &sgc::event_generator_type::apply,
+           R"pbdoc(
+          Apply an event
+
+          Parameters
+          ----------
+          occ_event: class:`~libcasm.monte.events.OccEvent`
+              The Monte Carlo event to apply to the current state.
+
+          Returns
+          -------
+          occ_event: class:`~libcasm.monte.events.OccEvent`
+              The proposed Monte Carlo event.
+          )pbdoc",
+           py::arg("occ_event"))
+      .def("__copy__",
+           [](sgc::event_generator_type const &self) {
+             return sgc::event_generator_type(self);
+           })
+      .def("__deepcopy__", [](sgc::event_generator_type const &self, py::dict) {
+        return sgc::event_generator_type(self);
+      });
+
   py::class_<sgc::calculator_type, std::shared_ptr<sgc::calculator_type>>(
       m, "SemiGrandCanonicalCalculator", R"pbdoc(
       A semi-grand canonical Monte Carlo calculator
 
       )pbdoc")
       .def(py::init<std::shared_ptr<sgc::system_type>>(), R"pbdoc(
-          Constructor
+          .. rubric:: Constructor
 
           Parameters
           ----------
-          system: libcasm.monte.models.ising_cpp.IsingSemiGrandCanonicalSystem
+          system: libcasm.monte.ising_cpp.IsingSystem
               Holds parameterized formation energy and parametric composition
-              calculators, without specifying at a particular state.
+              ising_cpp, without specifying at a particular state.
           )pbdoc",
            py::arg("system"))
       .def_readonly("system", &sgc::calculator_type::system,
                     R"pbdoc(
-          The system
+          Holds parameterized formation energy and parametric composition
+          ising_cpp, without specifying at a particular state.
           )pbdoc")
       .def_readonly("state", &sgc::calculator_type::state,
                     py::return_value_policy::reference,
@@ -408,12 +464,21 @@ PYBIND11_MODULE(_monte_calculators_sgc_ising_cpp, m) {
             return sampling_functions;
           },
           R"pbdoc(
-          Get default sampling functions.
+          Get sampling functions for this Monte Carlo calculator.
 
           Includes:
-          - param_composition
-          - formation_energy
-          - potential_energy
+
+          - "param_composition": Samples the current parametric composition,
+            :math:`x`, using the system's
+            :class:`~libcasm.monte.ising_cpp.IsingParamComposition`
+            calculator.
+          - "formation_energy": Sample the current formation energy, per
+            unitcell, using the system's
+            :class:`~libcasm.monte.ising_cpp.IsingFormationEnergy`
+            calculator.
+          - "potential_energy": Sample the current semi-grand canonical energy,
+            using the this Monte Carlo calculator's
+            :class:`SemiGrandCanonicalPotential` calculator.
 
           )pbdoc")
       .def(
@@ -431,7 +496,8 @@ PYBIND11_MODULE(_monte_calculators_sgc_ising_cpp, m) {
           Get default JSON sampling functions.
 
           Includes:
-          - configuration
+
+          - "configuration": Samples the current configuration
 
           )pbdoc")
       .def(
@@ -446,23 +512,26 @@ PYBIND11_MODULE(_monte_calculators_sgc_ising_cpp, m) {
              std::shared_ptr<engine_type> random_engine,
              std::optional<std::function<void(sgc::calculator_type const &,
                                               monte::MethodLog &)>>
-                 write_status_f) -> std::shared_ptr<sgc::data_type> {
+                 write_status_f) {
             if (!write_status_f.has_value() || !write_status_f.value()) {
-              using namespace CASM::monte::calculators::
-                  basic_semigrand_canonical;
+              using namespace CASM::monte::ising_cpp::basic_semigrand_canonical;
               write_status_f = default_write_status<sgc::calculator_type>;
             }
-            return mc_calculator.run(
-                state, sampling_functions, json_sampling_functions,
-                completion_check_params, event_generator, sample_period,
-                method_log, random_engine, *write_status_f);
+            mc_calculator.run(state, sampling_functions,
+                              json_sampling_functions, completion_check_params,
+                              event_generator, sample_period, method_log,
+                              random_engine, *write_status_f);
           },
           R"pbdoc(
           Run a semi-grand canonical calculation at a single thermodynamic state
 
+          Notes
+          -----
+          On completion, results can be obtained from the :attr:`data` attribute.
+
           Parameters
           ----------
-          state: libcasm.monte.models.ising_cpp.IsingState
+          state: libcasm.monte.ising_cpp.IsingState
               Initial Monte Carlo state, including configuration and conditions. Is
               modified by the method.
           sampling_functions: libcasm.monte.sampling.StateSamplingFunctionMap
@@ -479,9 +548,9 @@ PYBIND11_MODULE(_monte_calculators_sgc_ising_cpp, m) {
           method_log: libcasm.monte.MethodLog
               Method log, for writing status updates. If None, default writes to
               a "status.json" file in the current working directory every 10 minutes.
-          random_engine: libcasm.monte.RandomEngine
+          random_engine: libcasm.monte.RandomNumberEngine
               Random number engine. Default constructs a new engine.
-          write_status_f: Optional[function] = write_status_f
+          write_status_f: Optional[Callable] = None
               Function with signature
 
               .. code-block:: Python
@@ -494,16 +563,10 @@ PYBIND11_MODULE(_monte_calculators_sgc_ising_cpp, m) {
 
               accepting `self` as the first argument, that writes status updates,
               after a new sample has been taken and due according to
-              ``method_log.log_frequency()``. Default writes the current completion
-              check results to ``method_log.logfile_path()`` and prints a summary of
-              the current state and sampled data to stdout.
-
-          Returns
-          -------
-          data: SemiGrandCanonicalData
-              Data structure containing simulation results, including sampled data,
-              completion check results, etc.
-
+              ``method_log.log_frequency()``. Default uses :func:`default_write_status`,
+              which writes the current completion check results to
+              ``method_log.logfile_path()`` and prints a summary of the current state
+              and sampled data to stdout.
           )pbdoc",
           py::arg("state"), py::arg("sampling_functions"),
           py::arg("json_sampling_functions"),
@@ -511,6 +574,22 @@ PYBIND11_MODULE(_monte_calculators_sgc_ising_cpp, m) {
           py::arg("sample_period") = 1, py::arg("method_log") = std::nullopt,
           py::arg("random_engine") = nullptr,
           py::arg("write_status_f") = std::nullopt);
+
+  m.def(
+      "default_write_status",
+      &CASM::monte::ising_cpp::basic_semigrand_canonical::default_write_status<
+          sgc::calculator_type>,
+      R"pbdoc(
+        Write status to log file and screen
+
+        Parameters
+        ----------
+        mc_calculator: Any
+            The Monte Carlo calculator to write status for.
+        method_log: MethodLog
+            Method log, for writing status updates.
+        )pbdoc",
+      py::arg("mc_calculator"), py::arg("method_log"));
 
 #ifdef VERSION_INFO
   m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);

@@ -1,19 +1,17 @@
-"""Test Python implemented property calculators with Python implemented Monte Carlo \
-loop
-"""
+"""Test C++ implemented property ising_cpp with Python implemented Monte Carlo loop"""
 import json
 import pathlib
 
 import libcasm.monte as monte
-import libcasm.monte.calculators.semigrand_canonical_py as sgc
-import libcasm.monte.models.ising_py as ising
+import libcasm.monte.ising_cpp as ising
+import libcasm.monte.ising_cpp.semigrand_canonical as sgc
 import libcasm.monte.sampling as sampling
 
 
-def test_ising_semigrand_canonical_py():
+def test_ising_basic_semigrand_canonical_cpp():
     # construct a SemiGrandCanonicalCalculator
     mc_calculator = sgc.SemiGrandCanonicalCalculator(
-        system=ising.IsingSemiGrandCanonicalSystem(
+        system=ising.IsingSystem(
             formation_energy_calculator=ising.IsingFormationEnergy(
                 J=0.1,
                 lattice_type=1,
@@ -23,13 +21,8 @@ def test_ising_semigrand_canonical_py():
     )
 
     # construct sampling functions
-    sampling_functions = sampling.StateSamplingFunctionMap()
-    for f in [
-        sgc.make_param_composition_f(mc_calculator),
-        sgc.make_formation_energy_f(mc_calculator),
-        sgc.make_potential_energy_f(mc_calculator),
-    ]:
-        sampling_functions[f.name] = f
+    sampling_functions = mc_calculator.default_sampling_functions()
+    json_sampling_functions = mc_calculator.default_json_sampling_functions()
 
     # construct the initial state
     shape = (25, 25)
@@ -50,7 +43,7 @@ def test_ising_semigrand_canonical_py():
         initial_state.configuration.set_occ(linear_site_index, 1)
 
     # create an Ising model semi-grand canonical event proposer / applier
-    event_generator = ising.IsingSemiGrandCanonicalEventGenerator()
+    event_generator = sgc.SemiGrandCanonicalEventGenerator()
 
     # completion check params
     completion_check_params = sampling.CompletionCheckParams()
@@ -74,6 +67,7 @@ def test_ising_semigrand_canonical_py():
     mc_calculator.run(
         state=initial_state,
         sampling_functions=sampling_functions,
+        json_sampling_functions=json_sampling_functions,
         completion_check_params=completion_check_params,
         event_generator=event_generator,
         sample_period=1,

@@ -1,17 +1,19 @@
-"""Test C++ implemented property calculators with Python implemented Monte Carlo loop"""
+"""Test Python implemented property ising_cpp with Python implemented Monte Carlo \
+loop
+"""
 import json
 import pathlib
 
 import libcasm.monte as monte
-import libcasm.monte.calculators.semigrand_canonical_py as sgc
-import libcasm.monte.models.ising_cpp as ising
+import libcasm.monte.ising_py as ising
+import libcasm.monte.ising_py.semigrand_canonical as sgc
 import libcasm.monte.sampling as sampling
 
 
-def test_ising_basic_semigrand_canonical_mixed():
+def test_ising_semigrand_canonical_py():
     # construct a SemiGrandCanonicalCalculator
     mc_calculator = sgc.SemiGrandCanonicalCalculator(
-        system=ising.IsingSemiGrandCanonicalSystem(
+        system=ising.IsingSystem(
             formation_energy_calculator=ising.IsingFormationEnergy(
                 J=0.1,
                 lattice_type=1,
@@ -48,7 +50,7 @@ def test_ising_basic_semigrand_canonical_mixed():
         initial_state.configuration.set_occ(linear_site_index, 1)
 
     # create an Ising model semi-grand canonical event proposer / applier
-    event_generator = ising.IsingSemiGrandCanonicalEventGenerator()
+    event_generator = sgc.SemiGrandCanonicalEventGenerator()
 
     # completion check params
     completion_check_params = sampling.CompletionCheckParams()

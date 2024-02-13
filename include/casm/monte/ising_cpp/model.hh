@@ -1,3 +1,6 @@
+#ifndef CASM_monte_ising_cpp_model
+#define CASM_monte_ising_cpp_model
+
 #include "casm/casm_io/container/json_io.hh"
 #include "casm/global/definitions.hh"
 #include "casm/global/eigen.hh"
@@ -7,8 +10,7 @@
 
 namespace CASM {
 namespace monte {
-namespace models {
-namespace ising_eigen {
+namespace ising_cpp {
 
 /// \brief Ising model configuration, using an Eigen::VectorXi
 ///
@@ -152,63 +154,6 @@ class IsingState {
 
   /// \brief Current calculated properties, if applicable
   ValueMap properties;
-};
-
-/// \brief Propose and apply semi-grand canonical Ising model events
-template <typename EngineType>
-class IsingSemiGrandCanonicalEventGenerator {
- public:
-  typedef IsingState state_type;
-  typedef EngineType engine_type;
-  typedef RandomNumberGenerator<engine_type> random_number_generator_type;
-
-  /// \brief Constructor
-  IsingSemiGrandCanonicalEventGenerator()
-      : state(nullptr), m_max_linear_site_index(0) {
-    occ_event.linear_site_index.clear();
-    occ_event.linear_site_index.push_back(0);
-    occ_event.new_occ.clear();
-    occ_event.new_occ.push_back(1);
-  }
-
-  /// \brief The current state for which events are proposed and applied. Can be
-  ///     nullptr, but must be set for use.
-  state_type *state;
-
-  /// \brief The current proposed event
-  OccEvent occ_event;
-
- private:
-  Index m_max_linear_site_index;
-
- public:
-  /// \brief Set the current Monte Carlo state and occupant locations
-  ///
-  /// \param _state The current state for which events are proposed and applied.
-  ///     Throws if nullptr.
-  void set_state(state_type *_state) {
-    this->state = throw_if_null(
-        _state,
-        "Error in IsingSemiGrandCanonicalEventGenerator::set_state: "
-        "_state==nullptr");
-
-    m_max_linear_site_index = this->state->configuration.n_sites - 1;
-  }
-
-  /// \brief Propose a Monte Carlo occupation event, by setting this->occ_event
-  OccEvent const &propose(
-      random_number_generator_type &random_number_generator) {
-    this->occ_event.linear_site_index[0] =
-        random_number_generator.random_int(m_max_linear_site_index);
-    this->occ_event.new_occ[0] =
-        -this->state->configuration.occ(this->occ_event.linear_site_index[0]);
-    return this->occ_event;
-  }
-
-  /// \brief Update the occupation of the current state, using this->occ_event
-  void apply(OccEvent const &e) {
-    this->state->configuration.set_occ(e.linear_site_index[0], e.new_occ[0]);
-  }
 };
 
 /// \brief Calculates formation energy for the Ising model
@@ -491,15 +436,14 @@ class IsingParamComposition {
 };
 
 /// \brief Holds methods and data for calculating Ising system properties
-class IsingSemiGrandCanonicalSystem {
+class IsingSystem {
  public:
   typedef IsingState state_type;
   typedef IsingFormationEnergy formation_energy_f_type;
   typedef IsingParamComposition param_composition_f_type;
 
-  IsingSemiGrandCanonicalSystem(
-      formation_energy_f_type _formation_energy_calculator,
-      param_composition_f_type _param_composition_calculator)
+  IsingSystem(formation_energy_f_type _formation_energy_calculator,
+              param_composition_f_type _param_composition_calculator)
       : formation_energy_calculator(_formation_energy_calculator),
         param_composition_calculator(_param_composition_calculator) {}
 
@@ -507,7 +451,8 @@ class IsingSemiGrandCanonicalSystem {
   param_composition_f_type param_composition_calculator;
 };
 
-}  // namespace ising_eigen
-}  // namespace models
+}  // namespace ising_cpp
 }  // namespace monte
 }  // namespace CASM
+
+#endif

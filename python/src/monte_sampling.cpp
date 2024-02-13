@@ -105,6 +105,66 @@ monte::jsonStateSamplingFunction make_json_state_sampling_function(
       });
 }
 
+monte::CompletionCheckParams<statistics_type> make_completion_check_params(
+    std::optional<monte::RequestedPrecisionMap> requested_precision =
+        std::nullopt,
+    std::optional<monte::CutoffCheckParams> cutoff_params = std::nullopt,
+    monte::CalcStatisticsFunction<statistics_type> calc_statistics_f = nullptr,
+    monte::EquilibrationCheckFunction equilibration_check_f = nullptr,
+    bool log_spacing = false,
+    std::optional<monte::CountType> check_begin = std::nullopt,
+    std::optional<monte::CountType> check_period = std::nullopt,
+    std::optional<double> check_base = std::nullopt,
+    std::optional<double> check_shift = std::nullopt,
+    std::optional<monte::CountType> check_period_max = std::nullopt) {
+  monte::CompletionCheckParams<statistics_type> result;
+  if (!cutoff_params.has_value()) {
+    cutoff_params = monte::CutoffCheckParams();
+  }
+  if (!equilibration_check_f) {
+    equilibration_check_f = monte::default_equilibration_check;
+  }
+  if (!calc_statistics_f) {
+    calc_statistics_f = monte::BasicStatisticsCalculator();
+  }
+  if (!requested_precision.has_value()) {
+    requested_precision = monte::RequestedPrecisionMap();
+  }
+
+  if (!log_spacing) {
+    result.check_begin = 100;
+    result.check_period = 100;
+  } else {
+    result.check_begin = 0;
+    result.check_base = 10.0;
+    result.check_shift = 2.0;
+    result.check_period_max = 10000;
+  }
+
+  result.cutoff_params = cutoff_params.value();
+  result.equilibration_check_f = equilibration_check_f;
+  result.calc_statistics_f = calc_statistics_f;
+  result.requested_precision = requested_precision.value();
+  result.log_spacing = log_spacing;
+
+  if (check_begin.has_value()) {
+    result.check_begin = check_begin.value();
+  }
+  if (check_period.has_value()) {
+    result.check_period = check_period.value();
+  }
+  if (check_base.has_value()) {
+    result.check_base = check_base.value();
+  }
+  if (check_shift.has_value()) {
+    result.check_shift = check_shift.value();
+  }
+  if (check_period_max.has_value()) {
+    result.check_period_max = check_period_max.value();
+  }
+  return result;
+}
+
 }  // namespace CASMpy
 
 PYBIND11_DECLARE_HOLDER_TYPE(T, std::shared_ptr<T>);
@@ -257,7 +317,9 @@ PYBIND11_MODULE(_monte_sampling, m) {
       )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
-          SamplingParams only has a default constructor
+          .. rubric:: Constructor
+
+          Default constructor only.
           )pbdoc")
       .def_readwrite("sample_mode", &monte::SamplingParams::sample_mode,
                      R"pbdoc(
@@ -392,6 +454,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
       .def(py::init<>(&make_sampler),
            R"pbdoc(
 
+          .. rubric:: Constructor
+
           Parameters
           ----------
           shape : List[int]
@@ -492,6 +556,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
       .def(py::init<std::string, Index, std::string>(),
            R"pbdoc(
 
+          .. rubric:: Constructor
+
           Parameters
           ----------
           sampler_name : str
@@ -582,6 +648,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
         )pbdoc")
       .def(py::init<>(&make_state_sampling_function),
            R"pbdoc(
+
+          .. rubric:: Constructor
 
           Parameters
           ----------
@@ -699,6 +767,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
       .def(py::init<>(&make_json_state_sampling_function),
            R"pbdoc(
 
+          .. rubric:: Constructor
+
           Parameters
           ----------
           name : str
@@ -752,6 +822,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
       )pbdoc")
       .def(py::init<>(&make_requested_precision),
            R"pbdoc(
+
+          .. rubric:: Constructor
 
           Parameters
           ----------
@@ -819,6 +891,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
       )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
+          .. rubric:: Constructor
+
           Default constructor only.
           )pbdoc")
       .def_readwrite(
@@ -857,6 +931,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
       //
       .def(py::init<>(),
            R"pbdoc(
+          .. rubric:: Constructor
+
           Default constructor only.
           )pbdoc")
       .def_readwrite("all_equilibrated",
@@ -968,6 +1044,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
       )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
+          .. rubric:: Constructor
+
           Default constructor only.
           )pbdoc")
       .def_readwrite("mean", &monte::BasicStatistics::mean,
@@ -1169,6 +1247,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
       )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
+          .. rubric:: Constructor
+
           Default constructor only.
           )pbdoc")
       .def_readwrite("is_converged",
@@ -1207,6 +1287,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
       )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
+          .. rubric:: Constructor
+
           Default constructor only.
           )pbdoc")
       .def_readwrite(
@@ -1328,7 +1410,9 @@ PYBIND11_MODULE(_monte_sampling, m) {
         )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
-           Constructor
+           .. rubric:: Constructor
+
+          Default constructor only
            )pbdoc")
       .def_readwrite("min_count", &monte::CutoffCheckParams::min_count,
                      R"pbdoc(
@@ -1436,11 +1520,107 @@ PYBIND11_MODULE(_monte_sampling, m) {
       m, "CompletionCheckParams",
       R"pbdoc(
       Parameters that determine if a simulation is complete
+
+      CompletionCheckParams allow:
+
+      - setting the requested precision for convergence of sampled data
+      - setting cutoff parameters, forcing the simulation to keep running to meet certain
+        minimums (number of steps or passes, number of samples, amount of simulated time
+        or elapsed clocktime), or stop when certain maximums are met
+      - controlling when completion checks are performed
+      - customizing the method used to calculate statistics
+      - customizing the method used to check for equilibration.
+
       )pbdoc")
-      .def(py::init<>(),
-           R"pbdoc(
-          Default constructor only.
-          )pbdoc")
+      .def(py::init<>(&make_completion_check_params), R"pbdoc(
+
+          .. rubric:: Constructor
+
+          Parameters
+          ----------
+          requested_precision : Optional[:class:`~libcasm.monte.RequestedPrecisionMap`] = None
+              Requested precision for convergence of sampler components. When all components
+              reach the requested precision, and all `cutoff_params` minimums are met,
+              then the completion check returns True, indicating the Monte Carlo simulation
+              is complete.
+          cutoff_params: Optional[:class:`~libcasm.monte.CutoffCheckParams`] = None,
+              Cutoff check parameters allow setting limits on the Monte Carlo simulation to
+              prevent calculations from stopping too soon or running too long. If None, no
+              cutoffs are applied.
+          calc_statistics_f: Optional[Callable] = None,
+              A function for calculating :class:`~libcasm.monte.BasicStatistics` from
+              sampled data, with signature:
+
+              .. code-block:: Python
+
+                  def calc_statistics_f(
+                      observations: np.ndarray,
+                      sample_weight: np.ndarray,
+                  ) -> libcasm.monte.BasicStatistics:
+                      ...
+
+              If None, the default is :class:`~libcasm.monte.BasicStatisticsCalculator`.
+          equilibration_check_f: Optional[Callable] = None,
+              A function for checking equilibration of sampled data, with signature:
+
+              .. code-block:: Python
+
+                  def equilibration_check_f(
+                      observations: np.ndarray,
+                      sample_weight: np.ndarray,
+                      requested_precision: libcasm.monte.RequestedPrecision,
+                  ) -> libcasm.monte.IndividualEquilibrationResult:
+                      ...
+
+              If None, the default is :class:`~libcasm.monte.default_equilibration_check`.
+          log_spacing: bool = False
+              If True, use logarithmic spacing for completion checking; else use linear
+              spacing. For linear spacing, the n-th check will be taken when:
+
+              .. code-block:: Python
+
+                  sample = check_begin + check_period * n
+
+              For logarithmic spacing, the n-th check will be taken when:
+
+              .. code-block:: Python
+
+                  sample = check_begin + round( check_base ** (n + check_shift) )
+
+              However, if sample(n) - sample(n-1) > `check_period_max`, then subsequent
+              samples are taken every `check_period_max` samples.
+
+              For linear spacing, the default is to check for completion after `100`,
+              `200`, `300`, etc. samples are taken.
+
+              For log spacing, the default is to check for completion after `100`,
+              `1000`, `10000`, `20000`, `30000`, etc. samples are taken (note the
+              effect of the default ``check_period_max=10000``).
+
+              The default value is False, for linear spacing.
+          check_begin:  Optional[int] = None
+              The earliest sample to begin completion checking. Default is 100 for linear
+              spacing and 0 for log spacing.
+          check_period:  Optional[int] = None
+              The linear completion checking period. Default is 100.
+          check_base: Optional[float] = None
+              The logarithmic completion checking base. Default is 10.
+          check_shift: Optional[float] = None
+              The shift for the logarithmic spacing exponent. Default is 2.
+          check_period_max: Optional[int] = None
+              The maximum check spacing for logarithmic check spacing. Default is 10000.
+
+          )pbdoc",
+           py::arg("requested_precision") = std::nullopt,
+           py::arg("cutoff_params") = std::nullopt,
+           py::arg("calc_statistics_f") = nullptr,
+           py::arg("equilibration_check_f") = nullptr,
+           py::arg("log_spacing") = false,
+           py::arg("check_begin") = std::nullopt,
+           py::arg("check_period") = std::nullopt,
+           py::arg("check_base") = std::nullopt,
+           py::arg("check_shift") = std::nullopt,
+           py::arg("check_period_max") = std::nullopt)
       .def_readwrite(
           "cutoff_params",
           &monte::CompletionCheckParams<statistics_type>::cutoff_params,
@@ -1562,6 +1742,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
       )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
+          .. rubric:: Constructor
+
           Default constructor only.
           )pbdoc")
       .def_readwrite("params",
@@ -1685,7 +1867,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
       )pbdoc")
       .def(py::init<monte::CompletionCheckParams<statistics_type>>(),
            R"pbdoc(
-          Constructor
+          .. rubric:: Constructor
 
           Parameters
           ----------

@@ -79,10 +79,6 @@ PYBIND11_MODULE(_monte_events, m) {
 
   py::bind_vector<std::vector<int>>(m, "IntVector");
   py::bind_vector<std::vector<Index>>(m, "LongVector");
-  py::bind_vector<std::vector<monte::Atom>>(m, "AtomVector");
-  py::bind_vector<std::vector<monte::AtomTraj>>(m, "AtomTrajVector");
-  py::bind_vector<std::vector<monte::Mol>>(m, "MolVector");
-  py::bind_vector<std::vector<monte::OccTransform>>(m, "OccTransformVector");
 
   py::class_<monte::Conversions, std::shared_ptr<monte::Conversions>>(
       m, "Conversions", R"pbdoc(
@@ -112,7 +108,7 @@ PYBIND11_MODULE(_monte_events, m) {
     )pbdoc")
       .def(py::init<>(&make_monte_conversions),
            R"pbdoc(
-         Constructor
+         .. rubric:: Constructor
 
          Parameters
          ----------
@@ -435,6 +431,8 @@ PYBIND11_MODULE(_monte_events, m) {
       )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
+          .. rubric:: Constructor
+
           Default constructor only.
           )pbdoc")
       .def_readwrite("translation", &monte::Atom::translation,
@@ -447,12 +445,18 @@ PYBIND11_MODULE(_monte_events, m) {
           int: Current number of jumps
           )pbdoc");
 
+  py::bind_vector<std::vector<monte::Atom>>(m, "AtomVector", R"pbdoc(
+    AtomVector is a list[:class:`Atom`]-like object.
+    )pbdoc");
+
   py::class_<monte::Mol>(m, "Mol", R"pbdoc(
       Represents the occupant on a site
 
       )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
+          .. rubric:: Constructor
+
           Default constructor only.
           )pbdoc")
       .def_readwrite("id", &monte::Mol::id,
@@ -476,12 +480,18 @@ PYBIND11_MODULE(_monte_events, m) {
           int: Location in OccLocation mol location list
           )pbdoc");
 
+  py::bind_vector<std::vector<monte::Mol>>(m, "MolVector", R"pbdoc(
+    MolVector is a list[:class:`Mol`]-like object.
+    )pbdoc");
+
   py::class_<monte::OccTransform>(m, "OccTransform", R"pbdoc(
       Information used to update :class:`~libcasm.events.OccLocation`
 
       )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
+          .. rubric:: Constructor
+
           Default constructor only.
           )pbdoc")
       .def_readwrite("linear_site_index", &monte::OccTransform::l,
@@ -507,12 +517,19 @@ PYBIND11_MODULE(_monte_events, m) {
           :class:`~libcasm.monte.Conversions`, after transformation.
           )pbdoc");
 
+  py::bind_vector<std::vector<monte::OccTransform>>(m, "OccTransformVector",
+                                                    R"pbdoc(
+    OccTransformVector is a list[:class:`OccTransform`]-like object.
+    )pbdoc");
+
   py::class_<monte::AtomLocation>(m, "AtomLocation", R"pbdoc(
     Specify a specific atom location, on a site, or in a molecule
 
     )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
+        .. rubric:: Constructor
+
         Default constructor only.
         )pbdoc")
       .def_readwrite("linear_site_index", &monte::AtomLocation::l,
@@ -534,6 +551,8 @@ PYBIND11_MODULE(_monte_events, m) {
     )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
+        .. rubric:: Constructor
+
         Default constructor only.
         )pbdoc")
       .def_readwrite("from", &monte::AtomTraj::from,
@@ -550,12 +569,18 @@ PYBIND11_MODULE(_monte_events, m) {
         translation, in fractional coordinates
         )pbdoc");
 
+  py::bind_vector<std::vector<monte::AtomTraj>>(m, "AtomTrajVector", R"pbdoc(
+    AtomTrajVector is a list[:class:`AtomTraj`]-like object.
+    )pbdoc");
+
   py::class_<monte::OccEvent>(m, "OccEvent", R"pbdoc(
       Describes a Monte Carlo event that modifies occupation
 
       )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
+          .. rubric:: Constructor
+
           Default constructor only.
           )pbdoc")
       .def_readwrite("linear_site_index", &monte::OccEvent::linear_site_index,
@@ -592,6 +617,8 @@ PYBIND11_MODULE(_monte_events, m) {
     )pbdoc")
       .def(py::init<Index, Index>(),
            R"pbdoc(
+          .. rubric:: Constructor
+
           Parameters
           ----------
           asymmetric_unit_index: int
@@ -701,6 +728,8 @@ PYBIND11_MODULE(_monte_events, m) {
     )pbdoc")
       .def(py::init<const monte::OccCandidate &, const monte::OccCandidate &>(),
            R"pbdoc(
+          .. rubric:: Constructor
+
           Parameters
           ----------
           first: :class:`~libcasm.monte.events.OccCandidate`
@@ -809,6 +838,8 @@ PYBIND11_MODULE(_monte_events, m) {
     )pbdoc")
       .def(py::init<>(&make_OccCandidateList),
            R"pbdoc(
+          .. rubric:: Constructor
+
           Parameters
           ----------
           convert: :class:`~libcasm.monte.Conversions`
@@ -1018,6 +1049,8 @@ PYBIND11_MODULE(_monte_events, m) {
       .def(py::init<const monte::Conversions &, const monte::OccCandidateList &,
                     bool>(),
            R"pbdoc(
+          .. rubric:: Constructor
+
           Parameters
           ----------
           convert: :class:`~libcasm.monte.Conversions`

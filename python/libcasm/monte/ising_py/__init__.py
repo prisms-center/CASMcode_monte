@@ -1,9 +1,8 @@
 """Pure Python 2d square lattice Ising model"""
-from ._ising_py import (
+from ._model import (
     IsingConfiguration,
     IsingFormationEnergy,
     IsingParamComposition,
-    IsingSemiGrandCanonicalEventGenerator,
-    IsingSemiGrandCanonicalSystem,
     IsingState,
+    IsingSystem,
 )

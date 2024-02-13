@@ -236,38 +236,38 @@ if(DEFINED SKBUILD)
       _monte_methods PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
   endif()
 
-  ### libcasm.monte.models._monte_models_ising_cpp ###
-  pybind11_add_module(_monte_models_ising_cpp MODULE
-                      "${PROJECT_SOURCE_DIR}/python/src/monte_models_ising_cpp.cpp")
-  target_link_libraries(_monte_models_ising_cpp PRIVATE
+  ### libcasm.monte.ising_cpp._monte_ising_cpp ###
+  pybind11_add_module(_monte_ising_cpp MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_ising_cpp.cpp")
+  target_link_libraries(_monte_ising_cpp PRIVATE
     CASM::casm_global
     CASM::casm_crystallography
     casm_monte
   )
-  install(TARGETS _monte_models_ising_cpp DESTINATION monte/models/ising_cpp)
+  install(TARGETS _monte_ising_cpp DESTINATION monte/ising_cpp)
   if(APPLE)
     set_target_properties(
-      _monte_models_ising_cpp PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+      _monte_ising_cpp PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
   else()
     set_target_properties(
-      _monte_models_ising_cpp PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+      _monte_ising_cpp PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
   endif()
 
-  ### libcasm.monte.calculators.semigrand_canonical_ising_cpp._monte_calculators_sgc_ising_cpp ###
-  pybind11_add_module(_monte_calculators_sgc_ising_cpp MODULE
-                      "${PROJECT_SOURCE_DIR}/python/src/monte_calculators_sgc_ising_cpp.cpp")
-  target_link_libraries(_monte_calculators_sgc_ising_cpp PRIVATE
+  ### libcasm.monte.ising_cpp.semigrand_canonical._monte_ising_cpp_semigrand_canonical ###
+  pybind11_add_module(_monte_ising_cpp_semigrand_canonical MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_ising_cpp_semigrand_canonical.cpp")
+  target_link_libraries(_monte_ising_cpp_semigrand_canonical PRIVATE
     CASM::casm_global
     CASM::casm_crystallography
     casm_monte
   )
-  install(TARGETS _monte_calculators_sgc_ising_cpp DESTINATION monte/calculators/semigrand_canonical_ising_cpp)
+  install(TARGETS _monte_ising_cpp_semigrand_canonical DESTINATION monte/ising_cpp/semigrand_canonical)
   if(APPLE)
     set_target_properties(
-      _monte_calculators_sgc_ising_cpp PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+      _monte_ising_cpp_semigrand_canonical PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
   else()
     set_target_properties(
-      _monte_calculators_sgc_ising_cpp PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+      _monte_ising_cpp_semigrand_canonical PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
   endif()
 
   ### libcasm.monte.sampling._monte_sampling ###

@@ -1,12 +1,12 @@
 """ CASM Monte Carlo sampling and convergence check methods """
 
-from ._completion_check_params import CompletionCheckParams
 from ._monte_sampling import (
     SAMPLE_METHOD,
     SAMPLE_MODE,
     BasicStatistics,
     BasicStatisticsCalculator,
     CompletionCheck,
+    CompletionCheckParams,
     CompletionCheckResults,
     ConvergenceCheckResults,
     ConvergenceResultMap,
@@ -37,6 +37,6 @@ from ._monte_sampling import (
     scalar_as_vector,
 )
 from ._requested_precision_constructor import (
-    RequstedPrecisionConstructor,
+    RequestedPrecisionConstructor,
     converge,
 )

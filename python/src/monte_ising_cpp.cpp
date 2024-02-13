@@ -11,9 +11,8 @@
 
 // CASM
 #include "casm/casm_io/json/jsonParser.hh"
-#include "casm/monte/calculators/basic_semigrand_canonical.hh"
 #include "casm/monte/io/json/ValueMap_json_io.hh"
-#include "casm/monte/models/ising_eigen.hh"
+#include "casm/monte/ising_cpp/model.hh"
 
 #define STRINGIFY(x) #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
@@ -25,7 +24,7 @@ namespace CASMpy {
 
 using namespace CASM;
 using namespace CASM::monte;
-using namespace CASM::monte::models::ising_eigen;
+using namespace CASM::monte::ising_cpp;
 
 // used for libcasm.monte:
 typedef std::mt19937_64 engine_type;
@@ -33,10 +32,7 @@ typedef RandomNumberGenerator<engine_type> generator_type;
 typedef BasicStatistics statistics_type;
 typedef IsingConfiguration configuration_type;
 typedef IsingState state_type;
-
-typedef IsingSemiGrandCanonicalEventGenerator<engine_type>
-    sgc_event_generator_type;
-typedef IsingSemiGrandCanonicalSystem sgc_system_type;
+typedef IsingSystem system_type;
 
 state_type make_ising_state(
     configuration_type const &configuration, monte::ValueMap const &conditions,
@@ -65,13 +61,13 @@ PYBIND11_MAKE_OPAQUE(
     CASM::monte::ConvergenceResultMap<CASM::monte::BasicStatistics>);
 PYBIND11_MAKE_OPAQUE(CASM::monte::EquilibrationResultMap);
 
-PYBIND11_MODULE(_monte_models_ising_cpp, m) {
+PYBIND11_MODULE(_monte_ising_cpp, m) {
   using namespace CASMpy;
 
   m.doc() = R"pbdoc(
         Basic Ising model
 
-        libcasm.monte.models._ising_cpp
+        libcasm.monte._monte_ising_cpp
         --------------------------------------------------------------
 
         An Ising model, with implementation in C++.
@@ -85,7 +81,7 @@ PYBIND11_MODULE(_monte_models_ising_cpp, m) {
       )pbdoc")
       .def(py::init<Eigen::VectorXi, int>(),
            R"pbdoc(
-          Constructor
+          .. rubric:: Constructor
 
           Parameters
           ----------
@@ -191,7 +187,7 @@ PYBIND11_MODULE(_monte_models_ising_cpp, m) {
       )pbdoc")
       .def(py::init(&make_ising_state),
            R"pbdoc(
-          Constructor
+          .. rubric:: Constructor
 
           Parameters
           ----------
@@ -252,60 +248,6 @@ PYBIND11_MODULE(_monte_models_ising_cpp, m) {
       .def("__deepcopy__",
            [](state_type const &self, py::dict) { return state_type(self); });
 
-  py::class_<sgc_event_generator_type>(m,
-                                       "IsingSemiGrandCanonicalEventGenerator",
-                                       R"pbdoc(
-      Propose and apply semi-grand canonical Ising model events
-
-      )pbdoc")
-      .def(py::init<>(),
-           R"pbdoc(
-          Constructor
-           )pbdoc")
-      .def("set_state", &sgc_event_generator_type::set_state,
-           R"pbdoc(
-          Set the current Monte Carlo state used to propose and apply events.
-          )pbdoc",
-           py::arg("state"))
-      .def("propose", &sgc_event_generator_type::propose,
-           py::return_value_policy::reference_internal,
-           R"pbdoc(
-          Propose a semi-grand canonical event (1 site to flip signs)
-
-          Parameters
-          ----------
-          random_number_generator: class:`~libcasm.monte.RandomNumberGenerator`
-              The random number generator used to propose events.
-
-          Returns
-          -------
-          occ_event: class:`~libcasm.monte.events.OccEvent`
-              The proposed Monte Carlo event.
-          )pbdoc",
-           py::arg("random_number_generator"))
-      .def("apply", &sgc_event_generator_type::apply,
-           R"pbdoc(
-          Apply an event
-
-          Parameters
-          ----------
-          occ_event: class:`~libcasm.monte.events.OccEvent`
-              The Monte Carlo event to apply to the current state.
-
-          Returns
-          -------
-          occ_event: class:`~libcasm.monte.events.OccEvent`
-              The proposed Monte Carlo event.
-          )pbdoc",
-           py::arg("occ_event"))
-      .def("__copy__",
-           [](sgc_event_generator_type const &self) {
-             return sgc_event_generator_type(self);
-           })
-      .def("__deepcopy__", [](sgc_event_generator_type const &self, py::dict) {
-        return sgc_event_generator_type(self);
-      });
-
   py::class_<IsingFormationEnergy>(m, "IsingFormationEnergy",
                                    R"pbdoc(
       Calculates formation energy for the Ising model
@@ -315,7 +257,7 @@ PYBIND11_MODULE(_monte_models_ising_cpp, m) {
 
       )pbdoc")
       .def(py::init<double, int, bool, state_type const *>(), R"pbdoc(
-          Constructor
+          .. rubric:: Constructor
 
           Parameters
           ----------
@@ -385,72 +327,19 @@ PYBIND11_MODULE(_monte_models_ising_cpp, m) {
 
       .. rubric:: Notes
 
-      The composition of a crystal with sites that may be occupied by :math:`s`
-      different species can be described using :math:`s` concentration variables,
-      :math:`n_1, n_2, \dots, n_s`, where :math:`n_i = N_i/N_u` is the concentration
-      per unitcell of species :math:`i`, :math:`N_i` is the total number of
-      species :math:`i`, and :math:`N_u` is the total number of unit cells. For a
-      crystal with a fixed number of sites, the species concentration variables,
-      :math:`n_i`, are not independent.
+      - This assumes ``state.configuration.occupation()`` has values +1/-1
+      - This method defines the parametric composition, :math:`x`, as:
 
-      As described in :cite:t:`puchala2023casm`, the composition can also be represented
-      using :math:`k` independent parametric composition variables,
-      :math:`x_1, x_2, \dots, x_k`. The parametric composition variables describe the
-      composition after making a change of basis from the :math:`s`-dimensional space
-      the non-independent species concentration variables, :math:`n_1, n_2, \dots, n_s`
-      reside in to a :math:`k`-dimensional subspace that the allowed compositions are
-      restricted to.
+        - :math:`x=1`, if all sites are +1,
+        - :math:`x=0`,  if all sites are -1
 
-      The relationship between these different representations of the composition can
-      be written as
-
-      .. math::
-
-          \vec{n} = \vec{n}_0 + \mathbf{Q} \vec{x},
-
-      where:
-
-      - :math:`\vec{n} = (n_0, n_1, \dots, n_s)^{\top}` is the vector of species
-        concentrations, calculated on a per unitcell basis using :math:`n_i = N_i/N_u`
-        with :math:`N_i` being the total number of species :math:`i` and :math:`N_u`
-        being the total number of unit cells,
-      - :math:`\vec{n}_0`, is a point in the subspace of allowed compositions chosen as
-        the origin of the parametric composition axes,
-      - :math:`\mathbf{Q} = \left(\vec{q}_0, \vec{q}_1, \dots\right)` is the
-        :math:`s \times k` matrix formed by collecting :math:`k` independent parametric
-        composition axes, :math:`\vec{q}_i`, chosen to span the :math:`k`-dimensional
-        space of allowed compositions,
-      - and :math:`\vec{x} = (x_0, x_1, \dots, x_k)^{\top}` is the vector of independent
-        composition variables, which can be called the parametric composition.
-
-
-      The parametric composition can be calculated from the species concentration
-      using
-
-      .. math::
-
-          \vec{x} = \mathbf{R}^{\top}\left(\vec{n} - \vec{n}_0 \right),
-
-      where:
-
-      - :math:`\mathbf{R} = \left(\vec{r}_1, \vec{r}_2, \dots, \vec{r}_k \right)` is the
-        :math:`s \times k` matrix formed by the vectors :math:`\vec{r}_i` which form
-        the dual-spanning basis that satisfies
-        :math:`\vec{r}^{\top}_i \vec{q}_j = \delta_{ij}`.
-
-
-      The matrix :math:`\mathbf{R}` is related to :math:`Q^{+}`, the left pseudoinverse
-      of :math:`Q`, according to
-
-      .. math::
-
-          \mathbf{R}^{\top} = Q^{+} = \left(\mathbf{Q}^{\top}\mathbf{Q}\right)^{-1}\mathbf{Q}^{\top}.
-
+      - For details on the definition of the parametric composition, see
+        :cite:t:`puchala2023casm`.
 
 
       )pbdoc")
       .def(py::init<state_type const *>(), R"pbdoc(
-          Constructor
+          .. rubric:: Constructor
 
           Parameters
           ----------
@@ -506,17 +395,15 @@ PYBIND11_MODULE(_monte_models_ising_cpp, m) {
         return IsingParamComposition(self);
       });
 
-  py::class_<IsingSemiGrandCanonicalSystem,
-             std::shared_ptr<IsingSemiGrandCanonicalSystem>>(
-      m, "IsingSemiGrandCanonicalSystem",
-      R"pbdoc(
+  py::class_<IsingSystem, std::shared_ptr<IsingSystem>>(m, "IsingSystem",
+                                                        R"pbdoc(
       Holds methods and data for calculating Ising model system properties
       for semi-grand canonical Monte Carlo calculations.
 
       )pbdoc")
       .def(py::init<IsingFormationEnergy, IsingParamComposition>(),
            R"pbdoc(
-          Constructor
+          .. rubric:: Constructor
 
           Parameters
           ----------
@@ -529,12 +416,12 @@ PYBIND11_MODULE(_monte_models_ising_cpp, m) {
            py::arg("formation_energy_calculator"),
            py::arg("param_composition_calculator"))
       .def_readwrite("formation_energy_calculator",
-                     &sgc_system_type::formation_energy_calculator,
+                     &system_type::formation_energy_calculator,
                      R"pbdoc(
           IsingFormationEnergy: Get the parameterized formation energy calculator.
           )pbdoc")
       .def_readwrite("param_composition_calculator",
-                     &sgc_system_type::param_composition_calculator,
+                     &system_type::param_composition_calculator,
                      R"pbdoc(
           IsingFormationEnergy: Get the parameterized parametric composition calculator.
           )pbdoc");

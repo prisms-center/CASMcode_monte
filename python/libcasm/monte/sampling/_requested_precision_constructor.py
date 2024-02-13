@@ -2,12 +2,8 @@ from typing import Optional
 
 import libcasm.monte.sampling._monte_sampling as _sampling
 
-from ._completion_check_params import (
-    CompletionCheckParams,
-)
 
-
-class RequstedPrecisionConstructor:
+class RequestedPrecisionConstructor:
     """Sets requested precision level for equilibration and convergence
 
     Parameters
@@ -23,7 +19,7 @@ class RequstedPrecisionConstructor:
     def __init__(
         self,
         sampling_functions: _sampling.StateSamplingFunctionMap,
-        completion_check_params: CompletionCheckParams,
+        completion_check_params: _sampling.CompletionCheckParams,
     ):
         self.sampling_functions = sampling_functions
         self.completion_check_params = completion_check_params
@@ -61,7 +57,7 @@ class RequstedPrecisionConstructor:
 
         Returns
         -------
-        self: RequstedPrecisionConstructor
+        self: RequestedPrecisionConstructor
             To allow chaining multiple calls, `self` is returned
         """
         if quantity not in self.sampling_functions:
@@ -99,7 +95,7 @@ class RequstedPrecisionConstructor:
 
 def converge(
     sampling_functions: _sampling.StateSamplingFunctionMap,
-    completion_check_params: CompletionCheckParams,
+    completion_check_params: _sampling.CompletionCheckParams,
 ):
     """Helper for setting completion_check_params.requested_precision
 
@@ -121,15 +117,15 @@ def converge(
     ----------
     sampling_functions: _sampling.StateSamplingFunctionMap`
         State sampling function dictionary
-    completion_check_params: CompletionCheckParams
+    completion_check_params: _sampling.CompletionCheckParams
         Completion check parameters to set requested_precision
 
     Returns
     -------
-    rpc: RequstedPrecisionConstructor
+    rpc: RequestedPrecisionConstructor
         A RequestedPrecisionConstructor
     """
-    return RequstedPrecisionConstructor(
+    return RequestedPrecisionConstructor(
         sampling_functions,
         completion_check_params,
     )

@@ -84,8 +84,6 @@ set(
   ${PROJECT_SOURCE_DIR}/include/casm/monte/MethodLog.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/RandomNumberGenerator.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/ValueMap.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/calculators/basic_semigrand_canonical.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/calculators/complete_semigrand_canonical.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/CompletionCheck.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/ConvergenceCheck.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/CutoffCheck.hh
@@ -102,6 +100,9 @@ set(
   ${PROJECT_SOURCE_DIR}/include/casm/monte/events/io/OccCandidate_json_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/events/io/OccCandidate_stream_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/io/json/ValueMap_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/ising_cpp/basic_semigrand_canonical.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/ising_cpp/complete_semigrand_canonical.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/ising_cpp/model.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/basic_occupation_metropolis.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/kinetic_monte_carlo.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/metropolis.hh
@@ -109,7 +110,6 @@ set(
   ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/occupation_metropolis.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/BasicStructureTools.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/math.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/models/ising_eigen.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/ConfigGenerator.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/FixedConfigGenerator.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/IncrementalConditionsStateGenerator.hh
@@ -303,38 +303,38 @@ if(DEFINED SKBUILD)
       _monte_methods PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
   endif()
 
-  ### libcasm.monte.models._monte_models_ising_cpp ###
-  pybind11_add_module(_monte_models_ising_cpp MODULE
-                      "${PROJECT_SOURCE_DIR}/python/src/monte_models_ising_cpp.cpp")
-  target_link_libraries(_monte_models_ising_cpp PRIVATE
+  ### libcasm.monte.ising_cpp._monte_ising_cpp ###
+  pybind11_add_module(_monte_ising_cpp MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_ising_cpp.cpp")
+  target_link_libraries(_monte_ising_cpp PRIVATE
     CASM::casm_global
     CASM::casm_crystallography
     casm_monte
   )
-  install(TARGETS _monte_models_ising_cpp DESTINATION monte/models/ising_cpp)
+  install(TARGETS _monte_ising_cpp DESTINATION monte/ising_cpp)
   if(APPLE)
     set_target_properties(
-      _monte_models_ising_cpp PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+      _monte_ising_cpp PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
   else()
     set_target_properties(
-      _monte_models_ising_cpp PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+      _monte_ising_cpp PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
   endif()
 
-  ### libcasm.monte.calculators.semigrand_canonical_ising_cpp._monte_calculators_sgc_ising_cpp ###
-  pybind11_add_module(_monte_calculators_sgc_ising_cpp MODULE
-                      "${PROJECT_SOURCE_DIR}/python/src/monte_calculators_sgc_ising_cpp.cpp")
-  target_link_libraries(_monte_calculators_sgc_ising_cpp PRIVATE
+  ### libcasm.monte.ising_cpp.semigrand_canonical._monte_ising_cpp_semigrand_canonical ###
+  pybind11_add_module(_monte_ising_cpp_semigrand_canonical MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_ising_cpp_semigrand_canonical.cpp")
+  target_link_libraries(_monte_ising_cpp_semigrand_canonical PRIVATE
     CASM::casm_global
     CASM::casm_crystallography
     casm_monte
   )
-  install(TARGETS _monte_calculators_sgc_ising_cpp DESTINATION monte/calculators/semigrand_canonical_ising_cpp)
+  install(TARGETS _monte_ising_cpp_semigrand_canonical DESTINATION monte/ising_cpp/semigrand_canonical)
   if(APPLE)
     set_target_properties(
-      _monte_calculators_sgc_ising_cpp PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+      _monte_ising_cpp_semigrand_canonical PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
   else()
     set_target_properties(
-      _monte_calculators_sgc_ising_cpp PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+      _monte_ising_cpp_semigrand_canonical PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
   endif()
 
   ### libcasm.monte.sampling._monte_sampling ###
