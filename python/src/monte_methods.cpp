@@ -37,6 +37,7 @@ typedef monte::BasicStatistics statistics_type;
 
 PYBIND11_DECLARE_HOLDER_TYPE(T, std::shared_ptr<T>);
 PYBIND11_MAKE_OPAQUE(CASM::monte::SamplerMap);
+PYBIND11_MAKE_OPAQUE(CASM::monte::jsonSamplerMap);
 PYBIND11_MAKE_OPAQUE(CASM::monte::StateSamplingFunctionMap);
 
 PYBIND11_MODULE(_monte_methods, m) {
@@ -53,6 +54,7 @@ PYBIND11_MODULE(_monte_methods, m) {
   py::module::import("libcasm.xtal");
   py::module::import("libcasm.monte");
   py::module::import("libcasm.monte.events");
+  py::module::import("libcasm.monte.sampling");
 
   py::class_<monte::methods::BasicOccupationMetropolisData<statistics_type>>(
       m, "BasicOccupationMetropolisData", R"pbdoc(
@@ -68,14 +70,14 @@ PYBIND11_MODULE(_monte_methods, m) {
 
           Parameters
           ----------
-          sampling_functions: :class:`~libcasm.monte.StateSamplingFunctionMap`
+          sampling_functions: libcasm.monte.sampling.StateSamplingFunctionMap
               The sampling functions to use
-          json_sampling_functions: :class:`~libcasm.monte.jsonStateSamplingFunctionMap`
+          json_sampling_functions: libcasm.monte.sampling.jsonStateSamplingFunctionMap
               The json sampling functions to use
           n_steps_per_pass: int
               Number of steps per pass.  One pass is equal to one Monte Carlo step
               per variable site in the configuration.
-          completion_check_params: :class:`~libcasm.monte.CompletionCheckParams`
+          completion_check_params: libcasm.monte.sampling.CompletionCheckParams
               Controls when the run finishes
           )pbdoc",
            py::arg("sampling_functions"), py::arg("json_sampling_functions"),
@@ -84,40 +86,37 @@ PYBIND11_MODULE(_monte_methods, m) {
                      &monte::methods::BasicOccupationMetropolisData<
                          statistics_type>::completion_check,
                      R"pbdoc(
-          :class:`~libcasm.monte.CompletionCheck`: \
-          The completion checker used during the Monte Carlo run
+          libcasm.monte.sampling.CompletionCheck: The completion checker used during the Monte Carlo run
           )pbdoc")
       .def_readwrite("sampling_functions",
                      &monte::methods::BasicOccupationMetropolisData<
                          statistics_type>::sampling_functions,
                      R"pbdoc(
-          :class:`~libcasm.monte.StateSamplingFunctionMap`: \
-          The sampling functions to use
+          libcasm.monte.sampling.StateSamplingFunctionMap: The sampling functions to use
           )pbdoc")
       .def_readwrite("samplers",
                      &monte::methods::BasicOccupationMetropolisData<
                          statistics_type>::samplers,
                      R"pbdoc(
-          :class:`~libcasm.monte.SamplerMap`: Holds sampled data
+          libcasm.monte.sampling.SamplerMap: Holds sampled data.
           )pbdoc")
       .def_readwrite("json_sampling_functions",
                      &monte::methods::BasicOccupationMetropolisData<
                          statistics_type>::json_sampling_functions,
                      R"pbdoc(
-          :class:`~libcasm.monte.jsonStateSamplingFunctionMap`: \
-          The JSON sampling functions to use
+          libcasm.monte.sampling.jsonStateSamplingFunctionMap: The JSON sampling functions to use
           )pbdoc")
-      .def_readwrite("json_sampled_data",
+      .def_readwrite("json_samplers",
                      &monte::methods::BasicOccupationMetropolisData<
-                         statistics_type>::json_sampled_data,
+                         statistics_type>::json_samplers,
                      R"pbdoc(
-          :class:`~libcasm.monte.jsonSampledDataMap`: Holds JSON sampled data
+          libcasm.monte.sampling.jsonSamplerMap: Holds JSON sampled data
           )pbdoc")
       .def_readwrite("sample_weight",
                      &monte::methods::BasicOccupationMetropolisData<
                          statistics_type>::sample_weight,
                      R"pbdoc(
-          :class:`~libcasm.monte.Sampler`: Sample weights remain empty (unweighted)
+          libcasm.monte.sampling.Sampler: Sample weights remain empty (unweighted)
           )pbdoc")
       .def_readwrite("n_pass",
                      &monte::methods::BasicOccupationMetropolisData<
@@ -143,7 +142,7 @@ PYBIND11_MODULE(_monte_methods, m) {
                      &monte::methods::BasicOccupationMetropolisData<
                          statistics_type>::n_reject,
                      R"pbdoc(
-          int: Number of rejepted Monte Carlo steps.
+          int: Number of rejected Monte Carlo steps.
           )pbdoc")
       .def("acceptance_rate",
            &monte::methods::BasicOccupationMetropolisData<
@@ -165,8 +164,22 @@ PYBIND11_MODULE(_monte_methods, m) {
             to_json(data, json);
             return static_cast<nlohmann::json>(json);
           },
-          "Represent the BasicOccupationMetropolisData as a Python dict. "
-          "Items from all attributes are combined into a single dict")
+          R"pbdoc(
+          Represent a summary of the BasicOccupationMetropolisData as a Python dict.
+
+          Includes:
+
+          - "completion_check_results": :class:`~libcasm.monte.sampling.CompletionCheckResults`
+          - "n_pass": int
+          - "n_steps_per_pass": int
+          - "n_accept": int
+          - "n_reject": int
+          - "acceptance_rate": float
+          - "rejection_rate": float
+
+          Does not include individual samples or weights.
+
+          )pbdoc")
       .def("__copy__",
            [](monte::methods::BasicOccupationMetropolisData<
                statistics_type> const &self) {
@@ -195,6 +208,10 @@ PYBIND11_MODULE(_monte_methods, m) {
                                 statistics_type> const &,
                             monte::MethodLog &)>
              write_status_f) -> void {
+        if (!write_status_f) {
+          write_status_f =
+              monte::methods::default_write_status<statistics_type>;
+        }
         monte::methods::basic_occupation_metropolis(
             data, temperature, potential_occ_delta_per_supercell_f,
             propose_event_f, apply_event_f, sample_period, method_log,
@@ -236,19 +253,14 @@ PYBIND11_MODULE(_monte_methods, m) {
             that writes status updates, after a new sample has been taken and
             is due according to ``method_log.log_frequency()``. Default writes
             the current completion check results to ``method_log.logfile_path()``
-            and prints a summary of the to stdout.
+            and prints a summary to stdout.
 
         )pbdoc",
       py::arg("data"), py::arg("temperature"),
       py::arg("potential_occ_delta_per_supercell_f"),
       py::arg("propose_event_f"), py::arg("apply_event_f"),
       py::arg("sample_period") = 1, py::arg("method_log") = std::nullopt,
-      py::arg("random_engine") = nullptr,
-      py::arg("write_status_f") =
-          std::function<void(monte::methods::BasicOccupationMetropolisData<
-                                 statistics_type> const &,
-                             monte::MethodLog &)>(
-              monte::methods::default_write_status<statistics_type>));
+      py::arg("random_engine") = nullptr, py::arg("write_status_f") = nullptr);
 
 #ifdef VERSION_INFO
   m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);

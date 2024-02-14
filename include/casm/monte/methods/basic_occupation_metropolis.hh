@@ -43,7 +43,7 @@ struct BasicOccupationMetropolisData {
     }
     for (auto const &pair : json_sampling_functions) {
       auto const &f = pair.second;
-      this->json_sampled_data.emplace(f.name, std::vector<jsonParser>());
+      this->json_samplers.emplace(f.name, jsonSampler());
     }
 
     n_pass = 0;
@@ -61,7 +61,7 @@ struct BasicOccupationMetropolisData {
   jsonStateSamplingFunctionMap json_sampling_functions;
 
   /// \brief Holds sampled JSON data
-  jsonSampledDataMap json_sampled_data;
+  jsonSamplerMap json_samplers;
 
   /// \brief Sample weights
   ///
@@ -104,8 +104,8 @@ struct BasicOccupationMetropolisData {
     for (auto &pair : samplers) {
       pair.second->clear();
     }
-    for (auto &pair : json_sampled_data) {
-      pair.second.clear();
+    for (auto &pair : json_samplers) {
+      pair.second.values.clear();
     }
     sample_weight.clear();
     n_pass = 0;
@@ -412,7 +412,7 @@ void basic_occupation_metropolis(
       }
       for (auto const &pair : data.json_sampling_functions) {
         auto const &f = pair.second;
-        data.json_sampled_data.at(f.name).push_back(f());
+        data.json_samplers.at(f.name).values.push_back(f());
       }
       // # write status if due
       if (method_log->log_frequency.has_value() &&

@@ -113,6 +113,11 @@ class Sampler {
 
 typedef std::map<std::string, std::shared_ptr<monte::Sampler>> SamplerMap;
 
+/// \brief jsonSampler stores a vector of JSON-valued samples
+struct jsonSampler {
+  std::vector<jsonParser> values;
+};
+
 /// \brief Construct vector of component_names
 std::vector<std::string> default_component_names(std::vector<Index> shape);
 
@@ -191,7 +196,7 @@ CountType get_n_samples(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers);
 
 /// \brief Holds sampled JSON data
-typedef std::map<std::string, std::vector<jsonParser>> jsonSampledDataMap;
+typedef std::map<std::string, jsonSampler> jsonSamplerMap;
 
 }  // namespace monte
 }  // namespace CASM

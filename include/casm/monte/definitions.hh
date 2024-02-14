@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "casm/casm_io/json/jsonParser.hh"
 #include "casm/global/definitions.hh"
 #include "casm/global/eigen.hh"
 

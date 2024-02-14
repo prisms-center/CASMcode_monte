@@ -114,21 +114,12 @@ class SemiGrandCanonicalPotential:
         Parameters
         ----------
         system: libcasm.monte.ising_py.IsingSystem
-            Holds parameterized ising_cpp, without specifying at a particular state.
-            In particular, `system` must provide:
-
-            - formation_energy_calculator: IsingFormationEnergy
-            - A formation energy calculator
-            - param_composition_calculator: IsingParamComposition
-            - A parametric composition calculator
-
-            The provided ising_cpp must be able to calculate properties using the
-            configuration type provided to the Monte Carlo calculator run method as
-            part of the `state` parameter.
+            Holds parameterized formation energy and parametric composition
+            calculators, without specifying at a particular state.
 
         """
         self.system: IsingSystem = system
-        """Holds parameterized ising_cpp, without specifying at a particular state. \
+        """Holds parameterized calculators, without specifying at a particular state. \
         This is a shared object. """
 
         self.formation_energy_calculator: IsingFormationEnergy = copy.deepcopy(
@@ -152,7 +143,7 @@ class SemiGrandCanonicalPotential:
         
         This is set from the input parameter. The `state.configuration` attribute must 
         be usable by the potential, formation energy, and parametric composition 
-        ising_cpp. The `state.conditions` attribute must be convertible to a
+        calculators. The `state.conditions` attribute must be convertible to a
         :class:`SemiGrandCanonicalConditions` instance.
         """
 
@@ -239,7 +230,7 @@ class SemiGrandCanonicalData:
             )
         self.sample_weight: Sampler = Sampler(shape=[])
         """ Sample weights remain empty (unweighted). Included for compatibility with \
-        statistics ising_cpp. """
+        statistics calculators. """
 
         self.n_pass: int = int(0)
         """ Total number of passes completed. One pass is equal to one Monte Carlo \
@@ -514,24 +505,13 @@ class SemiGrandCanonicalCalculator:
         Parameters
         ----------
         system: libcasm.monte.ising_py.IsingSystem
-            Holds parameterized ising_cpp, without specifying at a particular state.
-            In particular, must have attributes:
-
-            - formation_energy_calculator: IsingFormationEnergy
-                - A formation energy calculator
-                - Must be copy-able
-            - param_composition_calculator: IsingParamComposition
-                - A parametric composition calculator
-                - Must be copy-able
-
-            The provided ising_cpp must be able to calculate properties using the
-            configuration type provided to the Monte Carlo calculator run method as part
-            of the `state` parameter.
+            Holds parameterized formation energy and parametric composition
+            calculators, without specifying at a particular state.
 
         """
         # This contains the system parameters, state-independent
         self.system: IsingSystem = system
-        """Holds parameterized ising_cpp, without specifying at a particular state. \
+        """Holds parameterized calculators, without specifying at a particular state. \
         This is a shared object."""
 
         # The potential calculator, set to current state during `run`
@@ -562,7 +542,7 @@ class SemiGrandCanonicalCalculator:
         
         This is set from the input parameter. The `state.configuration` attribute must 
         be a type usable by the potential, formation energy, and parametric composition
-        ising_cpp.
+        calculators.
         """
 
         # SemiGrandCanonicalConditions, set during `run`
@@ -590,7 +570,7 @@ class SemiGrandCanonicalCalculator:
         ----------
         state: libcasm.monte.ising_py.IsingState
             Initial Monte Carlo state, including configuration and conditions. The
-            configuration type must be supported by the ising_cpp provided by
+            configuration type must be supported by the calculators provided by
             the `system` constructor parameter. The `conditions` must be
             convertible to :class:`SemiGrandCanonicalConditions`. This is mutated
             during the calculation.
@@ -637,7 +617,7 @@ class SemiGrandCanonicalCalculator:
         temperature = self.conditions.temperature
         n_steps_per_pass = self.state.configuration.n_variable_sites
 
-        # set potential and other ising_cpp
+        # set potential and other calculators
         self.potential = SemiGrandCanonicalPotential(
             system=self.system,
         )

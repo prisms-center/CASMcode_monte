@@ -160,7 +160,7 @@ PYBIND11_MODULE(_monte_ising_cpp_semigrand_canonical, m) {
           ----------
           system: libcasm.monte.ising_cpp.IsingSystem
               Holds parameterized formation energy and parametric composition
-              ising_cpp, without specifying at a particular state.
+              calculators, without specifying at a particular state.
           )pbdoc",
            py::arg("system"))
       .def("set_state", &sgc::potential_type::set_state,
@@ -283,7 +283,7 @@ PYBIND11_MODULE(_monte_ising_cpp_semigrand_canonical, m) {
                      R"pbdoc(
           The JSON sampling functions.
           )pbdoc")
-      .def_readwrite("json_sampled_data", &sgc::data_type::json_sampled_data,
+      .def_readwrite("json_samplers", &sgc::data_type::json_samplers,
                      R"pbdoc(
           Holds sampled JSON data.
           )pbdoc")
@@ -292,11 +292,11 @@ PYBIND11_MODULE(_monte_ising_cpp_semigrand_canonical, m) {
           Sample weights
 
           Sample weights may remain empty (unweighted). Included for compatibility
-          with statistics ising_cpp.
+          with statistics calculators.
           )pbdoc")
       .def_readwrite("n_pass", &sgc::data_type::n_pass,
                      R"pbdoc(
-          Number of passes. One pass is equal to one Monte Carlo step \
+          int: Number of passes. One pass is equal to one Monte Carlo step \
           per variable site in the configuration.
           )pbdoc")
       .def_readwrite("n_steps_per_pass", &sgc::data_type::n_steps_per_pass,
@@ -412,16 +412,16 @@ PYBIND11_MODULE(_monte_ising_cpp_semigrand_canonical, m) {
           ----------
           system: libcasm.monte.ising_cpp.IsingSystem
               Holds parameterized formation energy and parametric composition
-              ising_cpp, without specifying at a particular state.
+              calculators, without specifying at a particular state.
           )pbdoc",
            py::arg("system"))
       .def_readonly("system", &sgc::calculator_type::system,
                     R"pbdoc(
           Holds parameterized formation energy and parametric composition
-          ising_cpp, without specifying at a particular state.
+          calculators, without specifying at a particular state.
           )pbdoc")
       .def_readonly("state", &sgc::calculator_type::state,
-                    py::return_value_policy::reference,
+                    py::return_value_policy::reference_internal,
                     R"pbdoc(
           A reference to the current Monte Carlo state
           )pbdoc")
@@ -435,13 +435,13 @@ PYBIND11_MODULE(_monte_ising_cpp_semigrand_canonical, m) {
           )pbdoc")
       .def_readonly("formation_energy_calculator",
                     &sgc::calculator_type::formation_energy_calculator,
-                    py::return_value_policy::reference,
+                    py::return_value_policy::reference_internal,
                     R"pbdoc(
           A reference to the formation energy calculator
           )pbdoc")
       .def_readonly("param_composition_calculator",
                     &sgc::calculator_type::param_composition_calculator,
-                    py::return_value_policy::reference,
+                    py::return_value_policy::reference_internal,
                     R"pbdoc(
           A reference to the parametric composition calculator
           )pbdoc")

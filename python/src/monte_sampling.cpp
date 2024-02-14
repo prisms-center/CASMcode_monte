@@ -17,8 +17,6 @@
 #include "casm/casm_io/json/jsonParser.hh"
 #include "casm/monte/BasicStatistics.hh"
 #include "casm/monte/MethodLog.hh"
-#include "casm/monte/RandomNumberGenerator.hh"
-#include "casm/monte/ValueMap.hh"
 #include "casm/monte/checks/EquilibrationCheck.hh"
 #include "casm/monte/checks/io/json/CompletionCheck_json_io.hh"
 #include "casm/monte/checks/io/json/ConvergenceCheck_json_io.hh"
@@ -43,9 +41,6 @@ namespace CASMpy {
 
 using namespace CASM;
 
-// used for libcasm.monte:
-typedef std::mt19937_64 engine_type;
-typedef monte::RandomNumberGenerator<engine_type> generator_type;
 typedef monte::BasicStatistics statistics_type;
 
 std::shared_ptr<monte::Sampler> make_sampler(
@@ -170,6 +165,7 @@ monte::CompletionCheckParams<statistics_type> make_completion_check_params(
 PYBIND11_DECLARE_HOLDER_TYPE(T, std::shared_ptr<T>);
 // #include "opaque_types.cc"
 PYBIND11_MAKE_OPAQUE(CASM::monte::SamplerMap);
+PYBIND11_MAKE_OPAQUE(CASM::monte::jsonSamplerMap);
 PYBIND11_MAKE_OPAQUE(CASM::monte::StateSamplingFunctionMap);
 PYBIND11_MAKE_OPAQUE(CASM::monte::jsonStateSamplingFunctionMap);
 PYBIND11_MAKE_OPAQUE(CASM::monte::RequestedPrecisionMap);
@@ -193,63 +189,73 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
   py::bind_map<monte::SamplerMap>(m, "SamplerMap",
                                   R"pbdoc(
-    SamplerMap stores :class:`~libcasm.monte.Sampler` by name of the sampled quantity
+    SamplerMap stores :class:`~libcasm.monte.sampling.Sampler` by name of the sampled quantity
 
     Notes
     -----
-    SamplerMap is a Dict[str, :class:`~libcasm.monte.Sampler`]-like object.
+    SamplerMap is a Dict[str, :class:`~libcasm.monte.sampling.Sampler`]-like object.
     )pbdoc",
                                   py::module_local(false));
 
-  py::bind_map<monte::StateSamplingFunctionMap>(m, "StateSamplingFunctionMap",
-                                                R"pbdoc(
-    StateSamplingFunctionMap stores :class:`~libcasm.monte.StateSamplingFunction` by name of the sampled quantity.
+  py::bind_map<monte::jsonSamplerMap>(m, "jsonSamplerMap",
+                                      R"pbdoc(
+    SamplerMap stores :class:`~libcasm.monte.sampling.jsonSampler` by name of the sampled quantity
 
     Notes
     -----
-    StateSamplingFunctionMap is a Dict[str, :class:`~libcasm.monte.StateSamplingFunction`]-like object.
+    jsonSamplerMap is a Dict[str, :class:`~libcasm.monte.sampling.jsonSampler`]-like object.
+    )pbdoc",
+                                      py::module_local(false));
+
+  py::bind_map<monte::StateSamplingFunctionMap>(m, "StateSamplingFunctionMap",
+                                                R"pbdoc(
+    StateSamplingFunctionMap stores :class:`~libcasm.monte.sampling.StateSamplingFunction` by name of the sampled quantity.
+
+    Notes
+    -----
+    StateSamplingFunctionMap is a Dict[str, :class:`~libcasm.monte.sampling.StateSamplingFunction`]-like object.
     )pbdoc",
                                                 py::module_local(false));
 
   py::bind_map<monte::jsonStateSamplingFunctionMap>(
       m, "jsonStateSamplingFunctionMap",
       R"pbdoc(
-    jsonStateSamplingFunctionMap stores :class:`~libcasm.monte.jsonStateSamplingFunction` by name of the sampled quantity.
+    jsonStateSamplingFunctionMap stores :class:`~libcasm.monte.sampling.jsonStateSamplingFunction` by name of the sampled quantity.
 
     Notes
     -----
-    jsonStateSamplingFunctionMap is a Dict[str, :class:`~libcasm.monte.jsonStateSamplingFunction`]-like object.
+    jsonStateSamplingFunctionMap is a Dict[str, :class:`~libcasm.monte.sampling.jsonStateSamplingFunction`]-like object.
     )pbdoc",
       py::module_local(false));
 
   py::bind_map<monte::RequestedPrecisionMap>(m, "RequestedPrecisionMap",
                                              R"pbdoc(
-    RequestedPrecisionMap stores :class:`~libcasm.monte.RequestedPrecision` with :class:`~libcasm.monte.SamplerComponent` keys.
+    RequestedPrecisionMap stores :class:`~libcasm.monte.sampling.RequestedPrecision` with :class:`~libcasm.monte.sampling.SamplerComponent` keys.
 
     Notes
     -----
-    RequestedPrecisionMap is a Dict[:class:`~libcasm.monte.SamplerComponent`, :class:`~libcasm.monte.RequestedPrecision`]-like object.
+    RequestedPrecisionMap is a Dict[:class:`~libcasm.monte.sampling.SamplerComponent`, :class:`~libcasm.monte.sampling.RequestedPrecision`]-like object.
     )pbdoc",
                                              py::module_local(false));
 
   py::bind_map<monte::EquilibrationResultMap>(m, "EquilibrationResultMap",
                                               R"pbdoc(
-    EquilibrationResultMap stores :class:`~libcasm.monte.IndividualEquilibrationResult` by :class:`~libcasm.monte.SamplerComponent`
+    EquilibrationResultMap stores :class:`~libcasm.monte.sampling.IndividualEquilibrationResult` by :class:`~libcasm.monte.sampling.SamplerComponent`
 
     Notes
     -----
-    EquilibrationResultMap is a Dict[:class:`~libcasm.monte.SamplerComponent`, :class:`~libcasm.monte.IndividualEquilibrationResult`]-like object.
+    EquilibrationResultMap is a Dict[:class:`~libcasm.monte.sampling.SamplerComponent`, :class:`~libcasm.monte.sampling.IndividualEquilibrationResult`]-like object.
     )pbdoc",
                                               py::module_local(false));
 
   py::bind_map<monte::ConvergenceResultMap<statistics_type>>(
       m, "ConvergenceResultMap",
       R"pbdoc(
-    ConvergenceResultMap stores :class:`~libcasm.monte.IndividualConvergenceResult` by :class:`~libcasm.monte.SamplerComponent`
+    ConvergenceResultMap stores :class:`~libcasm.monte.sampling.IndividualConvergenceResult` by :class:`~libcasm.monte.sampling.SamplerComponent`
 
     Notes
     -----
-    ConvergenceResultMap is a Dict[:class:`~libcasm.monte.SamplerComponent`, :class:`~libcasm.monte.IndividualConvergenceResult`]-like object.
+    ConvergenceResultMap is a Dict[:class:`~libcasm.monte.sampling.SamplerComponent`, :class:`~libcasm.monte.sampling.IndividualConvergenceResult`]-like object.
     )pbdoc",
       py::module_local(false));
 
@@ -445,7 +451,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
       Notes
       -----
-      - :class:`~libcasm.monte.Sampler` helps sampling by re-sizing the underlying matrix holding data automatically, and it allows accessing particular observations as an unrolled vector or accessing a particular component as a vector to check convergence.
+      - :class:`~libcasm.monte.sampling.Sampler` helps sampling by re-sizing the underlying matrix holding data automatically, and it allows accessing particular observations as an unrolled vector or accessing a particular component as a vector to check convergence.
       - Sampler can be used to sample quantities of any dimension (scalar, vector, matrix, etc.) by unrolling values. The standard approach is to use column-major order.
       - For sampling scalars, a size=1 vector is expected. This can be done with the function :func:`~libcasm.monte.scalar_as_vector`.
       - For sampling matrices, column-major order unrolling can be done with the function :func:`~libcasm.monte.matrix_as_vector`.
@@ -538,9 +544,122 @@ PYBIND11_MODULE(_monte_sampling, m) {
           )pbdoc",
            py::arg("sample_index"));
 
+  py::class_<monte::jsonSampler, std::shared_ptr<monte::jsonSampler>>(
+      m, "jsonSampler",
+      R"pbdoc(
+      Sampler stores sampled dict-like data for JSON output
+
+      Notes
+      -----
+      - jsonSampler can be used to sample quantities that do not need to be
+        checked for convergence directly and are not well represented by an array.
+
+      )pbdoc")
+      .def(py::init<>(),
+           R"pbdoc(
+
+          .. rubric:: Constructor
+
+          Default constructor only.
+
+          )pbdoc")
+      .def(
+          "append",
+          [](monte::jsonSampler &s, const nlohmann::json &data) {
+            s.values.push_back(jsonParser(data));
+          },
+          R"pbdoc(
+          Add a new sample.
+          )pbdoc",
+          py::arg("data"))
+      .def(
+          "set_values",
+          [](monte::jsonSampler &s, std::vector<nlohmann::json> const &data) {
+            s.values.clear();
+            for (auto const &value : data) {
+              s.values.push_back(jsonParser(value));
+            }
+          },
+          R"pbdoc(
+           Set all values directly
+           )pbdoc",
+          py::arg("values"))
+      .def(
+          "clear", [](monte::jsonSampler &s) { s.values.clear(); },
+          R"pbdoc(
+          Clear values.
+          )pbdoc")
+      .def(
+          "set_sample_capacity",
+          [](monte::jsonSampler &s, monte::CountType sample_capacity) {
+            s.values.reserve(sample_capacity);
+          },
+          R"pbdoc(
+          Conservative resize, to increase capacity for more samples.
+          )pbdoc",
+          py::arg("sample_capacity"))
+      .def(
+          "n_samples", [](monte::jsonSampler const &s) { s.values.size(); },
+          R"pbdoc(
+            Current number of samples taken.
+          )pbdoc")
+      .def(
+          "sample_capacity",
+          [](monte::jsonSampler const &s) { s.values.capacity(); },
+          R"pbdoc(
+            Current sample capacity.
+          )pbdoc")
+      .def(
+          "values",
+          [](monte::jsonSampler const &s) -> std::vector<nlohmann::json> {
+            std::vector<nlohmann::json> list;
+            for (auto const &value : s.values) {
+              list.push_back(value);
+            }
+            return list;
+          },
+          R"pbdoc(
+          Get sampled values as a const reference.
+          )pbdoc")
+      .def(
+          "sample",
+          [](monte::jsonSampler const &s, monte::CountType sample_index)
+              -> nlohmann::json const & { return s.values.at(sample_index); },
+          py::return_value_policy::reference_internal,
+          R"pbdoc(
+          Get a sampled value as a const reference.
+          )pbdoc",
+          py::arg("sample_index"))
+      .def("__len__",
+           [](monte::jsonSampler const &s) { return s.values.size(); })
+      .def(
+          "__iter__",  // for x in occ_candidate_list
+          [](monte::jsonSampler const &s) {
+            return py::make_iterator(s.values.begin(), s.values.end());
+          },
+          py::keep_alive<
+              0, 1>() /* Essential: keep object alive while iterator exists */)
+      .def(
+          "to_list",
+          [](monte::jsonSampler const &s) -> std::vector<nlohmann::json> {
+            std::vector<nlohmann::json> list;
+            for (auto const &value : s.values) {
+              list.push_back(value);
+            }
+            return list;
+          },
+          R"pbdoc(
+          Represent the jsonSampler values as a list of dict
+
+          Returns
+          -------
+          data : list[dict]
+              The jsonSampler values as a list of dict
+          )pbdoc");
+
   m.def("get_n_samples", monte::get_n_samples,
         R"pbdoc(
-        Return the number of samples taken. Assumes the same value for all samplers in the :class:`~libcasm.monte.SamplerMap`.
+        Return the number of samples taken. Assumes the same value for all samplers in the :class:`~libcasm.monte.sampling.SamplerMap`.
       )pbdoc",
         py::arg("samplers"));
 
@@ -561,7 +680,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           Parameters
           ----------
           sampler_name : str
-              Name of the sampled quantity. Should match keys in a :class:`~libcasm.monte.SamplerMap`.
+              Name of the sampled quantity. Should match keys in a :class:`~libcasm.monte.sampling.SamplerMap`.
           component_index : int
               Index into the unrolled vector of a sampled quantity.
           component_name : str
@@ -574,7 +693,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
                      R"pbdoc(
                       str : Name of the sampled quantity.
 
-                      Should match keys in a :class:`~libcasm.monte.SamplerMap`.
+                      Should match keys in a :class:`~libcasm.monte.sampling.SamplerMap`.
                       )pbdoc")
       .def_readwrite("component_index",
                      &monte::SamplerComponent::component_index,
@@ -643,8 +762,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
         - StateSamplingFunction can be used to sample quantities of any dimension (scalar, vector, matrix, etc.) by unrolling values. The standard approach is to use column-major order.
         - For sampling scalars, a size=1 vector is expected. This can be done with the function :func:`~libcasm.monte.scalar_as_vector`.
         - For sampling matrices, column-major order unrolling can be done with the function :func:`~libcasm.monte.matrix_as_vector`.
-        - Data sampled by a StateSamplingFunction can be stored in a :class:`~libcasm.monte.Sampler`.
-        - A call operator exists (:func:`~libcasm.monte.StateSamplingFunction.__call__`) to call the function held by :class:`~libcasm.monte.StateSamplingFunction`.
+        - Data sampled by a StateSamplingFunction can be stored in a :class:`~libcasm.monte.sampling.Sampler`.
+        - A call operator exists (:func:`~libcasm.monte.StateSamplingFunction.__call__`) to call the function held by :class:`~libcasm.monte.sampling.StateSamplingFunction`.
         )pbdoc")
       .def(py::init<>(&make_state_sampling_function),
            R"pbdoc(
@@ -747,21 +866,21 @@ PYBIND11_MODULE(_monte_sampling, m) {
             sampling_functions[f.name] = f
 
             # ... create samplers to hold data ...
-            json_sampled_data = jsonSampledDataMap()
+            json_samplers = jsonSamplerMap()
             for name, f in json_sampling_functions.items():
-                json_sampled_data[name] = []
+                json_samplers[name] = []
 
             # ... in Monte Carlo simulation ...
             # ... sample JSON data ...
             for name, f in json_sampling_functions.items():
-                json_sampled_data[name].append(f())
+                json_samplers[name].append(f())
 
 
         Notes
         -----
         - Typically this holds a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
         - jsonStateSamplingFunction can be used to sample quantities not easily converted to scalar, vector, matrix, etc.
-        - Data sampled by a jsonStateSamplingFunction can be stored in a :class:`~libcasm.monte.jsonSampledDataMap`.
+        - Data sampled by a jsonStateSamplingFunction can be stored in a :class:`~libcasm.monte.sampling.jsonSamplerMap`.
         - A call operator exists (:func:`~libcasm.monte.jsonStateSamplingFunction.__call__`) to call the function held by :class:`~libcasm.monte.jsonStateSamplingFunction`.
         )pbdoc")
       .def(py::init<>(&make_json_state_sampling_function),
@@ -1027,12 +1146,12 @@ PYBIND11_MODULE(_monte_sampling, m) {
           A 1d array of observations. Should include all samples.
       sample_weight : array_like
           Sample weights associated with observations. May have size 0, in which case the observations are treated as being equally weighted and no resampling is performed, or have the same size as `observations`.
-      requested_precision : :class:`~libcasm.monte.RequestedPrecision`
+      requested_precision : libcasm.monte.sampling.RequestedPrecision
           The requested precision level for convergence.
 
       Returns
       -------
-      results : :class:`~libcasm.monte.IndividualEquilibrationResult`
+      results : libcasm.monte.sampling.IndividualEquilibrationResult
           The equilibration check results.
       )pbdoc");
 
@@ -1166,7 +1285,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           Returns
           -------
-          stats : :class:`~libcasm.monte.BasicStatistics`
+          stats : libcasm.monte.sampling.BasicStatistics
               Calculated statistics.
 
           )pbdoc")
@@ -1191,7 +1310,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           Returns
           -------
-          stats : :class:`~libcasm.monte.BasicStatistics`
+          stats : libcasm.monte.sampling.BasicStatistics
               Calculated statistics.
 
           )pbdoc")
@@ -1243,7 +1362,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
   py::class_<monte::IndividualConvergenceCheckResult<statistics_type>>(
       m, "IndividualConvergenceResult",
       R"pbdoc(
-      Convergence check results for a single :class:`~libcasm.monte.SamplerComponent`
+      Convergence check results for a single :class:`~libcasm.monte.sampling.SamplerComponent`
       )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
@@ -1349,18 +1468,18 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
         Parameters
         ----------
-        sampler: :class:`~libcasm.monte.Sampler`
+        sampler: libcasm.monte.sampling.Sampler
             The sampler containing the sampled data.
-        sample_weight : :class:`~libcasm.monte.Sampler`
+        sample_weight : libcasm.monte.sampling.Sampler
             Optional weight to give to each to observation.
-        key : :class:`~libcasm.monte.SamplerComponent`
+        key : libcasm.monte.sampling.SamplerComponent
             Specifies the component of sampler being checked for convergence.
-        requested_precision : :class:`~libcasm.monte.RequestedPrecisionMap`
+        requested_precision : libcasm.monte.sampling.RequestedPrecisionMap
             The requested precision level for convergence.
         N_samples_for_statistics : int
             The number of tail samples from `sampler` to include in statistics.
         calc_statistics_f : function
-            Fucntion used to calculate :class:`~libcasm.monte.BasicStatistics`. For example, an instance of :class:`~libcasm.monte.BasicStatisticsCalculator`.
+            Fucntion used to calculate :class:`~libcasm.monte.sampling.BasicStatistics`. For example, an instance of :class:`~libcasm.monte.sampling.BasicStatisticsCalculator`.
         )pbdoc",
       py::arg("sampler"), py::arg("sample_weight"), py::arg("key"),
       py::arg("requested_precision"), py::arg("N_samples_for_statistics"),
@@ -1383,16 +1502,16 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
         Parameters
         ----------
-        samplers: :class:`~libcasm.monte.SamplerMap`
+        samplers: libcasm.monte.sampling.SamplerMap
             The samplers containing the sampled data.
-        sample_weight : :class:`~libcasm.monte.Sampler`
+        sample_weight : libcasm.monte.sampling.Sampler
             Optional weight to give to each to observation.
-        requested_precision : :class:`~libcasm.monte.RequestedPrecisionMap`
-            The requested precision levels for all :class:`~libcasm.monte.SamplerComponent` that are requested to converge.
+        requested_precision : libcasm.monte.sampling.RequestedPrecisionMap
+            The requested precision levels for all :class:`~libcasm.monte.sampling.SamplerComponent` that are requested to converge.
         N_samples_for_equilibration : int
             Number of initial samples to exclude from statistics because the system is out of equilibrium.
         calc_statistics_f : function
-            Fucntion used to calculate :class:`~libcasm.monte.BasicStatistics`. For example, an instance of :class:`~libcasm.monte.BasicStatistics`.
+            Fucntion used to calculate :class:`~libcasm.monte.sampling.BasicStatistics`. For example, an instance of :class:`~libcasm.monte.sampling.BasicStatistics`.
         )pbdoc",
       py::arg("samplers"), py::arg("sample_weight"),
       py::arg("requested_precision"), py::arg("N_samples_for_equilibration"),
@@ -1472,7 +1591,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
       Parameters
       ----------
-      cutoff_params : :class:`~libcasm.monte.CutoffCheckParams`
+      cutoff_params : libcasm.monte.sampling.CutoffCheckParams
           Cutoff check parameters
       count : Optional[int]
           Number of steps or passes
@@ -1497,7 +1616,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
       Parameters
       ----------
-      cutoff_params : :class:`~libcasm.monte.CutoffCheckParams`
+      cutoff_params : libcasm.monte.sampling.CutoffCheckParams
           Cutoff check parameters
       count : Optional[int]
           Number of steps or passes
@@ -1538,17 +1657,17 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           Parameters
           ----------
-          requested_precision : Optional[:class:`~libcasm.monte.RequestedPrecisionMap`] = None
+          requested_precision : Optional[libcasm.monte.sampling.RequestedPrecisionMap] = None
               Requested precision for convergence of sampler components. When all components
               reach the requested precision, and all `cutoff_params` minimums are met,
               then the completion check returns True, indicating the Monte Carlo simulation
               is complete.
-          cutoff_params: Optional[:class:`~libcasm.monte.CutoffCheckParams`] = None,
+          cutoff_params: Optional[libcasm.monte.sampling.CutoffCheckParams] = None,
               Cutoff check parameters allow setting limits on the Monte Carlo simulation to
               prevent calculations from stopping too soon or running too long. If None, no
               cutoffs are applied.
           calc_statistics_f: Optional[Callable] = None,
-              A function for calculating :class:`~libcasm.monte.BasicStatistics` from
+              A function for calculating :class:`~libcasm.monte.sampling.BasicStatistics` from
               sampled data, with signature:
 
               .. code-block:: Python
@@ -1559,7 +1678,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
                   ) -> libcasm.monte.BasicStatistics:
                       ...
 
-              If None, the default is :class:`~libcasm.monte.BasicStatisticsCalculator`.
+              If None, the default is :class:`~libcasm.monte.sampling.BasicStatisticsCalculator`.
           equilibration_check_f: Optional[Callable] = None,
               A function for checking equilibration of sampled data, with signature:
 
@@ -1572,7 +1691,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
                   ) -> libcasm.monte.IndividualEquilibrationResult:
                       ...
 
-              If None, the default is :class:`~libcasm.monte.default_equilibration_check`.
+              If None, the default is :class:`~libcasm.monte.sampling.default_equilibration_check`.
           log_spacing: bool = False
               If True, use logarithmic spacing for completion checking; else use linear
               spacing. For linear spacing, the n-th check will be taken when:
@@ -1625,7 +1744,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           "cutoff_params",
           &monte::CompletionCheckParams<statistics_type>::cutoff_params,
           R"pbdoc(
-          :class:`~libcasm.monte.CutoffCheckParams`: Cutoff check parameters
+          :class:`~libcasm.monte.sampling.CutoffCheckParams`: Cutoff check parameters
           )pbdoc")
       .def_readwrite(
           "equilibration_check_f",
@@ -1635,8 +1754,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           A function, such as :func:`~libcasm.monte.default_equilibration_check`, with
           signature f(array_like observations, array_like sample_weight,
-          :class:`~libcasm.monte.RequestedPrecision` requested_precision) ->
-          :class:`~libcasm.monte.IndividualEquilibrationResult`.
+          :class:`~libcasm.monte.sampling.RequestedPrecision` requested_precision) ->
+          :class:`~libcasm.monte.sampling.IndividualEquilibrationResult`.
           )pbdoc")
       .def_readwrite(
           "calc_statistics_f",
@@ -1645,19 +1764,19 @@ PYBIND11_MODULE(_monte_sampling, m) {
           function: Function to calculate statistics.
 
           A function, such as an instance of
-          :class:`~libcasm.monte.BasicStatisticsCalculator`, with signature
+          :class:`~libcasm.monte.sampling.BasicStatisticsCalculator`, with signature
           f(array_like observations, array_like sample_weight) ->
-          :class:`~libcasm.monte.BasicStatistics`.
+          :class:`~libcasm.monte.sampling.BasicStatistics`.
           )pbdoc")
       .def_readwrite(
           "requested_precision",
           &monte::CompletionCheckParams<statistics_type>::requested_precision,
           R"pbdoc(
-          :class:`~libcasm.monte.RequestedPrecisionMap`: Requested precision for \
+          :class:`~libcasm.monte.sampling.RequestedPrecisionMap`: Requested precision for \
           convergence of sampler components.
 
-          A Dict[:class:`~libcasm.monte.SamplerComponent`,
-          :class:`~libcasm.monte.RequestedPrecision`]-like object that specifies
+          A Dict[:class:`~libcasm.monte.sampling.SamplerComponent`,
+          :class:`~libcasm.monte.sampling.RequestedPrecision`]-like object that specifies
           convergence criteria.
           )pbdoc")
       .def_readwrite(
@@ -1749,7 +1868,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
       .def_readwrite("params",
                      &monte::CompletionCheckResults<statistics_type>::params,
                      R"pbdoc(
-          :class:`~libcasm.monte.CompletionCheckParams`: Completion check parameters
+          :class:`~libcasm.monte.sampling.CompletionCheckParams`: Completion check parameters
           )pbdoc")
       .def_readwrite("count",
                      &monte::CompletionCheckResults<statistics_type>::count,
@@ -1793,13 +1912,13 @@ PYBIND11_MODULE(_monte_sampling, m) {
                      &monte::CompletionCheckResults<
                          statistics_type>::equilibration_check_results,
                      R"pbdoc(
-          :class:`~libcasm.monte.EquilibrationCheckResults`: Results of equilibration check
+          :class:`~libcasm.monte.sampling.EquilibrationCheckResults`: Results of equilibration check
           )pbdoc")
       .def_readwrite("convergence_check_results",
                      &monte::CompletionCheckResults<
                          statistics_type>::convergence_check_results,
                      R"pbdoc(
-          :class:`~libcasm.monte.ConvergenceCheckResults`: Results of convergence check
+          :class:`~libcasm.monte.sampling.ConvergenceCheckResults`: Results of convergence check
           )pbdoc")
       .def_readwrite(
           "is_complete",
@@ -1871,7 +1990,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           Parameters
           ----------
-          params : :class:`~libcasm.monte.CompletionCheckParams`
+          params : libcasm.monte.sampling.CompletionCheckParams
               Data struture holding completion check parameters.
           )pbdoc")
       .def("reset", &monte::CompletionCheck<statistics_type>::reset,
@@ -1901,15 +2020,15 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           Parameters
           ----------
-          samplers: :class:`~libcasm.monte.SamplerMap`
+          samplers: libcasm.monte.sampling.SamplerMap
               The samplers containing the sampled data.
-          sample_weight : :class:`~libcasm.monte.Sampler`
+          sample_weight : libcasm.monte.sampling.Sampler
               Sample weights associated with observations. May have 0 samples, in which
               case the obsservations are treated as being equally weighted, otherwise
               must match the number of samples made by each sampler in `samplers`.
           count : int
               Number of steps or passes
-          method_log : :class:`~libcasm.monte.MethodLog`
+          method_log : libcasm.monte.MethodLog
               The method log specifies where to write status updates and internally
               tracks the elapsed clock time.
 
@@ -1951,9 +2070,9 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           Parameters
           ----------
-          samplers: :class:`~libcasm.monte.SamplerMap`
+          samplers: libcasm.monte.sampling.SamplerMap
               The samplers containing the sampled data.
-          sample_weight : :class:`~libcasm.monte.Sampler`
+          sample_weight : libcasm.monte.sampling.Sampler
               Sample weights associated with observations. May have 0 samples, in which
               case the obsservations are treated as being equally weighted, otherwise
               must match the number of samples made by each sampler in `samplers`.
@@ -1961,7 +2080,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
               Number of steps or passes
           time : Optional[float]
               Simulated time
-          method_log : :class:`~libcasm.monte.MethodLog`
+          method_log : libcasm.monte.MethodLog
               The method log specifies where to write status updates and internally
               tracks the elapsed clock time.
 
@@ -1987,9 +2106,9 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           Parameters
           ----------
-          samplers: :class:`~libcasm.monte.SamplerMap`
+          samplers: libcasm.monte.sampling.SamplerMap
               The samplers containing the sampled data.
-          sample_weight : :class:`~libcasm.monte.Sampler`
+          sample_weight : libcasm.monte.sampling.Sampler
               Sample weights associated with observations. May have 0 samples, in which
               case the obsservations are treated as being equally weighted, otherwise
               must match the number of samples made by each sampler in `samplers`.
@@ -1997,7 +2116,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
               Number of steps or passes
           time : float
               Simulated time
-          method_log : :class:`~libcasm.monte.MethodLog`
+          method_log : libcasm.monte.MethodLog
               The method log specifies where to write status updates and internally
               tracks the elapsed clock time.
 
@@ -2022,15 +2141,15 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           Parameters
           ----------
-          samplers: :class:`~libcasm.monte.SamplerMap`
+          samplers: libcasm.monte.sampling.SamplerMap
               The samplers containing the sampled data.
-          sample_weight : :class:`~libcasm.monte.Sampler`
+          sample_weight : libcasm.monte.sampling.Sampler
               Sample weights associated with observations. May have 0 samples, in which
               case the observations are treated as being equally weighted, otherwise
               must match the number of samples made by each sampler in `samplers`.
           time : float
               Simulated time
-          method_log : :class:`~libcasm.monte.MethodLog`
+          method_log : libcasm.monte.MethodLog
               The method log specifies where to write status updates and internally
               tracks the elapsed clock time.
 
@@ -2055,13 +2174,13 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           Parameters
           ----------
-          samplers: :class:`~libcasm.monte.SamplerMap`
+          samplers: libcasm.monte.sampling.SamplerMap
               The samplers containing the sampled data.
-          sample_weight : :class:`~libcasm.monte.Sampler`
+          sample_weight : libcasm.monte.sampling.Sampler
               Sample weights associated with observations. May have 0 samples, in which
               case the obsservations are treated as being equally weighted, otherwise
               must match the number of samples made by each sampler in `samplers`.
-          method_log : :class:`~libcasm.monte.MethodLog`
+          method_log : libcasm.monte.MethodLog
               The method log specifies where to write status updates and internally
               tracks the elapsed clock time.
 

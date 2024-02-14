@@ -325,3 +325,7 @@ def test_ising_basic_semigrand_canonical_cpp():
     converge_results = results.convergence_check_results.individual_results
     for key, req in completion_check_params.requested_precision.items():
         assert converge_results[key].stats.calculated_precision < req.abs_precision
+
+    # json results
+    for key, value in mc_calculator.data.json_samplers.items():
+        assert isinstance(value.to_list(), list)

@@ -19,6 +19,19 @@ jsonParser &to_json(std::shared_ptr<Sampler> const &value, jsonParser &json) {
   return json;
 }
 
+/// \brief jsonSampler to JSON
+jsonParser &to_json(jsonSampler const &value, jsonParser &json) {
+  json = value.values;
+  return json;
+}
+
+/// \brief jsonSampler to JSON
+jsonParser &to_json(std::shared_ptr<jsonSampler> const &value,
+                    jsonParser &json) {
+  json = value->values;
+  return json;
+}
+
 /// \brief RequestedPrecision to JSON
 ///
 /// Notes:

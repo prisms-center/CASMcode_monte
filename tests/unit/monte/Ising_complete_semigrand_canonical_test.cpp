@@ -361,7 +361,7 @@ TEST(IsingCompleteSemiGrandCanonicalTest, SemiGrandCanonicalRun1) {
 
   {
     jsonParser json;
-    to_json(mc_calculator->data->json_sampled_data, json);
+    to_json(mc_calculator->data->json_samplers, json);
     std::cout << json << std::endl;
   }
 
