@@ -52,11 +52,11 @@ void occupation_metropolis(
 ///     indicated by the asymmetric unit index and occupant index of the
 ///     sites potentially being swapped. Typically constructed from
 ///     `make_canonical_swaps` which generates all possible canonical swaps, or
-///     `make_grand_canonical_swaps` which generates all possible grand
+///     `make_semigrand_canonical_swaps` which generates all possible grand
 ///      canonical swaps. It can also be a subset to restrict which swaps are
 ///     allowed.
 /// \param propose_event_f A function, typically one of
-///     `propose_canonical_event` or `propose_grand_canonical_event`, which
+///     `propose_canonical_event` or `propose_semigrand_canonical_event`, which
 ///     proposes an event (of type `OccEvent`) based on the current occupation,
 ///     possible_swaps, and random_number_generator.
 /// \param random_number_generator A random number generator

@@ -18,7 +18,7 @@ OccCandidateList::OccCandidateList(std::vector<OccCandidate> candidates,
   Index Nasym = convert.asym_size();
   m_end = m_candidate.size();
   std::vector<Index> unallowed(Nspecies, m_end);
-  m_species_to_cand_index = std::vector<std::vector<Index> >(Nasym, unallowed);
+  m_species_to_cand_index = std::vector<std::vector<Index>>(Nasym, unallowed);
 
   Index index = 0;
   for (const auto &cand : m_candidate) {
@@ -50,7 +50,7 @@ OccCandidateList::OccCandidateList(const Conversions &convert) {
   Index Nasym = convert.asym_size();
   m_end = m_candidate.size();
   std::vector<Index> unallowed(Nspecies, m_end);
-  m_species_to_cand_index = std::vector<std::vector<Index> >(Nasym, unallowed);
+  m_species_to_cand_index = std::vector<std::vector<Index>>(Nasym, unallowed);
 
   Index index = 0;
   for (const auto &cand : m_candidate) {
@@ -123,8 +123,9 @@ std::vector<OccSwap> make_canonical_swaps(
 /// - cand_a and cand_b are valid
 /// - the asym index is the same
 /// - the species are different and both allowed on the asym site
-bool allowed_grand_canonical_swap(Conversions const &convert,
-                                  OccCandidate cand_a, OccCandidate cand_b) {
+bool allowed_semigrand_canonical_swap(Conversions const &convert,
+                                      OccCandidate cand_a,
+                                      OccCandidate cand_b) {
   return is_valid(convert, cand_a) && is_valid(convert, cand_b) &&
          cand_a.asym == cand_b.asym &&
          cand_a.species_index != cand_b.species_index &&
@@ -132,34 +133,34 @@ bool allowed_grand_canonical_swap(Conversions const &convert,
 };
 
 /// \brief Construct OccSwap allowed for grand canonical Monte Carlo
-std::vector<OccSwap> make_grand_canonical_swaps(
+std::vector<OccSwap> make_semigrand_canonical_swaps(
     const Conversions &convert, OccCandidateList const &occ_candidate_list) {
   // construct grand canonical swaps
-  std::vector<OccSwap> grand_canonical_swaps;
+  std::vector<OccSwap> semigrand_canonical_swaps;
 
   // for each pair of candidates, check if they are allowed to swap
   for (const auto &cand_a : occ_candidate_list) {
     for (const auto &cand_b : occ_candidate_list) {
       // allow a->b, b->a
       // check that asym is the same and species_index is different
-      if (allowed_grand_canonical_swap(convert, cand_a, cand_b)) {
-        grand_canonical_swaps.push_back(OccSwap(cand_a, cand_b));
+      if (allowed_semigrand_canonical_swap(convert, cand_a, cand_b)) {
+        semigrand_canonical_swaps.push_back(OccSwap(cand_a, cand_b));
       }
     }
   }
-  return grand_canonical_swaps;
+  return semigrand_canonical_swaps;
 }
 
 /// \brief For grand canonical swaps, get the number of possible events
 ///     that can be chosen from at any one time
 Index get_n_allowed_per_unitcell(
     Conversions const &convert,
-    std::vector<OccSwap> const &grand_canonical_swaps) {
+    std::vector<OccSwap> const &semigrand_canonical_swaps) {
   std::map<Index, Index> asym_to_n_swaps;
   for (Index asym = 0; asym < convert.asym_size(); ++asym) {
     asym_to_n_swaps.emplace(asym, 0);
   }
-  for (OccSwap const &swap : grand_canonical_swaps) {
+  for (OccSwap const &swap : semigrand_canonical_swaps) {
     asym_to_n_swaps[swap.cand_a.asym]++;
   }
 

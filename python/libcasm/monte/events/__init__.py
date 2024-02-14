@@ -21,7 +21,7 @@ from ._monte_events import (
     choose_semigrand_canonical_swap,
     is_allowed_canonical_swap,
     make_canonical_swaps,
-    make_semigrad_canonical_swaps,
+    make_semigrand_canonical_swaps,
     propose_canonical_event,
     propose_canonical_event_from_swap,
     propose_semigrand_canonical_event,

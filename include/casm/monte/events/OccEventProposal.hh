@@ -16,7 +16,8 @@ class OccSwap;
 
 // /// \brief Typedef of function pointer
 // ///
-// /// Could be `propose_canonical_event`, `propose_grand_canonical_event`, or a
+// /// Could be `propose_canonical_event`, `propose_semigrand_canonical_event`,
+// or a
 // /// similar custom function.
 // typedef OccEvent &(*ProposeOccEventFuntionType)(OccEvent &e,
 //                                                 OccLocation const &,
@@ -43,22 +44,22 @@ OccEvent &propose_canonical_event(OccEvent &e, OccLocation const &occ_location,
 
 /// \brief Choose a swap type from a list of allowed grand canonical swap types
 template <typename GeneratorType>
-OccSwap const &choose_grand_canonical_swap(
+OccSwap const &choose_semigrand_canonical_swap(
     OccLocation const &occ_location,
-    std::vector<OccSwap> const &grand_canonical_swap,
+    std::vector<OccSwap> const &semigrand_canonical_swap,
     GeneratorType &random_number_generator);
 
 /// \brief Propose grand canonical OccEvent of particular swap type
 template <typename GeneratorType>
-OccEvent &propose_grand_canonical_event_from_swap(
+OccEvent &propose_semigrand_canonical_event_from_swap(
     OccEvent &e, OccLocation const &occ_location, OccSwap const &swap,
     GeneratorType &random_number_generator);
 
 /// \brief Propose grand canonical OccEvent from list of swap types
 template <typename GeneratorType>
-OccEvent &propose_grand_canonical_event(
+OccEvent &propose_semigrand_canonical_event(
     OccEvent &e, OccLocation const &occ_location,
-    std::vector<OccSwap> const &grand_canonical_swap,
+    std::vector<OccSwap> const &semigrand_canonical_swap,
     GeneratorType &random_number_generator);
 
 // --- Implementation ---
@@ -215,13 +216,13 @@ OccEvent &propose_canonical_event(OccEvent &e, OccLocation const &occ_location,
 ///
 /// \param occ_location Contains lookup table with occupant locations for
 /// efficient choosing in dilute systems.
-/// \param grand_canonical_swap List of allowed swap types (OccSwap). Swap types
-/// consists of two pairs (asymmetric unit a, species_index a) and (asymmetric
-/// unit b, species_index b) defining what will change, but not which sites.
-/// For grand canonical swaps, the species indices must be the different and
-/// the asymmetric unit index must be the same. Do include reverse swaps (i.e.
-/// a->b and b->a).
-/// \param random_number_generator The random number generator used to
+/// \param semigrand_canonical_swap List of allowed swap types (OccSwap). Swap
+/// types consists of two pairs (asymmetric unit a, species_index a) and
+/// (asymmetric unit b, species_index b) defining what will change, but not
+/// which sites. For grand canonical swaps, the species indices must be the
+/// different and the asymmetric unit index must be the same. Do include reverse
+/// swaps (i.e. a->b and b->a). \param random_number_generator The random number
+/// generator used to
 ///     stochastically choose the swap, requires
 ///     `random_number_generator.random_real(maximum_value)`.
 ///
@@ -232,9 +233,9 @@ OccEvent &propose_canonical_event(OccEvent &e, OccLocation const &occ_location,
 /// choose which type occurs.
 ///
 template <typename GeneratorType>
-OccSwap const &choose_grand_canonical_swap(
+OccSwap const &choose_semigrand_canonical_swap(
     OccLocation const &occ_location,
-    std::vector<OccSwap> const &grand_canonical_swap,
+    std::vector<OccSwap> const &semigrand_canonical_swap,
     GeneratorType &random_number_generator) {
   // Calculate m_tsum[i]:
   // - The total number of possible events of swap types [0, i)`
@@ -249,7 +250,7 @@ OccSwap const &choose_grand_canonical_swap(
   // - m_tsum[0] is 0.0
   // - m_tsum[canonical_swap.size()] is total number of possible events
   //
-  Index tsize = grand_canonical_swap.size();
+  Index tsize = semigrand_canonical_swap.size();
   static std::vector<double> m_tsum;
   m_tsum.resize(tsize + 1);
 
@@ -257,26 +258,26 @@ OccSwap const &choose_grand_canonical_swap(
   for (Index i = 0; i < tsize; ++i) {
     m_tsum[i + 1] =
         m_tsum[i] +
-        ((double)occ_location.cand_size(grand_canonical_swap[i].cand_a));
+        ((double)occ_location.cand_size(semigrand_canonical_swap[i].cand_a));
   }
 
   if (m_tsum.back() == 0.0) {
     throw std::runtime_error(
-        "Error in choose_grand_canonical_swap: No events possible.");
+        "Error in choose_semigrand_canonical_swap: No events possible.");
   }
 
   // Choose a random number on [0, m_tsum[grand_canonical_swap.size()])
-  // Swap type grand_canonical_swap[i] occurs if the random number is between
-  // m_tsum[i] and m_tsum[i+1]
+  // Swap type semigrand_canonical_swap[i] occurs if the random number is
+  // between m_tsum[i] and m_tsum[i+1]
   double rand = random_number_generator.random_real(m_tsum.back());
 
   for (Index i = 0; i < tsize; ++i) {
     if (rand < m_tsum[i + 1]) {
-      return grand_canonical_swap[i];
+      return semigrand_canonical_swap[i];
     }
   }
 
-  throw std::runtime_error("Error in choose_grand_canonical_swap");
+  throw std::runtime_error("Error in choose_semigrand_canonical_swap");
 }
 
 /// \brief Propose grand canonical OccEvent of particular swap type
@@ -285,7 +286,7 @@ OccSwap const &choose_grand_canonical_swap(
 /// the swap occurs on.
 /// Sets e.atom_traj to size 0.
 template <typename GeneratorType>
-OccEvent &propose_grand_canonical_event_from_swap(
+OccEvent &propose_semigrand_canonical_event_from_swap(
     OccEvent &e, OccLocation const &occ_location, OccSwap const &swap,
     GeneratorType &random_number_generator) {
   e.occ_transform.resize(1);
@@ -311,14 +312,14 @@ OccEvent &propose_grand_canonical_event_from_swap(
 
 /// \brief Propose grand canonical OccEvent from list of swap types
 template <typename GeneratorType>
-OccEvent &propose_grand_canonical_event(
+OccEvent &propose_semigrand_canonical_event(
     OccEvent &e, OccLocation const &occ_location,
-    std::vector<OccSwap> const &grand_canonical_swap,
+    std::vector<OccSwap> const &semigrand_canonical_swap,
     GeneratorType &random_number_generator) {
-  auto const &swap = choose_grand_canonical_swap(
-      occ_location, grand_canonical_swap, random_number_generator);
-  return propose_grand_canonical_event_from_swap(e, occ_location, swap,
-                                                 random_number_generator);
+  auto const &swap = choose_semigrand_canonical_swap(
+      occ_location, semigrand_canonical_swap, random_number_generator);
+  return propose_semigrand_canonical_event_from_swap(e, occ_location, swap,
+                                                     random_number_generator);
 }
 
 }  // namespace monte

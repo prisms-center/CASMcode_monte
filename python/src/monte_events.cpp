@@ -977,7 +977,7 @@ PYBIND11_MODULE(_monte_events, m) {
         py::arg("convert"), py::arg("occ_candidate_list"));
 
   m.def("is_allowed_semigrand_canonical_swap",
-        &monte::allowed_grand_canonical_swap,
+        &monte::allowed_semigrand_canonical_swap,
         R"pbdoc(
         Check that candidates form an allowed semi-grand canonical Monte Carlo swap
 
@@ -1002,7 +1002,8 @@ PYBIND11_MODULE(_monte_events, m) {
         )pbdoc",
         py::arg("convert"), py::arg("first"), py::arg("second"));
 
-  m.def("make_semigrad_canonical_swaps", &monte::make_grand_canonical_swaps,
+  m.def("make_semigrand_canonical_swaps",
+        &monte::make_semigrand_canonical_swaps,
         R"pbdoc(
         Make all allowed OccSwap for semi-grand canonical Monte Carlo events
 
@@ -1303,7 +1304,7 @@ PYBIND11_MODULE(_monte_events, m) {
       [](monte::OccLocation const &occ_location,
          std::vector<monte::OccSwap> const &semigrand_canonical_swaps,
          generator_type &random_number_generator) {
-        return monte::choose_grand_canonical_swap(
+        return monte::choose_semigrand_canonical_swap(
             occ_location, semigrand_canonical_swaps, random_number_generator);
       },
       R"pbdoc(
@@ -1331,7 +1332,7 @@ PYBIND11_MODULE(_monte_events, m) {
       "propose_semigrand_canonical_event_from_swap",
       [](monte::OccEvent &e, monte::OccLocation const &occ_location,
          monte::OccSwap const &swap, generator_type &random_number_generator) {
-        return monte::propose_grand_canonical_event_from_swap(
+        return monte::propose_semigrand_canonical_event_from_swap(
             e, occ_location, swap, random_number_generator);
       },
       R"pbdoc(
@@ -1362,9 +1363,9 @@ PYBIND11_MODULE(_monte_events, m) {
       [](monte::OccEvent &e, monte::OccLocation const &occ_location,
          std::vector<monte::OccSwap> const &semigrand_canonical_swaps,
          generator_type &random_number_generator) {
-        return monte::propose_grand_canonical_event(e, occ_location,
-                                                    semigrand_canonical_swaps,
-                                                    random_number_generator);
+        return monte::propose_semigrand_canonical_event(
+            e, occ_location, semigrand_canonical_swaps,
+            random_number_generator);
       },
       R"pbdoc(
         Propose semi-grand canonical OccEvent from list of swap types

@@ -1,28 +1,41 @@
-CASM Monte Carlo Overview
-=========================
+libcasm-monte Usage
+===================
+
+The libcasm-monte package provides data structures and methods that can form the
+building blocks for Monte Carlo simulation implementations. The Python interface is
+provided for controlling simulations, data analysis, and initial testing. For the most
+efficient simulations, C++ extensions are used to implement calculators and checks
+used in the inner loop.
+
+.. note::
+
+    The libcasm-clexmonte_ package provides Python interfaces to efficient C++
+    implementations of the CASM cluster expansion Monte Carlo methods.
 
 
-CASM Monte Carlo implementations consist of two parts: a "model" and a "calculator".
+Overview
+--------
 
-Here, the term "model" is used to refer to the choice of data structures used to
-represent microstates of a crystal system and the choice of methods used to calculate
-microstate properties. For example, the CASM cluster expansion model is implemented
-using the :class:`~libcasm.clexmonte.Configuration` and
-:class:`~libcasm.clexmonte.State` classes to represent microstates and thermodynamic
-conditions, and the :class:`~libcasm.clexmonte.System` class to manage data needed for
-calculating the cluster expansion predicted formation energy, the parametric
-composition, order parameters, and other properties of a particular microstate or
-allowed event.
+CASM Monte Carlo implementations can be roughly divided into two parts: a "model" and a
+"calculator". A model includes:
 
-The term "calculator" refers to methods used to implement a particular type of Monte
-Carlo calculation and any data structures the implementation requires. For example,
-the :class:`libcasm.clexmonte.semigrand_canonical` package implements semi-grand
-canonical Monte Carlo calculations using the CASM cluster expansion model. CASM does not
-expect or require a standard interface to allow any model to work with any calculator.
+- a "configuration" data structure used to represent microstates of a crystal system,
+- the methods used to calculate configuration properties, and
+- a "system" data structure to organize access to the property calculators and any data
+  they use.
 
-Generally, it is expected that one or more calculators are built for a particular model
-re-using generic Monte Carlo methods the libcasm-monte package provides as building
-blocks.
+and a calculator includes:
+
+- an "event generator" method to propose events that update the configuration and
+  allow sampling, and
+- a "potential calculator" method to calculate changes in thermodynamic potential for
+  the proposed events under given thermodynamic conditions, and
+- methods to sample properties, check for convergence, and output results.
+
+CASM does not expect or require a standard interface to allow any model to work with
+any calculator. Generally, it is expected that one or more calculators are built for a
+particular model re-using generic Monte Carlo methods the libcasm-monte package
+provides as building blocks.
 
 The libcasm-monte package includes:
 
@@ -42,18 +55,36 @@ The libcasm-monte package includes:
   purposes.
 
 
-CASM Monte Carlo models
------------------------
+Monte Carlo models
+------------------
 
-In a CASM model the following types are implemented:
+Generally, a model implements:
 
-- a ConfigurationType, to represent a configuration (microstate)
-- a StateType, to represent a configuration and thermodynamic conditions
-- as many as needed PropertyCalculatorType, to implement methods that calculate
-  properties of a state
-- a SystemType, to store property calculators and handle input of data that is used
-  by property calculators, such as neighbor lists, order parameter definitions, and
-  cluster expansion basis sets.
+- a configuration data structure to represent microstates,
+- a state data structure, to represent a configuration and the current thermodynamic
+  conditions,
+- as many property calculation methods as necessary to calculate properties of
+  configurations,
+- a system data structure, to store property calculators, and handle input of data that
+  is used by property calculators, such as parametric composition axes,
+  order parameter definitions, neighbor lists, and cluster expansion basis sets and
+  coefficients.
+
+For example, the CASM cluster expansion model in libcasm-clexmonte_ is implemented
+using:
+
+- the :class:`~libcasm.clexmonte.Configuration`, :class:`~libcasm.clexmonte.State`, and
+  :class:`~libcasm.clexmonte.Conditions`, classes to represent microstates and
+  thermodynamic conditions,
+- the :class:`~libcasm.clexulator.ClusterExpansion` class and related methods for
+  calculating energies,
+- the :class:`~libcasm.composition.CompositionCalculator` and
+  :class:`~libcasm.composition.CompositionConverter` classes and related methods for
+  calculating compositions,
+- the :class:`~libcasm.clexulator.OrderParameter` class for calculating order
+  parameters, and
+- the :class:`~libcasm.clexmonte.System` class to manage the data needed by the
+  calculators.
 
 Existing models:
 
@@ -66,17 +97,31 @@ Existing models:
   libcasm-monte.
 
 
-CASM Monte Carlo calculators
-----------------------------
+Monte Carlo calculators
+-----------------------
 
-In a CASM calculator the following types are implemented:
+A Monte Carlo calculator samples properties of microstates in a particular statistical
+ensemble.
 
-- a MonteCarloCalculatorType, which runs a particular type of Monte Carlo calculation
-- a MonteCarloDataType data structure, which stores data needed by the Monte Carlo
-  calculator
-- a ConditionsType data structure, to represent thermodynamic conditions
-- a PotentialType property calculator, which calculates a thermodynamic potential
-- a EventGeneratorType, which proposes and applies events
+For example, the :class:`libcasm.clexmonte.semigrand_canonical` package implements
+Monte Carlo simulations in the semi-grand canonical ensemble for the CASM cluster
+expansion model.
+
+The :class:`libcasm.clexmonte.semigrand_canonical` package provides:
+
+- the :class:`~libcasm.clexmonte.semigrand_canonical.SemiGrandCanonicalPotential`
+  class for calculating the semi-grand canonical energy,
+- the :class:`~libcasm.clexmonte.semigrand_canonical.SemiGrandCanonicalCalculator`
+  class for sampling microstates in the semi-grand canonical ensemble,
+
+and it uses:
+
+- :class:`~libcasm.clexmonte.Conditions`, for representing thermodynamic conditions, and
+- :class:`~libcasm.monte.sampling.SamplingFixture` and
+  :class:`~libcasm.monte.sampling.RunManager`, to specify sampling functions,
+  sampling, and convergence checking criteria, and to store sampled data and output
+  results.
+
 
 Existing calculator packages:
 
@@ -96,3 +141,4 @@ Existing calculator packages:
 - libcasm.monte.ising_py.semigrand_canonical: An example semi-grand canonical Monte
   Carlo calculator for the Ising model, fully implemented in Python using libcasm-monte.
 
+.. _libcasm-clexmonte: https://prisms-center.github.io/CASMcode_pydocs/libcasm/clexmonte/2.0/
