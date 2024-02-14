@@ -12,6 +12,8 @@ intersphinx_libcasm_packages = [
     ("global", "2.0"),
     ("xtal", "2.0"),
     ("composition", "2.0"),
+    ("clexulator", "2.0"),
+    ("configuration", "2.0"),
 ]
 
 
