@@ -1,8 +1,8 @@
 #ifndef CASM_monte_RunManager
 #define CASM_monte_RunManager
 
-#include "casm/monte/SamplingFixture.hh"
 #include "casm/monte/run_management/RunData.hh"
+#include "casm/monte/run_management/SamplingFixture.hh"
 
 // io
 #include "casm/casm_io/SafeOfstream.hh"
