@@ -146,7 +146,6 @@ set(
   ${PROJECT_SOURCE_DIR}/src/casm/monte/events/io/OccCandidate_stream_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/io/json/ValueMap_json_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/misc/BasicStructureTools.cc
-  ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/RequestedPrecisionConstructor.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/Sampler_json_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/SamplingParams_json_io.cc
 )
