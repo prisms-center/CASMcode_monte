@@ -21,11 +21,6 @@ enum class SAMPLE_METHOD { LINEAR, LOG };
 typedef long CountType;
 typedef double TimeType;
 
-template <typename _ConfigType, typename _RunInfoType>
-class ConfigGenerator;
-template <typename _ConfigType>
-class FixedConfigGenerator;
-
 struct SamplingParams;
 class Sampler;
 typedef std::map<std::string, std::shared_ptr<Sampler>> SamplerMap;
@@ -37,19 +32,6 @@ template <typename _ConfigType>
 struct State;
 
 struct ValueMap;
-
-template <typename _ConfigType>
-struct RunData;
-
-template <typename _ConfigType, typename _RunInfoType>
-class StateGenerator;
-template <typename _ConfigType>
-class IncrementalConditionsStateGenerator;
-template <typename ConfigType>
-struct StateModifyingFunction;
-template <typename _ConfigType>
-using StateModifyingFunctionMap =
-    std::map<std::string, StateModifyingFunction<_ConfigType>>;
 
 template <typename _ConfigType, typename _EngineType>
 struct StateSampler;
@@ -114,6 +96,7 @@ template <typename ConfigType, typename StatisticsType>
 struct SamplingFixtureParams;
 template <typename ConfigType, typename StatisticsType, typename EngineType>
 class SamplingFixture;
+struct RunManagerParams;
 template <typename ConfigType, typename StatisticsType, typename EngineType>
 struct RunManager;
 

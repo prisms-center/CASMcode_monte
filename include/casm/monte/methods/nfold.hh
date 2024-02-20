@@ -42,7 +42,7 @@ struct NfoldData {
   double expected_acceptance_rate;
 };
 
-template <typename ConfigType, typename EventSelectorType,
+template <typename EventIDType, typename ConfigType, typename EventSelectorType,
           typename GetEventType, typename StatisticsType, typename EngineType>
 void nfold(State<ConfigType> &state, OccLocation &occ_location,
            NfoldData<ConfigType, EngineType> &nfold_data,
@@ -52,9 +52,6 @@ void nfold(State<ConfigType> &state, OccLocation &occ_location,
 // --- Implementation ---
 
 /// \brief Run a kinetic Monte Carlo calculation
-///
-/// TODO: clean up the way data is made available to samplers, especiallly
-/// for storing and sharing data taken at the previous sample time.
 ///
 /// \param state The state. Consists of both the initial
 ///     configuration and conditions. Conditions must include `temperature`
@@ -78,7 +75,7 @@ void nfold(State<ConfigType> &state, OccLocation &occ_location,
 /// State properties that are set:
 /// - None
 ///
-template <typename ConfigType, typename EventSelectorType,
+template <typename EventIDType, typename ConfigType, typename EventSelectorType,
           typename GetEventType, typename StatisticsType, typename EngineType>
 void nfold(State<ConfigType> &state, OccLocation &occ_location,
            NfoldData<ConfigType, EngineType> &nfold_data,
@@ -89,7 +86,7 @@ void nfold(State<ConfigType> &state, OccLocation &occ_location,
   double time;
   double event_time;
   double time_increment;
-  clexmonte::EventID selected_event_id;
+  EventIDType selected_event_id;
 
   // Initialize time
   time = 0.0;
@@ -115,7 +112,7 @@ void nfold(State<ConfigType> &state, OccLocation &occ_location,
       post_sample_action;
 
   // Main loop
-  run_manager.initialize(state, occ_location.mol_size());
+  run_manager.initialize(occ_location.mol_size());
   run_manager.update_next_sampling_fixture();
   while (!run_manager.is_complete()) {
     run_manager.write_status_if_due();

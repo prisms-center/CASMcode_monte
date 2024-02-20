@@ -6,7 +6,6 @@
 #include "casm/monte/definitions.hh"
 #include "casm/monte/misc/math.hh"
 #include "casm/monte/run_management/Results.hh"
-#include "casm/monte/run_management/RunData.hh"
 
 namespace CASM {
 namespace monte {
@@ -24,7 +23,6 @@ struct ResultsAnalysisFunction {
   ResultsAnalysisFunction(std::string _name, std::string _description,
                           std::vector<Index> _shape,
                           std::function<Eigen::VectorXd(
-                              RunData<ConfigType> const &,
                               Results<ConfigType, StatisticsType> const &)>
                               _function);
 
@@ -33,7 +31,6 @@ struct ResultsAnalysisFunction {
                           std::vector<std::string> const &_component_names,
                           std::vector<Index> _shape,
                           std::function<Eigen::VectorXd(
-                              RunData<ConfigType> const &,
                               Results<ConfigType, StatisticsType> const &)>
                               _function);
 
@@ -55,20 +52,17 @@ struct ResultsAnalysisFunction {
   std::vector<std::string> component_names;
 
   /// \brief The function to be evaluated
-  std::function<Eigen::VectorXd(RunData<ConfigType> const &,
-                                Results<ConfigType, StatisticsType> const &)>
+  std::function<Eigen::VectorXd(Results<ConfigType, StatisticsType> const &)>
       function;
 
   /// \brief Evaluates `function`
   Eigen::VectorXd operator()(
-      RunData<ConfigType> const &run_data,
       Results<ConfigType, StatisticsType> const &results) const;
 };
 
 /// \brief Evaluate all analysis functions
 template <typename ConfigType, typename StatisticsType>
 std::map<std::string, Eigen::VectorXd> make_analysis(
-    RunData<ConfigType> const &run_data,
     Results<ConfigType, StatisticsType> const &results,
     ResultsAnalysisFunctionMap<ConfigType, StatisticsType> const
         &analysis_functions);
@@ -79,8 +73,7 @@ std::map<std::string, Eigen::VectorXd> make_analysis(
 template <typename ConfigType, typename StatisticsType>
 ResultsAnalysisFunction<ConfigType, StatisticsType>::ResultsAnalysisFunction(
     std::string _name, std::string _description, std::vector<Index> _shape,
-    std::function<Eigen::VectorXd(RunData<ConfigType> const &,
-                                  Results<ConfigType, StatisticsType> const &)>
+    std::function<Eigen::VectorXd(Results<ConfigType, StatisticsType> const &)>
         _function)
     : name(_name),
       description(_description),
@@ -93,8 +86,7 @@ template <typename ConfigType, typename StatisticsType>
 ResultsAnalysisFunction<ConfigType, StatisticsType>::ResultsAnalysisFunction(
     std::string _name, std::string _description,
     std::vector<std::string> const &_component_names, std::vector<Index> _shape,
-    std::function<Eigen::VectorXd(RunData<ConfigType> const &,
-                                  Results<ConfigType, StatisticsType> const &)>
+    std::function<Eigen::VectorXd(Results<ConfigType, StatisticsType> const &)>
         _function)
     : name(_name),
       description(_description),
@@ -105,15 +97,13 @@ ResultsAnalysisFunction<ConfigType, StatisticsType>::ResultsAnalysisFunction(
 /// \brief Evaluates `function`
 template <typename ConfigType, typename StatisticsType>
 Eigen::VectorXd ResultsAnalysisFunction<ConfigType, StatisticsType>::operator()(
-    RunData<ConfigType> const &run_data,
     Results<ConfigType, StatisticsType> const &results) const {
-  return function(run_data, results);
+  return function(results);
 }
 
 /// \brief Evaluate all analysis functions
 template <typename ConfigType, typename StatisticsType>
 std::map<std::string, Eigen::VectorXd> make_analysis(
-    RunData<ConfigType> const &run_data,
     Results<ConfigType, StatisticsType> const &results,
     ResultsAnalysisFunctionMap<ConfigType, StatisticsType> const
         &analysis_functions) {
@@ -121,7 +111,7 @@ std::map<std::string, Eigen::VectorXd> make_analysis(
   for (auto const &pair : analysis_functions) {
     auto const &f = pair.second;
     try {
-      analysis.emplace(f.name, f(run_data, results));
+      analysis.emplace(f.name, f(results));
     } catch (std::exception &e) {
       CASM::err_log() << "Results analysis '" << pair.first
                       << "' failed: " << e.what() << std::endl;

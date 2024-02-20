@@ -1,36 +1,29 @@
 #ifndef CASM_monte_RunManager
 #define CASM_monte_RunManager
 
-#include "casm/monte/run_management/RunData.hh"
 #include "casm/monte/run_management/SamplingFixture.hh"
-
-// io
-#include "casm/casm_io/SafeOfstream.hh"
-#include "casm/casm_io/container/json_io.hh"
-#include "casm/casm_io/json/jsonParser.hh"
-#include "casm/monte/run_management/io/json/RunData_json_io.hh"
 
 namespace CASM {
 namespace monte {
 
 struct RunManagerParams {
-  /// \brief Save all initial_state in completed_runs
-  bool do_save_all_initial_states = false;
-
-  /// \brief Save all final_state in completed_runs
-  bool do_save_all_final_states = false;
-
-  /// \brief Save last final_state in completed_runs
-  bool do_save_last_final_state = true;
-
-  /// \brief Write saved initial_state to completed_runs.json
-  bool do_write_initial_states = false;
-
-  /// \brief Write saved final_state to completed_runs.json
-  bool do_write_final_states = false;
-
-  /// \brief Location to save completed_runs.json if not empty
-  fs::path output_dir;
+  //  /// \brief Save all initial_state in completed_runs
+  //  bool do_save_all_initial_states = false;
+  //
+  //  /// \brief Save all final_state in completed_runs
+  //  bool do_save_all_final_states = false;
+  //
+  //  /// \brief Save last final_state in completed_runs
+  //  bool do_save_last_final_state = true;
+  //
+  //  /// \brief Write saved initial_state to completed_runs.json
+  //  bool do_write_initial_states = false;
+  //
+  //  /// \brief Write saved final_state to completed_runs.json
+  //  bool do_write_final_states = false;
+  //
+  //  /// \brief Location to save completed_runs.json if not empty
+  //  fs::path output_dir;
 
   /// \brief If true, the run is complete if any sampling fixture
   ///     is complete. Otherwise, all sampling fixtures must be
@@ -58,17 +51,14 @@ struct RunManager : public RunManagerParams {
   typedef SamplingFixture<config_type, stats_type, engine_type>
       sampling_fixture_type;
 
+  /// A `run_index` used for status messages and results output
+  Index run_index;
+
   /// Random number generator engine
   std::shared_ptr<engine_type> engine;
 
   /// Sampling fixtures
   std::vector<sampling_fixture_type> sampling_fixtures;
-
-  /// Current run data
-  RunData<config_type> current_run;
-
-  /// Completed runs
-  std::vector<RunData<config_type>> completed_runs;
 
   /// Next time-based sampling fixture, or nullptr if none
   sampling_fixture_type *next_sampling_fixture;
@@ -98,6 +88,7 @@ struct RunManager : public RunManagerParams {
       std::shared_ptr<engine_type> _engine,
       std::vector<sampling_fixture_params_type> const &sampling_fixture_params)
       : RunManagerParams(run_manager_params),
+        run_index(0),
         engine(_engine),
         next_sampling_fixture(nullptr),
         next_sample_time(0.0),
@@ -107,37 +98,9 @@ struct RunManager : public RunManagerParams {
     }
   }
 
-  /// \brief Return completed runs from file
-  ///
-  /// Notes:
-  /// - Reads from output_dir / "completed_runs.json", if exists
-  void read_completed_runs() {
-    completed_runs.clear();
-
-    if (!this->output_dir.empty()) {
-      fs::path completed_runs_path = this->output_dir / "completed_runs.json";
-      if (!fs::exists(completed_runs_path)) {
-        return;
-      }
-      jsonParser json(completed_runs_path);
-      completed_runs = json.get<std::vector<RunData<config_type>>>();
-    }
-    return;
-  }
-
-  void initialize(state_type const &state, Index steps_per_pass) {
-    current_run = RunData<config_type>();
-    current_run.conditions = state.conditions;
-    current_run.transformation_matrix_to_super =
-        get_transformation_matrix_to_super(state);
-    current_run.n_unitcells =
-        current_run.transformation_matrix_to_super.determinant();
-    if (this->do_save_all_initial_states) {
-      current_run.initial_state = state;
-    }
-
+  void initialize(Index steps_per_pass) {
     for (auto &fixture : sampling_fixtures) {
-      fixture.initialize(state, steps_per_pass);
+      fixture.initialize(steps_per_pass);
     }
     break_point_set = false;
   }
@@ -165,7 +128,7 @@ struct RunManager : public RunManagerParams {
 
   void write_status_if_due() {
     for (auto &fixture : sampling_fixtures) {
-      fixture.write_status_if_due(completed_runs.size());
+      fixture.write_status_if_due(run_index);
     }
   }
 
@@ -259,31 +222,32 @@ struct RunManager : public RunManagerParams {
   /// - Writes completed runs to  `output_dir / "completed_runs.json"`
   /// - Calls `finalize` for all sampling fixtures
   void finalize(state_type const &final_state) {
-    if (this->do_save_last_final_state || this->do_save_all_final_states) {
-      current_run.final_state = final_state;
-    }
-    if (completed_runs.size() && this->do_save_last_final_state &&
-        !this->do_save_all_final_states) {
-      completed_runs.back().final_state.reset();
-    }
-    completed_runs.push_back(current_run);
+    //    if (this->do_save_last_final_state || this->do_save_all_final_states)
+    //    {
+    //      current_run.final_state = final_state;
+    //    }
+    //    if (completed_runs.size() && this->do_save_last_final_state &&
+    //        !this->do_save_all_final_states) {
+    //      completed_runs.back().final_state.reset();
+    //    }
+    //    completed_runs.push_back(current_run);
 
     for (auto &fixture : sampling_fixtures) {
-      fixture.finalize(final_state, completed_runs.size(), current_run);
+      fixture.finalize(final_state, run_index);
     }
 
-    // write completed_runs file
-    if (!this->output_dir.empty()) {
-      fs::path completed_runs_path = this->output_dir / "completed_runs.json";
-      fs::create_directories(this->output_dir);
-      SafeOfstream file;
-      file.open(completed_runs_path);
-      jsonParser json;
-      to_json(completed_runs, json, this->do_write_initial_states,
-              this->do_write_final_states);
-      json.print(file.ofstream(), -1);
-      file.close();
-    }
+    //    // write completed_runs file
+    //    if (!this->output_dir.empty()) {
+    //      fs::path completed_runs_path = this->output_dir /
+    //      "completed_runs.json"; fs::create_directories(this->output_dir);
+    //      SafeOfstream file;
+    //      file.open(completed_runs_path);
+    //      jsonParser json;
+    //      to_json(completed_runs, json, this->do_write_initial_states,
+    //              this->do_write_final_states);
+    //      json.print(file.ofstream(), -1);
+    //      file.close();
+    //    }
   }
 };
 

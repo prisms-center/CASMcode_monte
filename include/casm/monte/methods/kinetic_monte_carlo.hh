@@ -131,7 +131,7 @@ void kinetic_monte_carlo(
   double total_rate;
   double event_time;
   double time_increment;
-  clexmonte::EventID selected_event_id;
+  EventIDType selected_event_id;
 
   // Initialize atom positions & time
   kmc_data.time = 0.0;
@@ -170,7 +170,7 @@ void kinetic_monte_carlo(
       };
 
   // Main loop
-  run_manager.initialize(state, occ_location.mol_size());
+  run_manager.initialize(occ_location.mol_size());
   run_manager.update_next_sampling_fixture();
   while (!run_manager.is_complete()) {
     run_manager.write_status_if_due();

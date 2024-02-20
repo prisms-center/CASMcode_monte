@@ -110,20 +110,16 @@ set(
   ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/occupation_metropolis.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/BasicStructureTools.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/math.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/ConfigGenerator.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/FixedConfigGenerator.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/IncrementalConditionsStateGenerator.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/polymorphic_method_json_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/Results.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/ResultsAnalysisFunction.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/RunData.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/RunManager.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/SamplingFixture.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/State.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/StateGenerator.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/StateModifyingFunction.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/StateSampler.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/ResultsIO.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/RunData_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/ResultsIO_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/SamplingFixtureParams_json_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/jsonResultsIO.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/jsonResultsIO_impl.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/RequestedPrecisionConstructor.hh

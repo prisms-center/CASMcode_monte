@@ -112,7 +112,7 @@ void occupation_metropolis(
       1.0 / (CASM::KB * state.conditions.scalar_values.at("temperature"));
 
   // Main loop
-  run_manager.initialize(state, occ_location.mol_size());
+  run_manager.initialize(occ_location.mol_size());
   run_manager.sample_data_by_count_if_due(state);
   while (!run_manager.is_complete()) {
     run_manager.write_status_if_due();

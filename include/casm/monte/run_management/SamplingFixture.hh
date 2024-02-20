@@ -7,7 +7,6 @@
 #include "casm/monte/checks/EquilibrationCheck.hh"
 #include "casm/monte/definitions.hh"
 #include "casm/monte/run_management/Results.hh"
-#include "casm/monte/run_management/RunData.hh"
 #include "casm/monte/run_management/io/ResultsIO.hh"
 #include "casm/monte/sampling/Sampler.hh"
 #include "casm/monte/sampling/SamplingParams.hh"
@@ -99,7 +98,7 @@ class SamplingFixture {
     return m_state_sampler;
   }
 
-  void initialize(state_type const &state, Index steps_per_pass) {
+  void initialize(Index steps_per_pass) {
     m_n_samples = 0;
     m_count = 0;
     m_is_complete = false;
@@ -190,8 +189,7 @@ class SamplingFixture {
     m_state_sampler.sample_data_by_time_if_due(state, event_time, log);
   }
 
-  void finalize(state_type const &state, Index run_index,
-                RunData<config_type> const &run_data) {
+  void finalize(state_type const &state, Index run_index) {
     Log &log = m_params.method_log.log;
     m_results.elapsed_clocktime = log.time_s();
     m_results.samplers = std::move(m_state_sampler.samplers);
@@ -201,13 +199,12 @@ class SamplingFixture {
     m_results.sample_clocktime = std::move(m_state_sampler.sample_clocktime);
     m_results.sample_trajectory = std::move(m_state_sampler.sample_trajectory);
     m_results.completion_check_results = m_completion_check.results();
-    m_results.analysis =
-        make_analysis(run_data, m_results, m_params.analysis_functions);
+    m_results.analysis = make_analysis(m_results, m_params.analysis_functions);
     m_results.n_accept = m_state_sampler.n_accept;
     m_results.n_reject = m_state_sampler.n_reject;
 
     if (m_params.results_io) {
-      m_params.results_io->write(m_results, run_data.conditions, run_index);
+      m_params.results_io->write(m_results, state.conditions, run_index);
     }
 
     write_status(run_index);
