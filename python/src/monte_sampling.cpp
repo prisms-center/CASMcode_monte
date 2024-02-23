@@ -46,6 +46,7 @@ monte::SamplingParams make_sampling_params(
     std::vector<std::string> sampler_names, monte::SAMPLE_MODE sample_mode,
     monte::SAMPLE_METHOD sample_method, double period,
     std::optional<double> begin, double base, double shift,
+    std::optional<std::function<double(monte::CountType)>> custom_sample_at,
     bool stochastic_sample_period, bool do_sample_trajectory,
     bool do_sample_time) {
   if (!begin.has_value()) {
@@ -53,10 +54,19 @@ monte::SamplingParams make_sampling_params(
       begin = period;
     } else if (sample_method == monte::SAMPLE_METHOD::LOG) {
       begin = 0.0;
+    } else if (sample_method == monte::SAMPLE_METHOD::CUSTOM) {
+      begin = 0.0;
     } else {
       throw std::runtime_error(
           "Error in make_sampling_params: Invalid sample_method");
     }
+  }
+  if (sample_method == monte::SAMPLE_METHOD::CUSTOM &&
+      !custom_sample_at.has_value()) {
+    throw std::runtime_error(
+        "Error in make_sampling_params: "
+        "sample_method==SAMPLE_METHOD::CUSTOM and "
+        "!custom_sample_at.has_value()");
   }
   monte::SamplingParams s;
   s.sampler_names = sampler_names;
@@ -66,6 +76,9 @@ monte::SamplingParams make_sampling_params(
   s.begin = begin.value();
   s.base = base;
   s.shift = shift;
+  if (custom_sample_at.has_value()) {
+    s.custom_sample_at = custom_sample_at.value();
+  }
   s.stochastic_sample_period = stochastic_sample_period;
   s.do_sample_trajectory = do_sample_trajectory;
   s.do_sample_time = do_sample_time;
@@ -322,17 +335,19 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           .. code-block:: Python
 
-              sample_mode = libcasm.monte.SAMPLE_MODE.BY_PASS
+              from libcasm.monte.sampling import SAMPLE_MODE
+              sample_mode = SAMPLE_MODE.BY_PASS
 
 
           )pbdoc")
       .value("BY_STEP", monte::SAMPLE_MODE::BY_STEP,
              R"pbdoc(
-          Sample by Monte Carlo step (1 step == 1 Metropolis attempt):
+          Sample by Monte Carlo step (i.e. one Metropolis proposal or one KMC event):
 
           .. code-block:: Python
 
-              sample_mode = libcasm.monte.SAMPLE_MODE.BY_PASS
+              from libcasm.monte.sampling import SAMPLE_MODE
+              sample_mode = libcasm.monte.sampling.SAMPLE_MODE.BY_PASS
 
 
           )pbdoc")
@@ -342,7 +357,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           .. code-block:: Python
 
-              sample_mode = libcasm.monte.SAMPLE_MODE.BY_TIME
+              from libcasm.monte.sampling import SAMPLE_MODE
+              sample_mode = SAMPLE_MODE.BY_TIME
 
           )pbdoc")
       .export_values();
@@ -357,7 +373,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           .. code-block:: Python
 
-              sample_method = libcasm.monte.SAMPLE_METHOD.LINEAR
+              from libcasm.monte.sampling import SAMPLE_METHOD
+              sample_method = SAMPLE_METHOD.LINEAR
 
           )pbdoc")
       .value("LOG", monte::SAMPLE_METHOD::LOG,
@@ -366,7 +383,18 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           .. code-block:: Python
 
+              from libcasm.monte.sampling import SAMPLE_METHOD
               sample_method = libcasm.monte.SAMPLE_METHOD.LOG
+
+          )pbdoc")
+      .value("CUSTOM", monte::SAMPLE_METHOD::CUSTOM,
+             R"pbdoc(
+          Use a custom function to specify sample spacing:
+
+          .. code-block:: Python
+
+              from libcasm.monte.sampling import SAMPLE_METHOD
+              sample_method = libcasm.monte.SAMPLE_METHOD.CUSTOM
 
           )pbdoc")
       .export_values();
@@ -376,34 +404,73 @@ PYBIND11_MODULE(_monte_sampling, m) {
       )pbdoc")
       .def(py::init<>(&make_sampling_params),
            R"pbdoc(
-          .. rubric:: Constructor
 
-          Notes
-          -----
+          .. rubric:: Sample mode
 
-          For ``SAMPLE_METHOD.LINEAR``, take the n-th sample (n=1,2,3,...) when:
+          Sampling can be requested in three modes: by Monte Carlo step, pass,
+          or simulated time (if applicable). A Monte Carlo pass is defined
+          as performing a number Monte Carlo steps equal to the number of
+          supercell sites with degrees of freedom. It is called sampling by
+          count if the sampling is performed by step or pass, and sampling by
+          time if the sampling is performed by simulated time.
+
+          .. rubric:: Sample spacing
+
+          Sample spacing can be either linear or logarithmic. Generally linear
+          sampling is used for calculating statistics, but logarithmic sampling
+          can be useful for understanding system dynamics, especially in kinetic
+          Monte Carlo calculations.
+
+          For linear sample spacing, the n-th sample (n=0,1,2,...) is taken
+          when the step/pass count or simulated time is equal to:
 
           .. code-block:: Python
 
-              sample/pass = round( begin + period * (n-1) )
+              count = round( begin + period * n )
 
-              time = begin + period * (n-1)
+              time = begin + period * n
 
-          The default values are:
-
-          For ``SAMPLE_METHOD.LOG``, take the n-th sample when:
+          For logarithmic sample spacing, the n-th sample is taken when:
 
           .. code-block:: Python
 
-              sample/pass = round( begin + base ** ( (n-1) + shift)
+              count = round( begin + base ** ( n + shift)
 
-              time = begin + base ** ( (n-1) + shift) )
+              time = begin + base ** ( n + shift) )
+
+
+          .. rubric:: Custom sample spacing
+
+          It is also possible to provide a custom sample spacing function,
+          using :py:attr:`SAMPLE_METHOD.CUSTOM`. A function must be provided
+          which returns a non-decreasing series of values indicating the
+          count/time at which a sample should be taken. It must have the
+          signature:
+
+          .. code-block:: Python
+
+              def custom_sample_at(n: int) -> float:
+                  ...
+
+          where `n` is the sample index (n=0,1,2,...).
+
+          .. rubric:: Stochastic sample spacing
+
+          Occasionally it is useful to take samples at stochastically spaced
+          intervals instead of deterministic intervals, for instance to
+          understand systems with highly correlated events.
 
           If ``stochastic_sample_period == true``, then instead of setting the
-          sample time / count deterministally, the mean sample rate
-          (samples per count/time) is calculated as the inverse of the
-          count/time until the next sample would be taken in a
-          non-stochastic fashion.
+          sample count/time deterministically, samples are taken
+          probabilistically based on mean sample rate (samples per count/time).
+          For linear sample spacing, the mean sample rate is calculated as
+          :math:`1/p`, where :math:`p` is the sample `period`. For logarithmic
+          sample spacing the mean sample rate is calculated as
+          :math:`1/\left(ln(b)b^{n+s}\right)`, where `b` is the `base`
+          and `s` is the `shift`. For custom sample spacing, the mean
+          sample rate is calculated as :math:`1/\left(f(n+1) - f(n)\right)`,
+          where :math:`f(n)` is the custom sample count/time for the n-th
+          sample.
 
           For sampling by count: If the mean sample rate is 1.0 or
           greater, a sample is taken every step or pass. If the mean sample
@@ -414,24 +481,30 @@ PYBIND11_MODULE(_monte_sampling, m) {
           as a Poisson process with mean rate :math:`r` using :math:`-ln(R)/r`,
           where :math:`R` is a random number in :math:`[0, 1.0)`.
 
+          .. rubric:: Constructor
 
           Parameters
           ----------
           sampler_names: list[str] = []
               List of sampling functions to call when a sample is taken.
-          sample_mode: SAMPLE_MODE = SAMPLE_MODE.BY_PASS
+          sample_mode: :class:`SAMPLE_MODE` = :py:attr:`SAMPLE_MODE.BY_PASS`
               Sample by pass, step, or time.
-          sample_method: SAMPLE_METHOD = SAMPLE_METHOD.LINEAR
-              Sample linearly or logarithmically.
+          sample_method: :class:`SAMPLE_METHOD` = :py:attr:`SAMPLE_METHOD.LINEAR`
+              Sample with linear, logarithmic, or custom spacing.
           period: float = 1.0
               Sample spacing parameter.
           begin: Optional[float] = None
               Sample spacing parameter. If None, uses `period` with
-              SAMPLE_METHOD.LINEAR, uses 0.0 with  SAMPLE_METHOD.LOG.
-          base: float = math.pow(10.0, 1./10.0)
+              :py:attr:`SAMPLE_METHOD.LINEAR`, and uses 0.0 with
+              :py:attr:`SAMPLE_METHOD.LOG`.
+          base: float = math.pow(10.0, 1.0/10.0)
               Base for log sample spacing.
           shift: float = 1.0
               Log sample spacing parameter.
+          custom_sample_at: Optional[Callable] = None
+              A custom sample spacing function, which must have the signature
+              ``def custom_sample_at(n: int) -> float``, used with
+              :py:attr:`SAMPLE_METHOD.CUSTOM`.
           stochastic_sample_period: bool = False
               If true, the sample period is stochastically chosen based on
               the mean sample rate.
@@ -446,17 +519,21 @@ PYBIND11_MODULE(_monte_sampling, m) {
            py::arg("sample_method") = monte::SAMPLE_METHOD::LINEAR,
            py::arg("period") = 1.0, py::arg("begin") = std::nullopt,
            py::arg("base") = std::pow(10.0, 1.0 / 10.0), py::arg("shift") = 0.0,
+           py::arg("custom_sample_at") = std::nullopt,
            py::arg("stochastic_sample_period") = false,
            py::arg("do_sample_trajectory") = false,
            py::arg("do_sample_time") = false)
       .def_readwrite("sample_mode", &monte::SamplingParams::sample_mode,
                      R"pbdoc(
-          SAMPLE_MODE: Sample by pass, step, or time. Default=``SAMPLE_MODE.BY_PASS``.
+          SAMPLE_MODE: Sample by pass, step, or time.
+
+          The default value is :py:attr:`SAMPLE_MODE.BY_PASS`.
           )pbdoc")
       .def_readwrite("sample_method", &monte::SamplingParams::sample_mode,
                      R"pbdoc(
-          SAMPLE_METHOD: Sample linearly or logarithmically. Default=``SAMPLE_METHOD.LINEAR``.
+          SAMPLE_METHOD: Sample with linear, logarithmic, or custom spacing.
 
+          The default value is :py:attr:`SAMPLE_METHOD.LINEAR`.
           )pbdoc")
       .def_readwrite("begin", &monte::SamplingParams::begin, R"pbdoc(
           float: See `sample_method`. Default=``1.0``.
@@ -1824,17 +1901,17 @@ PYBIND11_MODULE(_monte_sampling, m) {
               If None, the default is :class:`~libcasm.monte.sampling.default_equilibration_check`.
           log_spacing: bool = False
               If True, use logarithmic spacing for completion checking; else use linear
-              spacing. For linear spacing, the n-th check (n=1,2,3,...) will be taken when:
+              spacing. For linear spacing, the n-th check (n=0,1,2,...) will be taken when:
 
               .. code-block:: Python
 
-                  sample = check_begin + check_period * (n-1)
+                  sample = check_begin + check_period * n
 
               For logarithmic spacing, the n-th check will be taken when:
 
               .. code-block:: Python
 
-                  sample = check_begin + round( check_base ** ((n-1) + check_shift) )
+                  sample = check_begin + round( check_base ** (n + check_shift) )
 
               However, if check(n) - check(n-1) > `check_period_max`, then subsequent
               checks are made every `check_period_max` samples.

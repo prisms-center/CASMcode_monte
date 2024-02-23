@@ -16,7 +16,7 @@ namespace monte {
 enum class SAMPLE_MODE { BY_STEP, BY_PASS, BY_TIME };
 
 /// How to sample by time
-enum class SAMPLE_METHOD { LINEAR, LOG };
+enum class SAMPLE_METHOD { LINEAR, LOG, CUSTOM };
 
 typedef long CountType;
 typedef double TimeType;

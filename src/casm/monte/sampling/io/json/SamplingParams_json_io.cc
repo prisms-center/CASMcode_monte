@@ -18,7 +18,7 @@ namespace monte {
 ///
 ///   spacing: string (optional, default="linear")
 ///     The spacing of samples in the specified `"period"`. One of "linear"
-///     or "log".
+///     or "log". Custom functions must be specified using the Python interface.
 ///
 ///     For "linear" spacing, the n-th (n=0,1,2,...) sample will be taken when:
 ///

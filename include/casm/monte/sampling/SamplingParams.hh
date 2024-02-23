@@ -41,6 +41,11 @@ struct SamplingParams {
   ///    sample/pass = round( begin + base ^ ( n + shift )
   ///           time = begin + base ^ ( n + shift )
   ///
+  /// For SAMPLE_METHOD::CUSTOM, take the n-th sample when:
+  ///
+  ///    sample/pass = round( custom_sample_at(n) )
+  ///           time = custom_sample_at(n)
+  ///
   /// If stochastic_sample_period == true, then instead of setting the sample
   /// time / count deterministically, use the sampling period to determine the
   /// sampling rate and determine the next sample time / count stochastically.
@@ -60,6 +65,9 @@ struct SamplingParams {
 
   /// \brief See `sample_method`
   double shift;
+
+  /// \brief Custom sample spacing function
+  std::function<double(CountType)> custom_sample_at;
 
   /// \brief See `sample_method`
   bool stochastic_sample_period;
@@ -179,8 +187,15 @@ inline double sample_at(CountType sample_index,
   double n = static_cast<double>(sample_index);
   if (s.sample_method == SAMPLE_METHOD::LINEAR) {
     return s.begin + s.period * n;
-  } else /* sample_method == SAMPLE_METHOD::LOG */ {
+  } else if (s.sample_method == SAMPLE_METHOD::LOG) {
     return s.begin + std::pow(s.base, (n + s.shift));
+  } else {
+    if (!s.custom_sample_at) {
+      throw std::runtime_error(
+          "Error in sample_at: sample_method==SAMPLE_METHOD::CUSTOM and "
+          "!custom_sample_at");
+    }
+    return s.custom_sample_at(n);
   }
 }
 
@@ -257,8 +272,16 @@ double stochastic_sample_at(
   double rate;
   if (s.sample_method == SAMPLE_METHOD::LINEAR) {
     rate = 1.0 / s.period;
-  } else /* sample_method == SAMPLE_METHOD::LOG */ {
+  } else if (s.sample_method == SAMPLE_METHOD::LOG) {
     rate = 1.0 / (std::log(s.base) * std::pow(s.base, (n + s.shift)));
+  } else if (s.sample_method == SAMPLE_METHOD::LOG) {
+    if (!s.custom_sample_at) {
+      throw std::runtime_error(
+          "Error in stochastic_sample_at: "
+          "sample_method==SAMPLE_METHOD::CUSTOM and "
+          "!custom_sample_at");
+    }
+    rate = 1.0 / (s.custom_sample_at(n + 1) - s.custom_sample_at(n));
   }
   if (s.sample_mode == SAMPLE_MODE::BY_TIME) {
     return sample_time.back() +
