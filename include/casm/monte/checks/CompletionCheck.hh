@@ -18,20 +18,27 @@ namespace monte {
 /// \brief Parameters that determine if a calculation is complete
 template <typename StatisticsType>
 struct CompletionCheckParams {
+  /// \brief Default constructor
+  CompletionCheckParams();
+
   /// \brief Completion check parameters that don't depend on the sampled values
   CutoffCheckParams cutoff_params;
 
   /// \brief Function that performs equilibration checking
+  ///
+  /// Defaults to monte::default_equilibration_check
   EquilibrationCheckFunction equilibration_check_f;
 
   /// \brief Function to calculate statistics
+  ///
+  /// Defaults to monte::default_statistics_calculator<StatisticsType>()
   CalcStatisticsFunction<StatisticsType> calc_statistics_f;
 
   /// \brief Sampler components that must be checked for convergence, and the
   ///     estimated precision to which the mean must be converged
   std::map<SamplerComponent, RequestedPrecision> requested_precision;
 
-  //  For "linear" spacing, the n-th check will be taken when:
+  //  For "linear" spacing, the n-th check (n=0,1,2,...) will be taken when:
   //
   //      sample_check_linear(n) = round( check_begin + check_period * n )
   //
@@ -43,7 +50,7 @@ struct CompletionCheckParams {
   //  However, if sample(n) - sample(n-1) > check_period_max; then subsequent
   //  samples are taken every `check_period_max` samples.
 
-  /// Logirithmic checking or linear check spacing
+  /// Logarithmic checking or linear check spacing
   bool log_spacing = false;
 
   // Check spacing parameters
@@ -154,9 +161,9 @@ struct CompletionCheckResults {
   /// - params
   void full_reset(std::optional<CountType> _count = std::nullopt,
                   std::optional<TimeType> _time = std::nullopt,
-                  CountType _n_samples = 0) {
+                  TimeType _clocktime = 0.0, CountType _n_samples = 0) {
     // params: do not reset
-    partial_reset(_count, _time, _n_samples);
+    partial_reset(_count, _time, _clocktime, _n_samples);
     n_samples_at_convergence_check = std::nullopt;
     equilibration_check_results = EquilibrationCheckResults();
     convergence_check_results = ConvergenceCheckResults<StatisticsType>();
@@ -218,6 +225,13 @@ class CompletionCheck {
 };
 
 // --- Inline definitions ---
+
+/// \brief Default constructor
+template <typename StatisticsType>
+CompletionCheckParams<StatisticsType>::CompletionCheckParams()
+    : cutoff_params(),
+      equilibration_check_f(default_equilibration_check),
+      calc_statistics_f(default_statistics_calculator<StatisticsType>()) {}
 
 template <typename StatisticsType>
 void CompletionCheck<StatisticsType>::reset() {

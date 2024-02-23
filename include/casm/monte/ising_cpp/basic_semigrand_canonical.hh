@@ -24,8 +24,8 @@
 #include "casm/monte/ising_cpp/model.hh"
 #include "casm/monte/methods/basic_occupation_metropolis.hh"
 #include "casm/monte/methods/metropolis.hh"
-#include "casm/monte/run_management/StateSampler.hh"
 #include "casm/monte/sampling/Sampler.hh"
+#include "casm/monte/sampling/StateSamplingFunction.hh"
 
 namespace CASM {
 namespace monte {

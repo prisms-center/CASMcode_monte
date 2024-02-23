@@ -7,7 +7,6 @@
 #include "casm/monte/events/OccEventProposal.hh"
 #include "casm/monte/events/OccLocation.hh"
 #include "casm/monte/run_management/State.hh"
-#include "casm/monte/run_management/StateSampler.hh"
 #include "gtest/gtest.h"
 #include "testConfiguration.hh"
 #include "teststructures.hh"

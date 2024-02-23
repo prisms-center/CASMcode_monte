@@ -6,30 +6,7 @@
 namespace CASM {
 namespace monte {
 
-struct RunManagerParams {
-  //  /// \brief Save all initial_state in completed_runs
-  //  bool do_save_all_initial_states = false;
-  //
-  //  /// \brief Save all final_state in completed_runs
-  //  bool do_save_all_final_states = false;
-  //
-  //  /// \brief Save last final_state in completed_runs
-  //  bool do_save_last_final_state = true;
-  //
-  //  /// \brief Write saved initial_state to completed_runs.json
-  //  bool do_write_initial_states = false;
-  //
-  //  /// \brief Write saved final_state to completed_runs.json
-  //  bool do_write_final_states = false;
-  //
-  //  /// \brief Location to save completed_runs.json if not empty
-  //  fs::path output_dir;
-
-  /// \brief If true, the run is complete if any sampling fixture
-  ///     is complete. Otherwise, all sampling fixtures must be
-  ///     completed for the run to be completed
-  bool global_cutoff = true;
-};
+struct RunCounter {};
 
 /// \brief Holds sampling fixtures and checks for completion
 ///
@@ -40,7 +17,7 @@ struct RunManagerParams {
 ///   generator is more complicated otherwise.
 ///
 template <typename _ConfigType, typename _StatisticsType, typename _EngineType>
-struct RunManager : public RunManagerParams {
+struct RunManager {
   typedef _ConfigType config_type;
   typedef _StatisticsType stats_type;
   typedef _EngineType engine_type;
@@ -59,6 +36,11 @@ struct RunManager : public RunManagerParams {
 
   /// Sampling fixtures
   std::vector<sampling_fixture_type> sampling_fixtures;
+
+  /// \brief If true, the run is complete if any sampling fixture
+  ///     is complete. Otherwise, all sampling fixtures must be
+  ///     completed for the run to be completed
+  bool global_cutoff;
 
   /// Next time-based sampling fixture, or nullptr if none
   sampling_fixture_type *next_sampling_fixture;
@@ -83,17 +65,24 @@ struct RunManager : public RunManagerParams {
 
   bool break_point_set;
 
+  /// \brief Constructor
+  ///
+  /// \param _engine Random number generation engine
+  /// \param _sampling_fixture_params Sampling fixture parameters
+  /// \param _global_cutoff If true, the run is complete if any sampling fixture
+  ///     is complete. Otherwise, all sampling fixtures must be
+  ///     completed for the run to be completed.
   RunManager(
-      RunManagerParams const &run_manager_params,
       std::shared_ptr<engine_type> _engine,
-      std::vector<sampling_fixture_params_type> const &sampling_fixture_params)
-      : RunManagerParams(run_manager_params),
-        run_index(0),
+      std::vector<sampling_fixture_params_type> const &_sampling_fixture_params,
+      bool _global_cutoff = true)
+      : run_index(0),
         engine(_engine),
+        global_cutoff(_global_cutoff),
         next_sampling_fixture(nullptr),
         next_sample_time(0.0),
         break_point_set(false) {
-    for (auto const &params : sampling_fixture_params) {
+    for (auto const &params : _sampling_fixture_params) {
       sampling_fixtures.emplace_back(params, engine);
     }
   }
@@ -163,9 +152,9 @@ struct RunManager : public RunManagerParams {
       PreSampleActionType pre_sample_f = PreSampleActionType(),
       PostSampleActionType post_sample_f = PostSampleActionType()) {
     for (auto &fixture : sampling_fixtures) {
-      auto const &ss = fixture.state_sampler();
-      if (ss.sample_mode != SAMPLE_MODE::BY_TIME) {
-        if (ss.count == ss.next_sample_count) {
+      if (fixture.params().sampling_params.sample_mode !=
+          SAMPLE_MODE::BY_TIME) {
+        if (fixture.counter().count == fixture.next_sample_count()) {
           pre_sample_f(fixture, state);
           fixture.sample_data(state);
           post_sample_f(fixture, state);
@@ -205,11 +194,11 @@ struct RunManager : public RunManagerParams {
     // update next_sample_time and next_sampling_fixture
     next_sampling_fixture = nullptr;
     for (auto &fixture : sampling_fixtures) {
-      auto const &ss = fixture.state_sampler();
-      if (ss.sample_mode == SAMPLE_MODE::BY_TIME) {
+      if (fixture.params().sampling_params.sample_mode ==
+          SAMPLE_MODE::BY_TIME) {
         if (next_sampling_fixture == nullptr ||
-            ss.next_sample_time < next_sample_time) {
-          next_sample_time = ss.next_sample_time;
+            fixture.next_sample_time() < next_sample_time) {
+          next_sample_time = fixture.next_sample_time();
           next_sampling_fixture = &fixture;
         }
       }
@@ -219,35 +208,11 @@ struct RunManager : public RunManagerParams {
   /// \brief Write results for each sampling fixtures and write completed runs
   ///
   /// Notes:
-  /// - Writes completed runs to  `output_dir / "completed_runs.json"`
   /// - Calls `finalize` for all sampling fixtures
   void finalize(state_type const &final_state) {
-    //    if (this->do_save_last_final_state || this->do_save_all_final_states)
-    //    {
-    //      current_run.final_state = final_state;
-    //    }
-    //    if (completed_runs.size() && this->do_save_last_final_state &&
-    //        !this->do_save_all_final_states) {
-    //      completed_runs.back().final_state.reset();
-    //    }
-    //    completed_runs.push_back(current_run);
-
     for (auto &fixture : sampling_fixtures) {
       fixture.finalize(final_state, run_index);
     }
-
-    //    // write completed_runs file
-    //    if (!this->output_dir.empty()) {
-    //      fs::path completed_runs_path = this->output_dir /
-    //      "completed_runs.json"; fs::create_directories(this->output_dir);
-    //      SafeOfstream file;
-    //      file.open(completed_runs_path);
-    //      jsonParser json;
-    //      to_json(completed_runs, json, this->do_write_initial_states,
-    //              this->do_write_final_states);
-    //      json.print(file.ofstream(), -1);
-    //      file.close();
-    //    }
   }
 };
 

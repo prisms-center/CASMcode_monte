@@ -5,6 +5,7 @@
 
 #include "casm/monte/checks/CompletionCheck.hh"
 #include "casm/monte/run_management/State.hh"
+#include "casm/monte/sampling/StateSamplingFunction.hh"
 
 namespace CASM {
 namespace monte {
@@ -58,6 +59,28 @@ struct Results {
 
   /// Number of rejections
   long long n_reject;
+
+  void reset(std::vector<std::string> sampler_names,
+             StateSamplingFunctionMap const &sampling_functions) {
+    elapsed_clocktime.reset();
+    samplers.clear();
+    analysis.clear();
+    sample_count.clear();
+    sample_time.clear();
+    sample_weight.clear();
+    sample_clocktime.clear();
+    sample_trajectory.clear();
+    completion_check_results.full_reset();
+    n_accept = 0;
+    n_reject = 0;
+
+    for (auto const &sampler_name : sampler_names) {
+      auto const &function = sampling_functions.at(sampler_name);
+      auto shared_sampler =
+          std::make_shared<Sampler>(function.shape, function.component_names);
+      samplers.emplace(function.name, shared_sampler);
+    }
+  }
 };
 
 template <typename ConfigType, typename StatisticsType>

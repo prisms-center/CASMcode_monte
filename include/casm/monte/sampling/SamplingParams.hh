@@ -1,8 +1,10 @@
 #ifndef CASM_monte_SamplingParams
 #define CASM_monte_SamplingParams
 
+#include <utility>
 #include <vector>
 
+#include "casm/monte/RandomNumberGenerator.hh"
 #include "casm/monte/definitions.hh"
 
 namespace CASM {
@@ -13,6 +15,13 @@ struct SamplingParams {
   /// Default constructor
   SamplingParams();
 
+  /// \brief What quantities to sample
+  ///
+  /// These name must match StateSamplingFunction names.
+  ///
+  /// Default={}
+  std::vector<std::string> sampler_names;
+
   /// \brief Sample by step, pass, or time
   ///
   /// Default=SAMPLE_MODE::BY_PASS
@@ -22,19 +31,18 @@ struct SamplingParams {
   ///
   /// Default=SAMPLE_METHOD::LINEAR
   ///
-  /// For SAMPLE_METHOD::LINEAR, take the n-th sample when:
+  /// For SAMPLE_METHOD::LINEAR, take the n-th sample (n=0, 1, 2, ...) when:
   ///
-  ///    sample/pass = round( begin + (period / samples_per_period) * n )
-  ///           time = begin + (period / samples_per_period) * n
+  ///    sample/pass = round( begin + period * n )
+  ///           time = begin + period * n
   ///
   /// For SAMPLE_METHOD::LOG, take the n-th sample when:
   ///
-  ///    sample/pass = round( begin + period ^ ( (n + shift) /
-  ///                      samples_per_period ) )
-  ///           time = begin + period ^ ( (n + shift) / samples_per_period )
+  ///    sample/pass = round( begin + base ^ ( n + shift )
+  ///           time = begin + base ^ ( n + shift )
   ///
   /// If stochastic_sample_period == true, then instead of setting the sample
-  /// time / count deterministally, use the sampling period to determine the
+  /// time / count deterministically, use the sampling period to determine the
   /// sampling rate and determine the next sample time / count stochastically.
   ///
   SAMPLE_METHOD sample_method;
@@ -42,26 +50,19 @@ struct SamplingParams {
   // --- Parameters for determining when samples are taken ---
 
   /// \brief See `sample_method`
-  double begin;
-
-  /// \brief See `sample_method`
   double period;
 
   /// \brief See `sample_method`
-  double samples_per_period;
+  double begin;
+
+  /// \brief See `sample_method`
+  double base;
 
   /// \brief See `sample_method`
   double shift;
 
   /// \brief See `sample_method`
   bool stochastic_sample_period;
-
-  /// \brief What quantities to sample
-  ///
-  /// These name must match StateSamplingFunction names.
-  ///
-  /// Default={}
-  std::vector<std::string> sampler_names;
 
   /// \brief If true, save the configuration when a sample is taken
   ///
@@ -74,17 +75,61 @@ struct SamplingParams {
   bool do_sample_time;
 };
 
-// /// The pass/step/time when a particular sample should be taken
-// double sample_at(SamplingParams const &sampling_params, CountType
-// sample_index);
-//
-// /// \brief Returns true if samples should be taken - count based sampling
-// bool sample_is_due(SamplingParams const &sampling_params,
-//                    CountType sample_index, CountType count);
-//
-// /// \brief Returns true if samples should be taken - time based sampling
-// bool sample_is_due(SamplingParams const &sampling_params,
-//                    CountType sample_index, TimeType time);
+struct MakeSamplingParams {
+  MakeSamplingParams() = default;
+
+  operator SamplingParams const &() const { return m_sampling_params; }
+
+  MakeSamplingParams &sampler_names(std::vector<std::string> x) {
+    m_sampling_params.sampler_names = x;
+    return *this;
+  }
+
+  MakeSamplingParams &sample_by_step() {
+    m_sampling_params.sample_mode = SAMPLE_MODE::BY_PASS;
+    return *this;
+  }
+
+  MakeSamplingParams &sample_by_time() {
+    m_sampling_params.sample_mode = SAMPLE_MODE::BY_TIME;
+    return *this;
+  }
+
+  MakeSamplingParams &log_sampling() {
+    m_sampling_params.sample_method = SAMPLE_METHOD::LOG;
+    m_sampling_params.begin = 0.0;
+    return *this;
+  }
+
+  SamplingParams m_sampling_params;
+};
+
+/// \brief Return the count / time when the sample_index-th sample should be
+///     taken
+double sample_at(CountType sample_index, SamplingParams const &sampling_params);
+
+/// \brief Stochastically determine how many steps or passes
+///     until the next sample
+template <typename EngineType>
+CountType stochastic_count_step(
+    double sample_rate,
+    monte::RandomNumberGenerator<EngineType> random_number_generator);
+
+/// \brief Stochastically determine much time
+///     until the next sample
+template <typename EngineType>
+TimeType stochastic_time_step(
+    TimeType sample_rate,
+    monte::RandomNumberGenerator<EngineType> random_number_generator);
+
+/// \brief Return the count / time when the sample_index-th sample should be
+///     taken
+template <typename EngineType>
+double stochastic_sample_at(
+    CountType sample_index, SamplingParams const &sampling_params,
+    monte::RandomNumberGenerator<EngineType> random_number_generator,
+    std::vector<CountType> const &sample_count,
+    std::vector<TimeType> const &sample_time);
 
 }  // namespace monte
 }  // namespace CASM
@@ -97,85 +142,132 @@ namespace monte {
 /// Default constructor
 ///
 /// Default values are:
+/// - sampler_names={}
 /// - sample_mode=SAMPLE_MODE::BY_PASS
 /// - sample_method=SAMPLE_METHOD::LINEAR
-/// - begin=0.0
+/// - begin=1.0
 /// - period=1.0
-/// - samples_per_period=1.0
-/// - shift=0.0
-/// - sampler_names={}
+/// - base=std::pow(10.0,1.0/10.0)
+/// - shift=10.0
+/// - stochastic_sample_period=false
 /// - do_sample_trajectory=false
 /// - do_sample_time=false
 inline SamplingParams::SamplingParams()
-    : sample_mode(SAMPLE_MODE::BY_PASS),
+    : sampler_names({}),
+      sample_mode(SAMPLE_MODE::BY_PASS),
       sample_method(SAMPLE_METHOD::LINEAR),
-      begin(0.0),
+      begin(1.0),
       period(1.0),
-      samples_per_period(1.0),
-      shift(0.0),
-      sampler_names({}),
+      base(std::pow(10.0, 1.0 / 10.0)),
+      shift(10.0),
+      stochastic_sample_period(false),
       do_sample_trajectory(false),
       do_sample_time(false) {}
 
-// /// The pass/step/time when a particular sample should be taken
-// inline double sample_at(SamplingParams const &sampling_params,
-//                         CountType sample_index) {
-//   SamplingParams const &s = sampling_params;
-//   double n = static_cast<double>(sample_index);
-//   double value;
-//   if (s.sample_method == SAMPLE_METHOD::LINEAR) {
-//     value = s.begin + (s.period / s.samples_per_period) * n;
-//   } else /* sample_method == SAMPLE_METHOD::LOG */ {
-//     value = s.begin + std::pow(s.period, (n + s.shift) /
-//     s.samples_per_period);
-//   }
-//   return value;
-// }
+/// \brief Return the count / time when the sample_index-th sample should be
+///     taken
+///
+/// \param sample_index Index for sample (0, 1, 2, ...)
+/// \param sampling_params Sampling method parameters
+/// \return The time or count at which the sample_index-th sample should be
+///     taken, as a double
+///
+inline double sample_at(CountType sample_index,
+                        SamplingParams const &sampling_params) {
+  SamplingParams const &s = sampling_params;
+
+  double n = static_cast<double>(sample_index);
+  if (s.sample_method == SAMPLE_METHOD::LINEAR) {
+    return s.begin + s.period * n;
+  } else /* sample_method == SAMPLE_METHOD::LOG */ {
+    return s.begin + std::pow(s.base, (n + s.shift));
+  }
+}
+
+/// \brief Stochastically determine how many steps or passes
+///     until the next sample
+///
+/// \tparam EngineType Random number engine
+/// \param sample_rate Mean sample rate, in samples per count. Valid range is
+///     less than 1.0. If 1.0 or greater, a sample is taken every step or pass.
+///     If less than 1.0, a sample is taken with probability equal to the
+///     sample rate.
+/// \param random_number_generator Random number generator.
+/// \return Steps or pass until the next sample should be taken
+template <typename EngineType>
+CountType stochastic_count_step(
+    double sample_rate,
+    monte::RandomNumberGenerator<EngineType> random_number_generator) {
+  CountType dn = 1;
+  double max = 1.0;
+  while (true) {
+    if (random_number_generator.random_real(max) < sample_rate) {
+      return dn;
+    }
+    ++dn;
+  }
+}
+
+/// \brief Stochastically determine how much time until the next sample
+///
+/// \tparam EngineType Random number engine
+/// \param sample_rate Mean sample rate, in samples per time.
+/// \param random_number_generator Random number generator.
+/// \return Time until the next sample should be taken. Returns
+///     -ln(R)/sample_rate, where R is a random number in [0, 1.0).
+template <typename EngineType>
+TimeType stochastic_time_step(
+    TimeType sample_rate,
+    monte::RandomNumberGenerator<EngineType> random_number_generator) {
+  TimeType max = 1.0;
+  return -std::log(random_number_generator.random_real(max)) / sample_rate;
+}
+
+/// \brief Return the count / time when the sample_index-th sample should be
+///     taken
+///
+/// \param sample_index Index for sample (0, 1, 2, ...)
+/// \param sampling_params Sampling method parameters
+/// \param random_number_generator Random number generator, used for stochastic
+///     sampling only.
+/// \param sample_count Vector of counts (could be pass or step) when a sample
+///     occurred. Used for stochastic sampling by count only.
+/// \param sample_time Vector of times when a sample occurred. Used for
+///     stochastic sampling by time only.
+/// \return The time or count at which the sample-index-th sample should be
+///     taken, as a double
 //
-// /// \brief Returns true if samples should be taken - count based sampling
-// inline bool sample_is_due(SamplingParams const &sampling_params,
-//                           CountType sample_index, CountType count) {
-//   return count == static_cast<CountType>(
-//                       std::round(sample_at(sampling_params, sample_index)));
-// }
-//
-// /// \brief Returns true if samples should be taken - time based sampling
-// inline bool sample_is_due(SamplingParams const &sampling_params,
-//                           CountType sample_index, TimeType time) {
-//   return time >= sample_at(sampling_params, sample_index);
-// }
-//
-//
-// /// The pass/step/time when a particular sample should be taken
-// inline double sample_at(SAMPLE_METHOD sample_method,
-//                         double begin,
-//                         double period,
-//                         double samples_per_period,
-//                         double shift,
-//                         CountType sample_index) {
-//   SamplingParams const &s = sampling_params;
-//   double n = static_cast<double>(sample_index);
-//   double value;
-//   if (sample_method == SAMPLE_METHOD::LINEAR) {
-//     value = begin + (period / samples_per_period) * n;
-//   } else /* sample_method == SAMPLE_METHOD::LOG */ {
-//     value = begin + std::pow(period, (n + shift) / samples_per_period);
-//   }
-//   return value;
-// }
-//
-// /// \brief Returns true if samples should be taken - count based sampling
-// inline bool sample_is_due(SamplingParams const &sampling_params,
-//                           CountType sample_index, CountType count) {
-//   return count == static_cast<CountType>(
-//                       std::round(sample_at(sampling_params, sample_index)));
-// }
-//
-// /// \brief Returns true if samples should be taken - time based sampling
-// inline bool sample_is_due(SamplingParams const &sampling_params,
-//                           CountType sample_index, TimeType time) {
-//   return time >= sample_at(sampling_params, sample_index);
-// }
+/// Notes:
+/// - If stochastic_sample_period == true, then the next sample is chosen at
+///   a count or time using the input sampling parameters to determine a rate
+/// - If stochastic_sample_period == true, then sample_index must equal
+///   the current sample_count or sample_time size
+///
+template <typename EngineType>
+double stochastic_sample_at(
+    CountType sample_index, SamplingParams const &sampling_params,
+    monte::RandomNumberGenerator<EngineType> random_number_generator,
+    std::vector<CountType> const &sample_count,
+    std::vector<TimeType> const &sample_time) {
+  SamplingParams const &s = sampling_params;
+  if (sample_index == 0) {
+    return s.begin;
+  }
+  double n = static_cast<double>(sample_index);
+  double rate;
+  if (s.sample_method == SAMPLE_METHOD::LINEAR) {
+    rate = 1.0 / s.period;
+  } else /* sample_method == SAMPLE_METHOD::LOG */ {
+    rate = 1.0 / (std::log(s.base) * std::pow(s.base, (n + s.shift)));
+  }
+  if (s.sample_mode == SAMPLE_MODE::BY_TIME) {
+    return sample_time.back() +
+           stochastic_time_step(rate, random_number_generator);
+  } else {
+    return sample_count.back() +
+           stochastic_count_step(rate, random_number_generator);
+  }
+}
 
 }  // namespace monte
 }  // namespace CASM

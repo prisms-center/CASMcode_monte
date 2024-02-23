@@ -7,6 +7,7 @@
 #include "casm/monte/checks/EquilibrationCheck.hh"
 #include "casm/monte/definitions.hh"
 #include "casm/monte/run_management/Results.hh"
+#include "casm/monte/run_management/ResultsAnalysisFunction.hh"
 #include "casm/monte/run_management/io/ResultsIO.hh"
 #include "casm/monte/sampling/Sampler.hh"
 #include "casm/monte/sampling/SamplingParams.hh"
@@ -34,7 +35,7 @@ struct SamplingFixtureParams {
           _analysis_functions,
       monte::SamplingParams _sampling_params,
       monte::CompletionCheckParams<StatisticsType> _completion_check_params,
-      std::unique_ptr<results_io_type> _results_io,
+      std::unique_ptr<results_io_type> _results_io = nullptr,
       monte::MethodLog _method_log = monte::MethodLog())
       : label(_label),
         sampling_functions(_sampling_functions),
@@ -66,6 +67,80 @@ struct SamplingFixtureParams {
   monte::MethodLog method_log;
 };
 
+/// \brief Step / pass / time tracking ---
+struct MonteCounter {
+  MonteCounter() { reset(SAMPLE_MODE::BY_PASS, 1); }
+
+  /// \brief Sample by step, pass, or time
+  ///
+  /// Default=SAMPLE_MODE::BY_PASS
+  SAMPLE_MODE sample_mode;
+
+  /// \brief The number of steps per pass
+  ///
+  /// Typically the number of steps per pass is set equal to the number of
+  /// mutating sites
+  CountType steps_per_pass;
+
+  /// \brief Tracks the number of Monte Carlo steps
+  CountType step;
+
+  /// \brief Tracks the number of Monte Carlo passes
+  CountType pass;
+
+  /// \brief Equal to either the number of steps or passes, depending on
+  ///     sampling mode.
+  CountType count;
+
+  /// \brief Monte Carlo time, if applicable
+  TimeType time;
+
+  /// \brief Number of steps with an accepted event
+  long long n_accept;
+
+  /// \brief Number of steps with a rejected event
+  long long n_reject;
+
+  /// \brief Reset counters to zero
+  void reset(SAMPLE_MODE _sample_mode, CountType _steps_per_pass) {
+    sample_mode = _sample_mode;
+    steps_per_pass = _steps_per_pass;
+    step = 0;
+    pass = 0;
+    count = 0;
+    time = 0.0;
+    n_accept = 0;
+    n_reject = 0;
+  }
+
+  /// \brief Increment by one acceptance
+  void increment_n_accept() { ++n_accept; }
+
+  /// \brief Increment by one rejection
+  void increment_n_reject() { ++n_reject; }
+
+  /// \brief Increment by one step (updating pass, count as appropriate)
+  void increment_step() {
+    ++step;
+    if (sample_mode == SAMPLE_MODE::BY_STEP) {
+      ++count;
+    }
+    if (step == steps_per_pass) {
+      ++pass;
+      if (sample_mode != SAMPLE_MODE::BY_STEP) {
+        ++count;
+      }
+      step = 0;
+    }
+
+    // // If sampling by step, set count to step. Otherwise, set count to pass.
+    // count = (sample_mode == SAMPLE_MODE::BY_STEP) ? step : pass;
+  }
+
+  /// \brief Set time
+  void set_time(double event_time) { time = event_time; }
+};
+
 template <typename _ConfigType, typename _StatisticsType, typename _EngineType>
 class SamplingFixture {
  public:
@@ -77,33 +152,62 @@ class SamplingFixture {
   SamplingFixture(SamplingFixtureParams<config_type, stats_type> const &_params,
                   std::shared_ptr<engine_type> _engine)
       : m_params(_params),
-        m_engine(_engine),
+        m_random_number_generator(_engine),
         m_n_samples(0),
         m_count(0),
         m_is_complete(false),
-        m_state_sampler(m_engine, m_params.sampling_params,
-                        m_params.sampling_functions),
         m_completion_check(m_params.completion_check_params) {}
 
   /// \brief Label, to distinguish multiple sampling fixtures
   std::string label() const { return m_params.label; }
 
-  /// \brief Sampling fixture parameters
+  /// \brief Access sampling fixture parameters
   SamplingFixtureParams<config_type, stats_type> const &params() const {
     return m_params;
   }
 
-  /// \brief State sampler
-  StateSampler<config_type, engine_type> const &state_sampler() const {
-    return m_state_sampler;
-  }
+  /// \brief Access current step / pass / time
+  MonteCounter const &counter() const { return m_counter; }
+
+  /// \brief Access results
+  Results<config_type, stats_type> const &results() const { return m_results; }
 
   void initialize(Index steps_per_pass) {
     m_n_samples = 0;
     m_count = 0;
     m_is_complete = false;
-    m_state_sampler.reset(steps_per_pass);
+    m_counter.reset(m_params.sampling_params.sample_mode, steps_per_pass);
     m_completion_check.reset();
+    m_results.reset(m_params.sampling_params.sampler_names,
+                    m_params.sampling_functions);
+
+    if (m_params.sampling_params.sample_mode == SAMPLE_MODE::BY_TIME) {
+      m_next_sample_count = 0;
+      m_next_sample_time = this->sample_at(m_results.sample_time.size());
+      if (m_next_sample_time < 0.0) {
+        throw std::runtime_error(
+            "Error: sampling period parameter error, next_sample_time < "
+            "0.0");
+      }
+    } else {
+      m_next_sample_time = 0.0;
+      m_next_sample_count = static_cast<CountType>(
+          std::round(this->sample_at(m_results.sample_count.size())));
+      if (m_next_sample_count < 0) {
+        throw std::runtime_error(
+            "Error: sampling period parameter error, next_sample_count < "
+            "0");
+      }
+    }
+
+    for (auto const &name : m_params.sampling_params.sampler_names) {
+      if (!m_params.sampling_functions.count(name)) {
+        std::stringstream ss;
+        ss << "Sampling parameters error: No sampling function for '" << name
+           << "'";
+        throw std::runtime_error(ss.str());
+      }
+    }
 
     Log &log = m_params.method_log.log;
     log.restart_clock();
@@ -115,15 +219,14 @@ class SamplingFixture {
       return true;
     }
     Log &log = m_params.method_log.log;
-    if (m_state_sampler.do_sample_time) {
+    if (m_params.sampling_params.do_sample_time) {
       m_is_complete = m_completion_check.is_complete(
-          m_state_sampler.samplers, m_state_sampler.sample_weight,
-          m_state_sampler.count, m_state_sampler.time, log);
+          m_results.samplers, m_results.sample_weight, m_counter.count,
+          m_counter.time, log);
 
     } else {
       m_is_complete = m_completion_check.is_complete(
-          m_state_sampler.samplers, m_state_sampler.sample_weight,
-          m_state_sampler.count, log);
+          m_results.samplers, m_results.sample_weight, m_counter.count, log);
     }
     return m_is_complete;
   }
@@ -149,10 +252,10 @@ class SamplingFixture {
     if (!log_frequency.has_value()) {
       return;
     }
-    if (m_n_samples != get_n_samples(m_state_sampler.samplers) ||
-        m_count != m_state_sampler.count) {
-      m_n_samples = get_n_samples(m_state_sampler.samplers);
-      m_count = m_state_sampler.count;
+    if (m_n_samples != get_n_samples(m_results.samplers) ||
+        m_count != m_counter.count) {
+      m_n_samples = get_n_samples(m_results.samplers);
+      m_count = m_counter.count;
 
       Log &log = m_params.method_log.log;
       if (log_frequency.has_value() && log.lap_time() > *log_frequency) {
@@ -161,47 +264,106 @@ class SamplingFixture {
     }
   }
 
-  void increment_n_accept() { m_state_sampler.increment_n_accept(); }
+  void increment_n_accept() { m_counter.increment_n_accept(); }
 
-  void increment_n_reject() { m_state_sampler.increment_n_reject(); }
+  void increment_n_reject() { m_counter.increment_n_reject(); }
 
-  void increment_step() { m_state_sampler.increment_step(); }
+  void increment_step() { m_counter.increment_step(); }
 
-  void set_time(double event_time) { m_state_sampler.set_time(event_time); }
+  void set_time(double event_time) { m_counter.set_time(event_time); }
 
   void push_back_sample_weight(double weight) {
-    m_state_sampler.push_back_sample_weight(weight);
+    m_results.sample_weight.push_back(weight);
   }
 
+  /// \brief Next count at which to take a sample, if applicable
+  CountType next_sample_count() const { return m_next_sample_count; }
+
+  /// \brief Next time at which to take a sample, if applicable
+  TimeType next_sample_time() const { return m_next_sample_time; }
+
   void sample_data(state_type const &state) {
-    Log &log = m_params.method_log.log;
-    m_state_sampler.sample_data(state, log);
+    // - Record count
+    m_results.sample_count.push_back(m_counter.count);
+
+    // - Record simulated time
+    if (m_params.sampling_params.do_sample_time) {
+      m_results.sample_time.push_back(m_counter.time);
+    }
+
+    // - Record clocktime
+    m_results.sample_clocktime.push_back(m_params.method_log.log.time_s());
+
+    // - Record configuration
+    if (m_params.sampling_params.do_sample_trajectory) {
+      m_results.sample_trajectory.push_back(state.configuration);
+    }
+
+    // - Evaluate functions and record data
+    for (auto const &name : m_params.sampling_params.sampler_names) {
+      auto const &function = m_params.sampling_functions.at(name);
+      m_results.samplers.at(name)->push_back(function());
+    }
+
+    // - Set next sample count
+    if (m_params.sampling_params.sample_mode == SAMPLE_MODE::BY_TIME) {
+      m_next_sample_time = this->sample_at(m_results.sample_time.size());
+      if (m_next_sample_time <= m_counter.time) {
+        throw std::runtime_error(
+            "Error: state sampling period parameter error, next_sample_time <= "
+            "current time");
+      }
+    } else {
+      m_next_sample_count = static_cast<CountType>(
+          std::round(this->sample_at(m_results.sample_count.size())));
+      if (m_next_sample_count <= m_counter.count) {
+        throw std::runtime_error(
+            "Error: state sampling period parameter error, next_sample_count "
+            "<= current count");
+      }
+    }
   }
 
   void sample_data_by_count_if_due(state_type const &state) {
-    Log &log = m_params.method_log.log;
-    m_state_sampler.sample_data_by_count_if_due(state, log);
+    if (m_params.sampling_params.sample_mode != SAMPLE_MODE::BY_TIME &&
+        m_counter.count == m_next_sample_count) {
+      sample_data(state);
+    }
   }
 
-  // Note: Not sure if this is useful in practice
   void sample_data_by_time_if_due(state_type const &state, double event_time) {
-    Log &log = m_params.method_log.log;
-    m_state_sampler.sample_data_by_time_if_due(state, event_time, log);
+    if (m_params.sampling_params.sample_mode != SAMPLE_MODE::BY_TIME &&
+        event_time >= m_next_sample_time) {
+      sample_data(state);
+    }
   }
 
+  /// \brief Return the count / time when the sample_index-th sample should be
+  ///     taken
+  ///
+  /// Notes:
+  /// - If stochastic_sample_period == true, then the next sample is chosen at
+  ///   a count or time using the input sampling parameters to determine a rate
+  /// - If stochastic_sample_period == true, then sample_index must equal
+  ///   the current sample_count or sample_time size
+  double sample_at(CountType sample_index) {
+    if (m_params.sampling_params.stochastic_sample_period) {
+      return stochastic_sample_at(
+          sample_index, m_params.sampling_params, m_random_number_generator,
+          m_results.sample_count, m_results.sample_time);
+    } else {
+      return monte::sample_at(sample_index, m_params.sampling_params);
+    }
+  }
+
+  /// \brief Write results and final status
   void finalize(state_type const &state, Index run_index) {
     Log &log = m_params.method_log.log;
     m_results.elapsed_clocktime = log.time_s();
-    m_results.samplers = std::move(m_state_sampler.samplers);
-    m_results.sample_count = std::move(m_state_sampler.sample_count);
-    m_results.sample_time = std::move(m_state_sampler.sample_time);
-    m_results.sample_weight = std::move(m_state_sampler.sample_weight);
-    m_results.sample_clocktime = std::move(m_state_sampler.sample_clocktime);
-    m_results.sample_trajectory = std::move(m_state_sampler.sample_trajectory);
     m_results.completion_check_results = m_completion_check.results();
     m_results.analysis = make_analysis(m_results, m_params.analysis_functions);
-    m_results.n_accept = m_state_sampler.n_accept;
-    m_results.n_reject = m_state_sampler.n_reject;
+    m_results.n_accept = m_counter.n_accept;
+    m_results.n_reject = m_counter.n_reject;
 
     if (m_params.results_io) {
       m_params.results_io->write(m_results, state.conditions, run_index);
@@ -211,10 +373,11 @@ class SamplingFixture {
   }
 
  private:
+  /// \brief Parameters controlling what is sampled and when
   SamplingFixtureParams<config_type, stats_type> m_params;
 
-  /// Random number generator engine
-  std::shared_ptr<engine_type> m_engine;
+  /// \brief Random number generator
+  monte::RandomNumberGenerator<engine_type> m_random_number_generator;
 
   /// \brief This is for write_status_if_due only
   Index m_n_samples = 0;
@@ -222,12 +385,22 @@ class SamplingFixture {
   /// \brief This is for write_status_if_due only
   Index m_count = 0;
 
+  /// \brief Store whether this fixture has completed
   bool m_is_complete = false;
 
-  StateSampler<config_type, engine_type> m_state_sampler;
+  /// \brief Count steps / passes / time
+  MonteCounter m_counter;
 
+  /// \brief Next count at which to take a sample, if applicable
+  CountType m_next_sample_count;
+
+  /// \brief Next time at which to take a sample, if applicable
+  TimeType m_next_sample_time;
+
+  /// \brief Completion checker
   CompletionCheck<stats_type> m_completion_check;
 
+  /// \brief Holds sampled data
   Results<config_type, stats_type> m_results;
 };
 

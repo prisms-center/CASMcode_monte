@@ -33,9 +33,6 @@ struct State;
 
 struct ValueMap;
 
-template <typename _ConfigType, typename _EngineType>
-struct StateSampler;
-
 struct StateSamplingFunction;
 typedef std::map<std::string, StateSamplingFunction> StateSamplingFunctionMap;
 
@@ -47,6 +44,9 @@ struct BasicStatistics;
 template <typename StatisticsType>
 using CalcStatisticsFunction = std::function<StatisticsType(
     Eigen::VectorXd const &observations, Eigen::VectorXd const &sample_weight)>;
+
+template <typename StatisticsType>
+CalcStatisticsFunction<StatisticsType> default_statistics_calculator();
 
 struct IndividualEquilibrationCheckResult;
 struct EquilibrationCheckResults;
@@ -96,7 +96,6 @@ template <typename ConfigType, typename StatisticsType>
 struct SamplingFixtureParams;
 template <typename ConfigType, typename StatisticsType, typename EngineType>
 class SamplingFixture;
-struct RunManagerParams;
 template <typename ConfigType, typename StatisticsType, typename EngineType>
 struct RunManager;
 

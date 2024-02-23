@@ -22,15 +22,15 @@ namespace monte {
 ///
 /// Notes:
 /// - Allows sampling `expected_acceptance_rate`
-template <typename ConfigType, typename EngineType>
+template <typename ConfigType, typename StatisticsType, typename EngineType>
 struct NfoldData {
   /// \brief This will be set to the current sampling
   ///     fixture label before sampling data.
   std::string sampling_fixture_label;
 
-  /// \brief This will be set to point to the current state
-  ///     sampler sampling data.
-  monte::StateSampler<ConfigType, EngineType> const *state_sampler;
+  /// \brief This will be set to point to the current sampling fixture
+  monte::SamplingFixture<ConfigType, StatisticsType, EngineType> const
+      *sampling_fixture;
 
   /// \brief Total number of events that could be selected at any time
   ///     This is set before running and remains constant.
@@ -45,7 +45,7 @@ struct NfoldData {
 template <typename EventIDType, typename ConfigType, typename EventSelectorType,
           typename GetEventType, typename StatisticsType, typename EngineType>
 void nfold(State<ConfigType> &state, OccLocation &occ_location,
-           NfoldData<ConfigType, EngineType> &nfold_data,
+           NfoldData<ConfigType, StatisticsType, EngineType> &nfold_data,
            EventSelectorType &event_selector, GetEventType get_event_f,
            RunManager<ConfigType, StatisticsType, EngineType> &run_manager);
 
@@ -78,7 +78,7 @@ void nfold(State<ConfigType> &state, OccLocation &occ_location,
 template <typename EventIDType, typename ConfigType, typename EventSelectorType,
           typename GetEventType, typename StatisticsType, typename EngineType>
 void nfold(State<ConfigType> &state, OccLocation &occ_location,
-           NfoldData<ConfigType, EngineType> &nfold_data,
+           NfoldData<ConfigType, StatisticsType, EngineType> &nfold_data,
            EventSelectorType &event_selector, GetEventType get_event_f,
            RunManager<ConfigType, StatisticsType, EngineType> &run_manager) {
   // Used within the main loop:
@@ -98,12 +98,13 @@ void nfold(State<ConfigType> &state, OccLocation &occ_location,
       [&](SamplingFixture<ConfigType, StatisticsType, EngineType> &fixture,
           State<ConfigType> const &state) {
         nfold_data.sampling_fixture_label = fixture.label();
-        nfold_data.state_sampler = &fixture.state_sampler();
+        nfold_data.sampling_fixture = &fixture;
         nfold_data.expected_acceptance_rate =
             total_rate / nfold_data.n_events_possible;
-        if (nfold_data.state_sampler->sample_mode == SAMPLE_MODE::BY_TIME) {
+        if (fixture.params().sampling_params.sample_mode ==
+            SAMPLE_MODE::BY_TIME) {
           fixture.push_back_sample_weight(1.0);
-          time = nfold_data.state_sampler->next_sample_time;
+          time = fixture.next_sample_time();
         } else {
           fixture.push_back_sample_weight(time_increment);
         }

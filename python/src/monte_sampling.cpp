@@ -24,7 +24,6 @@
 #include "casm/monte/checks/io/json/EquilibrationCheck_json_io.hh"
 #include "casm/monte/definitions.hh"
 #include "casm/monte/io/json/ValueMap_json_io.hh"
-#include "casm/monte/run_management/StateSampler.hh"
 #include "casm/monte/sampling/Sampler.hh"
 #include "casm/monte/sampling/SamplingParams.hh"
 #include "casm/monte/sampling/StateSamplingFunction.hh"
@@ -42,6 +41,36 @@ namespace CASMpy {
 using namespace CASM;
 
 typedef monte::BasicStatistics statistics_type;
+
+monte::SamplingParams make_sampling_params(
+    std::vector<std::string> sampler_names, monte::SAMPLE_MODE sample_mode,
+    monte::SAMPLE_METHOD sample_method, double period,
+    std::optional<double> begin, double base, double shift,
+    bool stochastic_sample_period, bool do_sample_trajectory,
+    bool do_sample_time) {
+  if (!begin.has_value()) {
+    if (sample_method == monte::SAMPLE_METHOD::LINEAR) {
+      begin = period;
+    } else if (sample_method == monte::SAMPLE_METHOD::LOG) {
+      begin = 0.0;
+    } else {
+      throw std::runtime_error(
+          "Error in make_sampling_params: Invalid sample_method");
+    }
+  }
+  monte::SamplingParams s;
+  s.sampler_names = sampler_names;
+  s.sample_mode = sample_mode;
+  s.sample_method = sample_method;
+  s.period = period;
+  s.begin = begin.value();
+  s.base = base;
+  s.shift = shift;
+  s.stochastic_sample_period = stochastic_sample_period;
+  s.do_sample_trajectory = do_sample_trajectory;
+  s.do_sample_time = do_sample_time;
+  return s;
+}
 
 std::shared_ptr<monte::Sampler> make_sampler(
     std::vector<Index> shape,
@@ -120,15 +149,18 @@ monte::CompletionCheckParams<statistics_type> make_completion_check_params(
     equilibration_check_f = monte::default_equilibration_check;
   }
   if (!calc_statistics_f) {
-    calc_statistics_f = monte::BasicStatisticsCalculator();
+    calc_statistics_f = monte::default_statistics_calculator<statistics_type>();
   }
   if (!requested_precision.has_value()) {
     requested_precision = monte::RequestedPrecisionMap();
   }
 
   if (!log_spacing) {
-    result.check_begin = 100;
-    result.check_period = 100;
+    if (!check_period.has_value()) {
+      check_period = 100;
+    }
+    result.check_begin = check_period.value();
+    result.check_period = check_period.value();
   } else {
     result.check_begin = 0;
     result.check_base = 10.0;
@@ -158,6 +190,27 @@ monte::CompletionCheckParams<statistics_type> make_completion_check_params(
     result.check_period_max = check_period_max.value();
   }
   return result;
+}
+
+monte::CutoffCheckParams make_cutoff_check_params(
+    std::optional<monte::CountType> min_count,
+    std::optional<monte::CountType> max_count,
+    std::optional<monte::TimeType> min_time,
+    std::optional<monte::TimeType> max_time,
+    std::optional<monte::CountType> min_sample,
+    std::optional<monte::CountType> max_sample,
+    std::optional<monte::TimeType> min_clocktime,
+    std::optional<monte::TimeType> max_clocktime) {
+  monte::CutoffCheckParams params;
+  params.min_count = min_count;
+  params.max_count = max_count;
+  params.min_time = min_time;
+  params.max_time = max_time;
+  params.min_sample = min_sample;
+  params.max_sample = max_sample;
+  params.min_clocktime = min_clocktime;
+  params.max_clocktime = max_clocktime;
+  return params;
 }
 
 }  // namespace CASMpy
@@ -321,12 +374,81 @@ PYBIND11_MODULE(_monte_sampling, m) {
   py::class_<monte::SamplingParams>(m, "SamplingParams", R"pbdoc(
       Parameters controlling sampling fixtures
       )pbdoc")
-      .def(py::init<>(),
+      .def(py::init<>(&make_sampling_params),
            R"pbdoc(
           .. rubric:: Constructor
 
-          Default constructor only.
-          )pbdoc")
+          Notes
+          -----
+
+          For ``SAMPLE_METHOD.LINEAR``, take the n-th sample (n=1,2,3,...) when:
+
+          .. code-block:: Python
+
+              sample/pass = round( begin + period * (n-1) )
+
+              time = begin + period * (n-1)
+
+          The default values are:
+
+          For ``SAMPLE_METHOD.LOG``, take the n-th sample when:
+
+          .. code-block:: Python
+
+              sample/pass = round( begin + base ** ( (n-1) + shift)
+
+              time = begin + base ** ( (n-1) + shift) )
+
+          If ``stochastic_sample_period == true``, then instead of setting the
+          sample time / count deterministally, the mean sample rate
+          (samples per count/time) is calculated as the inverse of the
+          count/time until the next sample would be taken in a
+          non-stochastic fashion.
+
+          For sampling by count: If the mean sample rate is 1.0 or
+          greater, a sample is taken every step or pass. If the mean sample
+          rate is less than 1.0, a sample is taken at each step/pass
+          with probability equal to the mean sample rate.
+
+          For sampling by time: The time until the next sample is calculated
+          as a Poisson process with mean rate :math:`r` using :math:`-ln(R)/r`,
+          where :math:`R` is a random number in :math:`[0, 1.0)`.
+
+
+          Parameters
+          ----------
+          sampler_names: list[str] = []
+              List of sampling functions to call when a sample is taken.
+          sample_mode: SAMPLE_MODE = SAMPLE_MODE.BY_PASS
+              Sample by pass, step, or time.
+          sample_method: SAMPLE_METHOD = SAMPLE_METHOD.LINEAR
+              Sample linearly or logarithmically.
+          period: float = 1.0
+              Sample spacing parameter.
+          begin: Optional[float] = None
+              Sample spacing parameter. If None, uses `period` with
+              SAMPLE_METHOD.LINEAR, uses 0.0 with  SAMPLE_METHOD.LOG.
+          base: float = math.pow(10.0, 1./10.0)
+              Base for log sample spacing.
+          shift: float = 1.0
+              Log sample spacing parameter.
+          stochastic_sample_period: bool = False
+              If true, the sample period is stochastically chosen based on
+              the mean sample rate.
+          do_sample_trajectory: bool = False
+              If true, save the configuration when a sample is taken.
+          do_sample_time: bool = False
+              If true, save current time when taking a sample, if applicable.
+
+          )pbdoc",
+           py::arg("sampler_names") = std::vector<std::string>(),
+           py::arg("sample_mode") = monte::SAMPLE_MODE::BY_PASS,
+           py::arg("sample_method") = monte::SAMPLE_METHOD::LINEAR,
+           py::arg("period") = 1.0, py::arg("begin") = std::nullopt,
+           py::arg("base") = std::pow(10.0, 1.0 / 10.0), py::arg("shift") = 0.0,
+           py::arg("stochastic_sample_period") = false,
+           py::arg("do_sample_trajectory") = false,
+           py::arg("do_sample_time") = false)
       .def_readwrite("sample_mode", &monte::SamplingParams::sample_mode,
                      R"pbdoc(
           SAMPLE_MODE: Sample by pass, step, or time. Default=``SAMPLE_MODE.BY_PASS``.
@@ -335,57 +457,39 @@ PYBIND11_MODULE(_monte_sampling, m) {
                      R"pbdoc(
           SAMPLE_METHOD: Sample linearly or logarithmically. Default=``SAMPLE_METHOD.LINEAR``.
 
-          Notes
-          -----
-
-          For ``SAMPLE_METHOD.LINEAR``, take the n-th sample when:
-
-          .. code-block:: Python
-
-              sample/pass = round( begin + (period / samples_per_period) * n )
-
-              time = begin + (period / samples_per_period) * n
-
-          The default values are:
-
-          For ``SAMPLE_METHOD.LOG``, take the n-th sample when:
-
-          .. code-block:: Python
-
-              sample/pass = round( begin + period ** ( (n + shift) /
-                                   samples_per_period ) )
-
-              time = begin + period ** ( (n + shift) / samples_per_period )
-
-          If ``stochastic_sample_period == true``, then instead of setting the sample
-          time / count deterministally, use the sampling period to determine the
-          sampling rate and determine the next sample time / count stochastically.
           )pbdoc")
       .def_readwrite("begin", &monte::SamplingParams::begin, R"pbdoc(
-          float: See `sample_method`. Default=``0.0``.
+          float: See `sample_method`. Default=``1.0``.
           )pbdoc")
       .def_readwrite("period", &monte::SamplingParams::period, R"pbdoc(
           float: See `sample_method`. Default=``1.0``.
           )pbdoc")
-      .def_readwrite("samples_per_period",
-                     &monte::SamplingParams::samples_per_period, R"pbdoc(
-          float: See `sample_method`. Default=``1.0``.
+      .def_readwrite("base", &monte::SamplingParams::base,
+                     R"pbdoc(
+          float: See `sample_method`. Default=``math.pow(10.0, 1.0/10.0)``.
           )pbdoc")
       .def_readwrite("shift", &monte::SamplingParams::shift, R"pbdoc(
-          float: See `sample_method`. Default=``0.0``.
+          float: See `sample_method`. Default=``10.0``.
           )pbdoc")
       .def_readwrite("sampler_names", &monte::SamplingParams::sampler_names,
                      R"pbdoc(
           List[str]: The names of quantities to sample (i.e. sampling function \
           names). Default=``[]``.
           )pbdoc")
+      .def_readwrite("stochastic_sample_period",
+                     &monte::SamplingParams::stochastic_sample_period, R"pbdoc(
+          bool: If true, the sample period is stochastically chosen based on \
+          the mean sample rate.
+          )pbdoc")
       .def_readwrite("do_sample_trajectory",
                      &monte::SamplingParams::do_sample_trajectory, R"pbdoc(
-            bool: If true, save the configuration when a sample is taken. Default=``False``.
+            bool: If true, save the configuration when a sample is taken. \
+            Default=``False``.
           )pbdoc")
       .def_readwrite("do_sample_time", &monte::SamplingParams::do_sample_time,
                      R"pbdoc(
-            bool: If true, save current time when taking a sample. Default=``False``.
+            bool: If true, save current time when taking a sample, if \
+            applicable. Default=``False``.
           )pbdoc");
 
   m.def(
@@ -1527,19 +1631,45 @@ PYBIND11_MODULE(_monte_sampling, m) {
         - A Monte Carlo simulation does stop when any maximum is met
 
         )pbdoc")
-      .def(py::init<>(),
-           R"pbdoc(
-           .. rubric:: Constructor
+      .def(py::init<>(&make_cutoff_check_params), R"pbdoc(
 
-          Default constructor only
-           )pbdoc")
+          .. rubric:: Constructor
+
+          Parameters
+          ----------
+          min_count: Optional[int] = None
+              Minimum number of steps or passes.
+          max_count: Optional[int] = None
+              Maximum number of steps or passes.
+          min_time: Optional[float] = None
+              Minimum simulated time, if applicable.
+          max_time: Optional[float] = None
+              Maximum simulated time, if applicable.
+          min_sample: Optional[int] = None
+              Minimum number of samples.
+          max_sample: Optional[int] = None
+              Maximum number of samples.
+          min_clocktime: Optional[float] = None
+              Minimum elapsed clocktime.
+          max_clocktime: Optional[float] = None
+              Maximum elapsed clocktime.
+
+          )pbdoc",
+           py::arg("min_count") = std::nullopt,
+           py::arg("max_count") = std::nullopt,
+           py::arg("min_time") = std::nullopt,
+           py::arg("max_time") = std::nullopt,
+           py::arg("min_sample") = std::nullopt,
+           py::arg("max_sample") = std::nullopt,
+           py::arg("min_clocktime") = std::nullopt,
+           py::arg("max_clocktime") = std::nullopt)
       .def_readwrite("min_count", &monte::CutoffCheckParams::min_count,
                      R"pbdoc(
                      Optional[int]: Minimum number of steps or passes.
                      )pbdoc")
       .def_readwrite("min_time", &monte::CutoffCheckParams::min_time,
                      R"pbdoc(
-                     Optional[float]: Minimum simulated time.
+                     Optional[float]: Minimum simulated time, if applicable.
                      )pbdoc")
       .def_readwrite("min_sample", &monte::CutoffCheckParams::min_sample,
                      R"pbdoc(
@@ -1555,7 +1685,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
                      )pbdoc")
       .def_readwrite("max_time", &monte::CutoffCheckParams::max_time,
                      R"pbdoc(
-                     Optional[float]: Maximum simulated time.
+                     Optional[float]: Maximum simulated time, if applicable.
                      )pbdoc")
       .def_readwrite("max_sample", &monte::CutoffCheckParams::max_sample,
                      R"pbdoc(
@@ -1694,20 +1824,20 @@ PYBIND11_MODULE(_monte_sampling, m) {
               If None, the default is :class:`~libcasm.monte.sampling.default_equilibration_check`.
           log_spacing: bool = False
               If True, use logarithmic spacing for completion checking; else use linear
-              spacing. For linear spacing, the n-th check will be taken when:
+              spacing. For linear spacing, the n-th check (n=1,2,3,...) will be taken when:
 
               .. code-block:: Python
 
-                  sample = check_begin + check_period * n
+                  sample = check_begin + check_period * (n-1)
 
               For logarithmic spacing, the n-th check will be taken when:
 
               .. code-block:: Python
 
-                  sample = check_begin + round( check_base ** (n + check_shift) )
+                  sample = check_begin + round( check_base ** ((n-1) + check_shift) )
 
-              However, if sample(n) - sample(n-1) > `check_period_max`, then subsequent
-              samples are taken every `check_period_max` samples.
+              However, if check(n) - check(n-1) > `check_period_max`, then subsequent
+              checks are made every `check_period_max` samples.
 
               For linear spacing, the default is to check for completion after `100`,
               `200`, `300`, etc. samples are taken.
@@ -1717,11 +1847,11 @@ PYBIND11_MODULE(_monte_sampling, m) {
               effect of the default ``check_period_max=10000``).
 
               The default value is False, for linear spacing.
-          check_begin:  Optional[int] = None
-              The earliest sample to begin completion checking. Default is 100 for linear
-              spacing and 0 for log spacing.
           check_period:  Optional[int] = None
               The linear completion checking period. Default is 100.
+          check_begin:  Optional[int] = None
+              The earliest sample to begin completion checking. Default is
+              `check_period` for linear spacing and 0 for log spacing.
           check_base: Optional[float] = None
               The logarithmic completion checking base. Default is 10.
           check_shift: Optional[float] = None
@@ -1966,11 +2096,13 @@ PYBIND11_MODULE(_monte_sampling, m) {
               Number of steps or passes to reset to
           time : Optional[float] = None
               Simulated time to reset to
+          clocktime : float = 0.0
+              Elapsed clocktime to reset to
           n_samples : int = 0
               Number of samples to reset to
           )pbdoc",
            py::arg("count") = std::nullopt, py::arg("time") = std::nullopt,
-           py::arg("n_samples") = 0)
+           py::arg("clocktime") = 0.0, py::arg("n_samples") = 0)
       .def(
           "to_dict",
           [](monte::CompletionCheckResults<statistics_type> const &x) {
@@ -1991,7 +2123,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           Parameters
           ----------
           params : libcasm.monte.sampling.CompletionCheckParams
-              Data struture holding completion check parameters.
+              Data structure holding completion check parameters.
           )pbdoc")
       .def("reset", &monte::CompletionCheck<statistics_type>::reset,
            R"pbdoc(

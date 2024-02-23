@@ -116,7 +116,6 @@ set(
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/RunManager.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/SamplingFixture.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/State.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/StateSampler.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/ResultsIO.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/ResultsIO_json_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/SamplingFixtureParams_json_io.hh

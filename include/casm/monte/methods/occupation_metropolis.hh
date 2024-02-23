@@ -20,7 +20,6 @@
 #include "casm/monte/methods/metropolis.hh"
 #include "casm/monte/run_management/Results.hh"
 #include "casm/monte/run_management/ResultsAnalysisFunction.hh"
-#include "casm/monte/run_management/StateSampler.hh"
 #include "casm/monte/sampling/SamplingParams.hh"
 
 namespace CASM {

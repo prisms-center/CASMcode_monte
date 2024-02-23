@@ -8,7 +8,6 @@
 #include "casm/monte/checks/io/json/CompletionCheck_json_io.hh"
 #include "casm/monte/definitions.hh"
 #include "casm/monte/methods/metropolis.hh"
-#include "casm/monte/run_management/StateSampler.hh"
 #include "casm/monte/sampling/Sampler.hh"
 
 namespace CASM {

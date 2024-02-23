@@ -6,7 +6,6 @@
 #include "casm/casm_io/json/jsonParser.hh"
 #include "casm/casm_io/json/optional.hh"
 #include "casm/monte/run_management/Results.hh"
-#include "casm/monte/run_management/StateSampler.hh"
 #include "casm/monte/run_management/io/json/jsonResultsIO.hh"
 
 namespace CASM {

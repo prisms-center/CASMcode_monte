@@ -20,16 +20,15 @@ namespace monte {
 ///     The spacing of samples in the specified `"period"`. One of "linear"
 ///     or "log".
 ///
-///     For "linear" spacing, the n-th sample will be taken when:
+///     For "linear" spacing, the n-th (n=0,1,2,...) sample will be taken when:
 ///
-///         sample/pass = round( begin + (period / samples_per_period) * n )
-///                time = begin + (period / samples_per_period) * n
+///         sample/pass = round( begin + period * n )
+///                time = begin + period * n
 ///
 ///     For "log" spacing, the n-th sample will be taken when:
 ///
-///         sample/pass = round( begin + period ^ ( (n + shift) /
-///                           samples_per_period ) )
-///                time = begin + period ^ ( (n + shift) / samples_per_period )
+///         sample/pass = round( begin + base ^ (n + shift)
+///                time = begin + base ^ (n + shift)
 ///
 ///   begin: number (optional, default=0.0)
 ///     The number of pass/step or amount of time at which to begin
@@ -38,15 +37,15 @@ namespace monte {
 ///   period: number (required)
 ///     A number of pass/step or amount of time.
 ///
-///   samples_per_period: number (optional, default=1.0)
-///     The number of samples to be taken in the specified `"period"`.
+///   base: number (optional, default=10^(1/10))
+///     The base of logarithmic spaced sampling.
 ///
-///   shift: number (optional, default=0.0)
+///   shift: number (optional, default=10.0)
 ///     Used with `"spacing": "log"`.
 ///
 ///   stochastic_sample_period: bool (optional, default=false)
 ///     If true, then instead of setting the sample time / count
-///     deterministally, use the sampling period to determine the
+///     deterministically, use the sampling period to determine the
 ///     sampling rate and determine the next sample time / count
 ///     stochastically with equivalent mean rate.
 ///
@@ -123,12 +122,12 @@ void parse(InputParser<SamplingParams> &parser,
         "period", "Error: For \"spacing\"==\"log\", \"period\" must > 0.0.");
   }
 
-  // "samples_per_period"
-  sampling_params.samples_per_period = 1.0;
-  parser.optional(sampling_params.samples_per_period, "samples_per_period");
+  // "base"
+  sampling_params.base = std::pow(10.0, 1.0 / 10.0);
+  parser.optional(sampling_params.base, "base");
 
   // "shift"
-  sampling_params.shift = 0.0;
+  sampling_params.shift = 10.0;
   parser.optional(sampling_params.shift, "shift");
 
   // "stochastic_sample_period"

@@ -21,15 +21,15 @@ namespace CASM {
 namespace monte {
 
 /// \brief Data that can be used by sampling functions
-template <typename ConfigType, typename EngineType>
+template <typename ConfigType, typename StatisticsType, typename EngineType>
 struct KMCData {
   /// \brief This will be set to the current sampling
   ///     fixture label before sampling data.
   std::string sampling_fixture_label;
 
-  /// \brief This will be set to point to the current state
-  ///     sampler sampling data.
-  monte::StateSampler<ConfigType, EngineType> const *state_sampler;
+  /// \brief This will be set to point to the current sampling fixture
+  monte::SamplingFixture<ConfigType, StatisticsType, EngineType> const
+      *sampling_fixture;
 
   /// \brief This will be set to the total event rate at sampling time
   double total_rate;
@@ -85,7 +85,7 @@ template <typename EventIDType, typename ConfigType, typename EventSelectorType,
           typename GetEventType, typename StatisticsType, typename EngineType>
 void kinetic_monte_carlo(
     State<ConfigType> &state, OccLocation &occ_location,
-    KMCData<ConfigType, EngineType> &kmc_data,
+    KMCData<ConfigType, StatisticsType, EngineType> &kmc_data,
     EventSelectorType &event_selector, GetEventType get_event_f,
     RunManager<ConfigType, StatisticsType, EngineType> &run_manager);
 
@@ -124,7 +124,7 @@ template <typename EventIDType, typename ConfigType, typename EventSelectorType,
           typename GetEventType, typename StatisticsType, typename EngineType>
 void kinetic_monte_carlo(
     State<ConfigType> &state, OccLocation &occ_location,
-    KMCData<ConfigType, EngineType> &kmc_data,
+    KMCData<ConfigType, StatisticsType, EngineType> &kmc_data,
     EventSelectorType &event_selector, GetEventType get_event_f,
     RunManager<ConfigType, StatisticsType, EngineType> &run_manager) {
   // Used within the main loop:
@@ -152,11 +152,12 @@ void kinetic_monte_carlo(
           State<ConfigType> const &state) {
         // set data that can be used in sampling functions
         kmc_data.sampling_fixture_label = fixture.label();
-        kmc_data.state_sampler = &fixture.state_sampler();
+        kmc_data.sampling_fixture = &fixture;
         kmc_data.atom_positions_cart = occ_location.atom_positions_cart();
         kmc_data.total_rate = total_rate;
-        if (kmc_data.state_sampler->sample_mode == SAMPLE_MODE::BY_TIME) {
-          kmc_data.time = kmc_data.state_sampler->next_sample_time;
+        if (fixture.params().sampling_params.sample_mode ==
+            SAMPLE_MODE::BY_TIME) {
+          kmc_data.time = fixture.next_sample_time();
         }
       };
 

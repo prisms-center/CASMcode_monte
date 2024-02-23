@@ -60,6 +60,10 @@ struct ResultsAnalysisFunction {
       Results<ConfigType, StatisticsType> const &results) const;
 };
 
+template <typename ConfigType, typename StatisticsType>
+using ResultsAnalysisFunctionMap =
+    std::map<std::string, ResultsAnalysisFunction<ConfigType, StatisticsType>>;
+
 /// \brief Evaluate all analysis functions
 template <typename ConfigType, typename StatisticsType>
 std::map<std::string, Eigen::VectorXd> make_analysis(

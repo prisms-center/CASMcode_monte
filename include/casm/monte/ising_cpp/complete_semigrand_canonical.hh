@@ -22,7 +22,6 @@
 #include "casm/monte/io/json/ValueMap_json_io.hh"
 #include "casm/monte/ising_cpp/model.hh"
 #include "casm/monte/methods/metropolis.hh"
-#include "casm/monte/run_management/StateSampler.hh"
 #include "casm/monte/sampling/Sampler.hh"
 
 namespace CASM {

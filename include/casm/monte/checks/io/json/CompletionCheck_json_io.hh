@@ -9,7 +9,7 @@
 #include "casm/monte/checks/io/json/ConvergenceCheck_json_io.hh"
 #include "casm/monte/checks/io/json/CutoffCheck_json_io.hh"
 #include "casm/monte/checks/io/json/EquilibrationCheck_json_io.hh"
-#include "casm/monte/run_management/StateSampler.hh"
+#include "casm/monte/sampling/StateSamplingFunction.hh"
 
 namespace CASM {
 namespace monte {
