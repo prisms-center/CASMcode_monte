@@ -20,10 +20,8 @@ class jsonResultsIO : public ResultsIO<_ResultsType> {
   typedef typename results_type::config_type config_type;
   typedef typename results_type::stats_type stats_type;
 
-  jsonResultsIO(
-      fs::path _output_dir, StateSamplingFunctionMap _sampling_functions,
-      ResultsAnalysisFunctionMap<config_type, stats_type> _analysis_functions,
-      bool _write_trajectory, bool _write_observations);
+  jsonResultsIO(fs::path _output_dir, bool _write_trajectory,
+                bool _write_observations);
 
   /// \brief Write results
   void write(results_type const &results, ValueMap const &conditions,
@@ -45,8 +43,6 @@ class jsonResultsIO : public ResultsIO<_ResultsType> {
 
  private:
   fs::path m_output_dir;
-  StateSamplingFunctionMap m_sampling_functions;
-  ResultsAnalysisFunctionMap<config_type, stats_type> m_analysis_functions;
   bool m_write_trajectory;
   bool m_write_observations;
   bool m_write_conditions;

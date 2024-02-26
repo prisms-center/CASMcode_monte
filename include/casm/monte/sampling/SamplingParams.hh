@@ -22,6 +22,13 @@ struct SamplingParams {
   /// Default={}
   std::vector<std::string> sampler_names;
 
+  /// \brief What quantities to sample as JSON output
+  ///
+  /// These name must match jsonStateSamplingFunction names.
+  ///
+  /// Default={}
+  std::vector<std::string> json_sampler_names;
+
   /// \brief Sample by step, pass, or time
   ///
   /// Default=SAMPLE_MODE::BY_PASS
@@ -83,35 +90,6 @@ struct SamplingParams {
   bool do_sample_time;
 };
 
-struct MakeSamplingParams {
-  MakeSamplingParams() = default;
-
-  operator SamplingParams const &() const { return m_sampling_params; }
-
-  MakeSamplingParams &sampler_names(std::vector<std::string> x) {
-    m_sampling_params.sampler_names = x;
-    return *this;
-  }
-
-  MakeSamplingParams &sample_by_step() {
-    m_sampling_params.sample_mode = SAMPLE_MODE::BY_PASS;
-    return *this;
-  }
-
-  MakeSamplingParams &sample_by_time() {
-    m_sampling_params.sample_mode = SAMPLE_MODE::BY_TIME;
-    return *this;
-  }
-
-  MakeSamplingParams &log_sampling() {
-    m_sampling_params.sample_method = SAMPLE_METHOD::LOG;
-    m_sampling_params.begin = 0.0;
-    return *this;
-  }
-
-  SamplingParams m_sampling_params;
-};
-
 /// \brief Return the count / time when the sample_index-th sample should be
 ///     taken
 double sample_at(CountType sample_index, SamplingParams const &sampling_params);
@@ -151,6 +129,7 @@ namespace monte {
 ///
 /// Default values are:
 /// - sampler_names={}
+/// - json_sampler_names={}
 /// - sample_mode=SAMPLE_MODE::BY_PASS
 /// - sample_method=SAMPLE_METHOD::LINEAR
 /// - begin=1.0
@@ -162,6 +141,7 @@ namespace monte {
 /// - do_sample_time=false
 inline SamplingParams::SamplingParams()
     : sampler_names({}),
+      json_sampler_names({}),
       sample_mode(SAMPLE_MODE::BY_PASS),
       sample_method(SAMPLE_METHOD::LINEAR),
       begin(1.0),

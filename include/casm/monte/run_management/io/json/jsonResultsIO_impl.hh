@@ -239,9 +239,8 @@ jsonParser &append_completion_check_results_to_json(
 /// \endcode
 template <typename ConfigType, typename StatisticsType>
 jsonParser &append_results_analysis_to_json(
-    Results<ConfigType, StatisticsType> const &results, jsonParser &json,
-    ResultsAnalysisFunctionMap<ConfigType, StatisticsType> const
-        &analysis_functions) {
+    Results<ConfigType, StatisticsType> const &results, jsonParser &json) {
+  auto const &analysis_functions = results.analysis_functions;
   // for each analysis value
   for (auto const &pair : results.analysis) {
     std::string const &name = pair.first;
@@ -297,13 +296,10 @@ jsonParser &append_results_analysis_to_json(
 }  // namespace jsonResultsIO_impl
 
 template <typename _ResultsType>
-jsonResultsIO<_ResultsType>::jsonResultsIO(
-    fs::path _output_dir, StateSamplingFunctionMap _sampling_functions,
-    ResultsAnalysisFunctionMap<config_type, stats_type> _analysis_functions,
-    bool _write_trajectory, bool _write_observations)
+jsonResultsIO<_ResultsType>::jsonResultsIO(fs::path _output_dir,
+                                           bool _write_trajectory,
+                                           bool _write_observations)
     : m_output_dir(_output_dir),
-      m_sampling_functions(_sampling_functions),
-      m_analysis_functions(_analysis_functions),
       m_write_trajectory(_write_trajectory),
       m_write_observations(_write_observations) {}
 
@@ -374,9 +370,10 @@ void jsonResultsIO<_ResultsType>::write_summary(results_type const &results,
                                                 ValueMap const &conditions) {
   using namespace jsonResultsIO_impl;
 
-  StateSamplingFunctionMap const &sampling_functions = m_sampling_functions;
+  StateSamplingFunctionMap const &sampling_functions =
+      results.sampling_functions;
   ResultsAnalysisFunctionMap<config_type, stats_type> const
-      &analysis_functions = m_analysis_functions;
+      &analysis_functions = results.analysis_functions;
   fs::path const &output_dir = m_output_dir;
 
   // read existing summary file (create if not existing)
@@ -407,8 +404,7 @@ void jsonResultsIO<_ResultsType>::write_summary(results_type const &results,
                                           json["completion_check_results"]);
 
   // append results analysis
-  append_results_analysis_to_json(results, json["analysis"],
-                                  analysis_functions);
+  append_results_analysis_to_json(results, json["analysis"]);
 
   // write summary file
   fs::path summary_path = output_dir / "summary.json";
@@ -477,6 +473,9 @@ void jsonResultsIO<_ResultsType>::write_observations(
       json[pair.first]["component_names"] = pair.second->component_names();
       json[pair.first]["value"] = pair.second->values();
     }
+  }
+  for (auto const &pair : results.json_samplers) {
+    json[pair.first]["value"] = pair.second->values;
   }
   json.write(run_dir(run_index) / "observations.json", -1);
 }

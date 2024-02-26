@@ -21,6 +21,7 @@ template <typename ConfigType, typename StatisticsType>
 void parse(
     InputParser<SamplingFixtureParams<ConfigType, StatisticsType>> &parser,
     std::string label, StateSamplingFunctionMap const &sampling_functions,
+    jsonStateSamplingFunctionMap const &json_sampling_functions,
     ResultsAnalysisFunctionMap<ConfigType, StatisticsType> const
         &analysis_functions,
     MethodParserMap<ResultsIO<Results<ConfigType, StatisticsType>>> const
@@ -69,6 +70,7 @@ template <typename ConfigType, typename StatisticsType>
 void parse(
     InputParser<SamplingFixtureParams<ConfigType, StatisticsType>> &parser,
     std::string label, StateSamplingFunctionMap const &sampling_functions,
+    jsonStateSamplingFunctionMap const &json_sampling_functions,
     ResultsAnalysisFunctionMap<ConfigType, StatisticsType> const
         &analysis_functions,
     MethodParserMap<ResultsIO<Results<ConfigType, StatisticsType>>> const
@@ -87,9 +89,14 @@ void parse(
   }
   monte::SamplingParams const &sampling_params =
       *sampling_params_subparser->value;
-  std::map<std::string, StateSamplingFunction> selected_sampling_functions;
+  StateSamplingFunctionMap selected_sampling_functions;
   for (auto const &name : sampling_params.sampler_names) {
     selected_sampling_functions.emplace(name, sampling_functions.at(name));
+  }
+  jsonStateSamplingFunctionMap selected_json_sampling_functions;
+  for (auto const &name : sampling_params.json_sampler_names) {
+    selected_json_sampling_functions.emplace(name,
+                                             json_sampling_functions.at(name));
   }
 
   // Read completion check params
@@ -137,7 +144,8 @@ void parse(
   if (parser.valid()) {
     parser.value =
         std::make_unique<SamplingFixtureParams<ConfigType, StatisticsType>>(
-            label, selected_sampling_functions, selected_analysis_functions,
+            label, selected_sampling_functions,
+            selected_json_sampling_functions, selected_analysis_functions,
             sampling_params, *completion_check_params_subparser->value,
             std::move(results_io_subparser->value), method_log);
   }

@@ -31,6 +31,7 @@ struct SamplingFixtureParams {
 
   SamplingFixtureParams(
       std::string _label, StateSamplingFunctionMap _sampling_functions,
+      jsonStateSamplingFunctionMap _json_sampling_functions,
       ResultsAnalysisFunctionMap<ConfigType, StatisticsType>
           _analysis_functions,
       monte::SamplingParams _sampling_params,
@@ -39,17 +40,40 @@ struct SamplingFixtureParams {
       monte::MethodLog _method_log = monte::MethodLog())
       : label(_label),
         sampling_functions(_sampling_functions),
+        json_sampling_functions(_json_sampling_functions),
         analysis_functions(_analysis_functions),
         sampling_params(_sampling_params),
         completion_check_params(_completion_check_params),
         results_io(std::move(_results_io)),
-        method_log(_method_log) {}
+        method_log(_method_log) {
+    for (auto const &name : sampling_params.sampler_names) {
+      if (!sampling_functions.count(name)) {
+        std::stringstream ss;
+        ss << "SamplingFixtureParams constructor error: No sampling function "
+              "for '"
+           << name << "'";
+        throw std::runtime_error(ss.str());
+      }
+    }
+    for (auto const &name : sampling_params.json_sampler_names) {
+      if (!json_sampling_functions.count(name)) {
+        std::stringstream ss;
+        ss << "SamplingFixtureParams constructor error: No sampling function "
+              "for '"
+           << name << "'";
+        throw std::runtime_error(ss.str());
+      }
+    }
+  }
 
   /// Label, to distinguish multiple sampling fixtures
   std::string label;
 
   /// State sampling functions
   StateSamplingFunctionMap sampling_functions;
+
+  /// State sampling functions
+  jsonStateSamplingFunctionMap json_sampling_functions;
 
   /// Results analysis functions
   ResultsAnalysisFunctionMap<ConfigType, StatisticsType> analysis_functions;
@@ -156,7 +180,11 @@ class SamplingFixture {
         m_n_samples(0),
         m_count(0),
         m_is_complete(false),
-        m_completion_check(m_params.completion_check_params) {}
+        m_completion_check(m_params.completion_check_params),
+        m_results(
+            m_params.sampling_params.sampler_names, m_params.sampling_functions,
+            m_params.sampling_params.json_sampler_names,
+            m_params.json_sampling_functions, m_params.analysis_functions) {}
 
   /// \brief Label, to distinguish multiple sampling fixtures
   std::string label() const { return m_params.label; }
@@ -178,8 +206,7 @@ class SamplingFixture {
     m_is_complete = false;
     m_counter.reset(m_params.sampling_params.sample_mode, steps_per_pass);
     m_completion_check.reset();
-    m_results.reset(m_params.sampling_params.sampler_names,
-                    m_params.sampling_functions);
+    m_results.reset();
 
     if (m_params.sampling_params.sample_mode == SAMPLE_MODE::BY_TIME) {
       m_next_sample_count = 0;
@@ -301,8 +328,28 @@ class SamplingFixture {
 
     // - Evaluate functions and record data
     for (auto const &name : m_params.sampling_params.sampler_names) {
+      if (m_params.sampling_functions.find(name) ==
+          m_params.sampling_functions.end()) {
+        std::stringstream ss;
+        ss << "Error in SamplingFixture::sample_data: did not find sampling "
+              "function '"
+           << name << "'";
+        throw std::runtime_error(ss.str());
+      }
       auto const &function = m_params.sampling_functions.at(name);
       m_results.samplers.at(name)->push_back(function());
+    }
+    for (auto const &name : m_params.sampling_params.json_sampler_names) {
+      if (m_params.json_sampling_functions.find(name) ==
+          m_params.json_sampling_functions.end()) {
+        std::stringstream ss;
+        ss << "Error in SamplingFixture::sample_data: did not find json "
+              "sampling function'"
+           << name << "'";
+        throw std::runtime_error(ss.str());
+      }
+      auto const &function = m_params.json_sampling_functions.at(name);
+      m_results.json_samplers.at(name)->values.push_back(function());
     }
 
     // - Set next sample count

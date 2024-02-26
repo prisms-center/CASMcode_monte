@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "casm/monte/checks/CompletionCheck.hh"
+#include "casm/monte/run_management/ResultsAnalysisFunction.hh"
 #include "casm/monte/run_management/State.hh"
 #include "casm/monte/sampling/StateSamplingFunction.hh"
 
@@ -18,7 +19,33 @@ struct Results {
   typedef ConfigType config_type;
   typedef StatisticsType stats_type;
 
-  Results() : sample_weight({}) {}
+  Results(std::vector<std::string> _sampler_names,
+          StateSamplingFunctionMap const &_sampling_functions,
+          std::vector<std::string> _json_sampler_names,
+          jsonStateSamplingFunctionMap const &_json_sampling_functions,
+          ResultsAnalysisFunctionMap<ConfigType, StatisticsType> const
+              &_analysis_functions)
+      : sampler_names(_sampler_names),
+        sampling_functions(_sampling_functions),
+        json_sampler_names(_json_sampler_names),
+        json_sampling_functions(_json_sampling_functions),
+        analysis_functions(_analysis_functions),
+        sample_weight({}) {}
+
+  /// Quantities to sample
+  std::vector<std::string> sampler_names;
+
+  /// Sampling functions
+  StateSamplingFunctionMap sampling_functions;
+
+  /// JSON Quantities to sample
+  std::vector<std::string> json_sampler_names;
+
+  /// JSON sampling functions
+  jsonStateSamplingFunctionMap json_sampling_functions;
+
+  /// Results analysis functions
+  ResultsAnalysisFunctionMap<ConfigType, StatisticsType> analysis_functions;
 
   /// Elapsed clocktime
   std::optional<TimeType> elapsed_clocktime;
@@ -32,6 +59,9 @@ struct Results {
   ///   component name for equilibration and convergence checking of
   ///   individual components.
   std::map<std::string, std::shared_ptr<Sampler>> samplers;
+
+  /// Map of <sampler name>:<json sampler>
+  std::map<std::string, std::shared_ptr<jsonSampler>> json_samplers;
 
   /// Map of <analysis name>:<value>
   std::map<std::string, Eigen::VectorXd> analysis;
@@ -60,10 +90,10 @@ struct Results {
   /// Number of rejections
   long long n_reject;
 
-  void reset(std::vector<std::string> sampler_names,
-             StateSamplingFunctionMap const &sampling_functions) {
+  void reset() {
     elapsed_clocktime.reset();
     samplers.clear();
+    json_samplers.clear();
     analysis.clear();
     sample_count.clear();
     sample_time.clear();
@@ -75,10 +105,42 @@ struct Results {
     n_reject = 0;
 
     for (auto const &sampler_name : sampler_names) {
+      auto it = sampling_functions.find(sampler_name);
+      if (it == sampling_functions.end()) {
+        std::stringstream ss;
+        ss << "Results::reset error." << std::endl;
+        ss << "Failed to find sampling function '" << sampler_name << "'."
+           << std::endl;
+        ss << "Options are: " << std::endl;
+        for (auto const &pair : json_sampling_functions) {
+          ss << pair.first << std::endl;
+        }
+        ss << std::endl;
+        throw std::runtime_error(ss.str());
+      }
       auto const &function = sampling_functions.at(sampler_name);
       auto shared_sampler =
           std::make_shared<Sampler>(function.shape, function.component_names);
       samplers.emplace(function.name, shared_sampler);
+    }
+
+    for (auto const &name : json_sampler_names) {
+      auto it = json_sampling_functions.find(name);
+      if (it == json_sampling_functions.end()) {
+        std::stringstream ss;
+        ss << "Results::reset error." << std::endl;
+        ss << "Failed to find json sampling function '" << name << "'."
+           << std::endl;
+        ss << "Options are: " << std::endl;
+        for (auto const &pair : json_sampling_functions) {
+          ss << pair.first << std::endl;
+        }
+        ss << std::endl;
+        throw std::runtime_error(ss.str());
+      }
+      auto const &function = json_sampling_functions.at(name);
+      auto shared_sampler = std::make_shared<jsonSampler>();
+      json_samplers.emplace(function.name, shared_sampler);
     }
   }
 };

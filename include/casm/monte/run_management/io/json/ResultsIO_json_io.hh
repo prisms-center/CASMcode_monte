@@ -3,6 +3,7 @@
 
 #include "casm/monte/definitions.hh"
 #include "casm/monte/misc/polymorphic_method_json_io.hh"
+#include "casm/monte/run_management/io/json/jsonResultsIO_impl.hh"
 
 namespace CASM {
 
@@ -19,10 +20,7 @@ void parse(InputParser<ResultsIO<ResultsType>> &parser,
 /// \brief Construct jsonResultsIO from JSON
 template <typename ConfigType, typename StatisticsType>
 void parse(InputParser<monte::jsonResultsIO<
-               ResultsIO<Results<ConfigType, StatisticsType>>>> &parser,
-           StateSamplingFunctionMap const &sampling_functions,
-           ResultsAnalysisFunctionMap<ConfigType, StatisticsType> const
-               &analysis_functions);
+               ResultsIO<Results<ConfigType, StatisticsType>>>> &parser);
 
 // ~~~ Definitions ~~~
 
@@ -69,10 +67,7 @@ void parse(InputParser<ResultsIO<ResultsType>> &parser,
 template <typename ConfigType, typename StatisticsType>
 void parse(
     InputParser<monte::jsonResultsIO<Results<ConfigType, StatisticsType>>>
-        &parser,
-    StateSamplingFunctionMap const &sampling_functions,
-    ResultsAnalysisFunctionMap<ConfigType, StatisticsType> const
-        &analysis_functions) {
+        &parser) {
   std::string output_dir = "output";
   parser.optional(output_dir, "output_dir");
 
@@ -85,8 +80,7 @@ void parse(
   if (parser.valid()) {
     parser.value = std::make_unique<
         monte::jsonResultsIO<Results<ConfigType, StatisticsType>>>(
-        output_dir, sampling_functions, analysis_functions, write_trajectory,
-        write_observations);
+        output_dir, write_trajectory, write_observations);
   }
 }
 
