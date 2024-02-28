@@ -1,6 +1,7 @@
 #ifndef CASM_monte_OccLocation
 #define CASM_monte_OccLocation
 
+#include <set>
 #include <vector>
 
 #include "casm/crystallography/UnitCellCoord.hh"
@@ -62,9 +63,21 @@ class OccLocation {
   Mol const &choose_mol(Index cand_index,
                         GeneratorType &random_number_generator) const;
 
+  /// Stochastically choose an occupant of a particular OccCandidate type,
+  /// excluding some occupants by `loc`
+  template <typename GeneratorType>
+  Mol const &choose_mol(Index cand_index, std::set<Index> exclude,
+                        GeneratorType &random_number_generator) const;
+
   /// Stochastically choose an occupant of a particular OccCandidate type
   template <typename GeneratorType>
   Mol const &choose_mol(OccCandidate const &cand,
+                        GeneratorType &random_number_generator) const;
+
+  /// Stochastically choose an occupant of a particular OccCandidate type,
+  /// excluding some occupants by `loc`
+  template <typename GeneratorType>
+  Mol const &choose_mol(OccCandidate const &cand, std::set<Index> exclude,
                         GeneratorType &random_number_generator) const;
 
   /// Total number of mutating sites
@@ -141,7 +154,7 @@ class OccLocation {
 
   /// Gives a list of all Mol of the same {asym, species}-type allowed to mutate
   ///   m_loc[cand_index][i] -> m_mol index
-  std::vector<std::vector<Index> > m_loc;
+  std::vector<std::vector<Index>> m_loc;
 
   /// Holds Monte::Atom objects
   std::vector<Atom> m_atoms;
@@ -175,11 +188,34 @@ Mol const &OccLocation::choose_mol(
       m_loc[cand_index].size() - 1)]);
 }
 
+/// Stochastically choose an occupant of a particular OccCandidate type,
+/// excluding some occupants by `loc`
+template <typename GeneratorType>
+Mol const &OccLocation::choose_mol(
+    Index cand_index, std::set<Index> exclude,
+    GeneratorType &random_number_generator) const {
+  Index loc;
+  do {
+    loc = random_number_generator.random_int(m_loc[cand_index].size() - 1);
+  } while (exclude.count(loc));
+  return mol(m_loc[cand_index][loc]);
+}
+
 /// Stochastically choose an occupant of a particular OccCandidate type
 template <typename GeneratorType>
 Mol const &OccLocation::choose_mol(
     OccCandidate const &cand, GeneratorType &random_number_generator) const {
   return choose_mol(m_candidate_list.index(cand), random_number_generator);
+}
+
+/// Stochastically choose an occupant of a particular OccCandidate type,
+/// excluding some occupants by `loc`
+template <typename GeneratorType>
+Mol const &OccLocation::choose_mol(
+    OccCandidate const &cand, std::set<Index> exclude,
+    GeneratorType &random_number_generator) const {
+  return choose_mol(m_candidate_list.index(cand), exclude,
+                    random_number_generator);
 }
 
 /// Total number of mutating sites

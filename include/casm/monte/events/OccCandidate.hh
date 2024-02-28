@@ -1,6 +1,7 @@
 #ifndef CASM_monte_OccCandidate
 #define CASM_monte_OccCandidate
 
+#include <map>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -66,9 +67,7 @@ class OccSwap : public Comparisons<CRTPBase<OccSwap>> {
     return res;
   }
 
-  bool operator<(const OccSwap &B) const {
-    return this->sorted()._lt(B.sorted());
-  }
+  bool operator<(const OccSwap &B) const { return this->_lt(B); }
 
  private:
   bool _lt(const OccSwap &B) const { return this->tuple() < B.tuple(); }
@@ -76,6 +75,58 @@ class OccSwap : public Comparisons<CRTPBase<OccSwap>> {
   typedef std::tuple<OccCandidate, OccCandidate> tuple_type;
 
   tuple_type tuple() const { return std::make_tuple(cand_a, cand_b); }
+};
+
+class MultiOccSwap : public Comparisons<CRTPBase<MultiOccSwap>> {
+ public:
+  MultiOccSwap(std::map<OccSwap, int> const &_swaps)
+      : swaps(_swaps), total_count(0) {
+    if (!swaps.size()) {
+      throw std::runtime_error(
+          "Error constructing MultiOccSwap: "
+          "Empty multi-occ swap.");
+    }
+    for (auto const &pair : swaps) {
+      total_count += pair.second;
+    }
+  }
+
+  /// \brief {Swap, count}
+  std::map<OccSwap, int> swaps;
+
+  /// \brief Sum of swap counts (total number of single swaps)
+  int total_count;
+
+  void reverse() {
+    std::map<OccSwap, int> _reverse_swaps;
+    for (auto const &pair : swaps) {
+      OccSwap tmp = pair.first;
+      tmp.reverse();
+      _reverse_swaps.emplace(tmp, pair.second);
+    }
+    *this = MultiOccSwap(_reverse_swaps);
+  }
+
+  MultiOccSwap &sort() {
+    MultiOccSwap B(*this);
+    B.reverse();
+
+    if (B._lt(*this)) {
+      *this = B;
+    }
+    return *this;
+  }
+
+  MultiOccSwap sorted() const {
+    MultiOccSwap res(*this);
+    res.sort();
+    return res;
+  }
+
+  bool operator<(const MultiOccSwap &B) const { return this->_lt(B); }
+
+ private:
+  bool _lt(const MultiOccSwap &B) const { return this->swaps < B.swaps; }
 };
 
 /// List of asym / species_index pairs indicating allowed variable occupation
@@ -158,6 +209,10 @@ std::vector<OccSwap> make_semigrand_canonical_swaps(
 Index get_n_allowed_per_unitcell(
     Conversions const &convert,
     std::vector<OccSwap> const &semigrand_canonical_swaps);
+
+/// \brief Construct unique MultiOccSwap
+std::vector<MultiOccSwap> make_multiswaps(
+    std::vector<OccSwap> const &single_swaps, int max_total_count);
 
 }  // namespace monte
 }  // namespace CASM

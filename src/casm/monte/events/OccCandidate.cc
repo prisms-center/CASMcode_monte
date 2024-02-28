@@ -174,5 +174,39 @@ Index get_n_allowed_per_unitcell(
   return n_allowed_per_unitcell;
 }
 
+/// \brief Construct unique MultiOccSwap
+std::vector<MultiOccSwap> make_multiswaps(
+    std::vector<OccSwap> const &single_swaps, int max_total_count) {
+  // Get MultiOccSwap with total_count = 1
+  std::set<MultiOccSwap> multiswaps;
+  for (auto const &single : single_swaps) {
+    std::map<OccSwap, int> swaps;
+    swaps.emplace(single, 1);
+    multiswaps.emplace(swaps);
+  }
+
+  // Get MultiOccSwap with total_count > 1
+  std::set<MultiOccSwap> last = multiswaps;  // last: total_count = n
+  std::set<MultiOccSwap> next;               // next: total_count = n+1
+  for (Index n = 1; n < max_total_count; ++n) {
+    next.clear();
+    for (auto const &base : last) {  // for each 'last' multi-occ swap
+      for (auto const &single : single_swaps) {  // add each single swap
+        std::map<OccSwap, int> swaps = base.swaps;
+        auto it = swaps.find(single);
+        if (it == swaps.end()) {
+          swaps.emplace(single, 1);
+        } else {
+          it->second += 1;
+        }
+        next.emplace(swaps);
+      }
+    }
+    last = next;
+    multiswaps.insert(next.begin(), next.end());
+  }
+  return std::vector<MultiOccSwap>(multiswaps.begin(), multiswaps.end());
+}
+
 }  // namespace monte
 }  // namespace CASM

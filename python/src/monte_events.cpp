@@ -62,6 +62,7 @@ PYBIND11_MAKE_OPAQUE(std::vector<CASM::monte::Atom>);
 PYBIND11_MAKE_OPAQUE(std::vector<CASM::monte::AtomTraj>);
 PYBIND11_MAKE_OPAQUE(std::vector<CASM::monte::Mol>);
 PYBIND11_MAKE_OPAQUE(std::vector<CASM::monte::OccTransform>);
+PYBIND11_MAKE_OPAQUE(std::map<CASM::monte::OccSwap, int>);
 
 PYBIND11_MODULE(_monte_events, m) {
   using namespace CASMpy;
@@ -681,7 +682,7 @@ PYBIND11_MODULE(_monte_events, m) {
           [](monte::OccCandidate const &self,
              monte::Conversions const &convert) {
             jsonParser json;
-            to_json(self, convert, json);
+            to_json(self, json, convert);
             return json;
           },
           R"pbdoc(
@@ -746,7 +747,7 @@ PYBIND11_MODULE(_monte_events, m) {
                      R"pbdoc(
           :class:`~libcasm.monte.events.OccCandidate`: The second candidate occupant
           )pbdoc")
-      .def("reverse", &monte::OccSwap::sort,
+      .def("reverse", &monte::OccSwap::reverse,
            R"pbdoc(
           Transforms self so that `first` and `second` are reversed.
           )pbdoc")
@@ -756,7 +757,7 @@ PYBIND11_MODULE(_monte_events, m) {
           )pbdoc")
       .def("sorted", &monte::OccSwap::sorted,
            R"pbdoc(
-          bool: Returns True if already sorted
+          OccSwap: Returns the sorted swap.
           )pbdoc")
       .def(
           "is_valid",
@@ -792,7 +793,7 @@ PYBIND11_MODULE(_monte_events, m) {
           "to_dict",
           [](monte::OccSwap const &self, monte::Conversions const &convert) {
             jsonParser json;
-            to_json(self, convert, json);
+            to_json(self, json, convert);
             return json;
           },
           R"pbdoc(
@@ -830,6 +831,112 @@ PYBIND11_MODULE(_monte_events, m) {
          -------
          swap : :class:`~libcasm.monte.events.OccSwap`
               The OccSwap
+         )pbdoc");
+
+  py::bind_map<std::map<monte::OccSwap, int>>(m, "OccSwapCountMap",
+                                              R"pbdoc(
+    OccSwapCountMap stores :class:`~libcasm.monte.events.OccSwap` and the number that will be performed.
+
+    Notes
+    -----
+    OccSwapCountMapp is a Dict[:class:`~libcasm.monte.events.OccSwap`, int]-like object.
+    )pbdoc",
+                                              py::module_local(false));
+
+  py::class_<monte::MultiOccSwap>(m, "MultiOccSwap", R"pbdoc(
+    Represents a Monte Carlo event that performs multiple occupant swaps
+
+    This represents 1 or more :class:`libcasm.monte.events.OccSwap`. It
+    does not allow representing cycles.
+
+    )pbdoc")
+      .def(py::init<std::map<monte::OccSwap, int> const &>(),
+           R"pbdoc(
+          .. rubric:: Constructor
+
+          Parameters
+          ----------
+          swaps: libcasm.monte.events.OccSwapCountMap
+              The occupant swaps included in the multi-occ swap and how many.
+          )pbdoc",
+           py::arg("swaps"))
+      .def_readonly("swaps", &monte::MultiOccSwap::swaps,
+                    R"pbdoc(
+          libcasm.monte.events.OccSwapCountMap: The occupant swaps included in \
+          the multi-occ swap and how many.
+          )pbdoc")
+      .def_readonly("total_count", &monte::MultiOccSwap::total_count,
+                    R"pbdoc(
+          int: The total number of individual swaps
+          )pbdoc")
+      .def("reverse", &monte::MultiOccSwap::reverse,
+           R"pbdoc(
+          Transforms self so that all individual swaps are reversed.
+          )pbdoc")
+      .def("sort", &monte::MultiOccSwap::sort,
+           R"pbdoc(
+          Mutates self so that it compares less than its reverse.
+          )pbdoc")
+      .def("sorted", &monte::MultiOccSwap::sorted,
+           R"pbdoc(
+          MultiOccSwap: Returns the sorted multi-occ swap.
+          )pbdoc")
+      .def(py::self < py::self, "Compares two MultiOccSwap")
+      .def(py::self <= py::self, "Compares two MultiOccSwap")
+      .def(py::self > py::self, "Compares two MultiOccSwap")
+      .def(py::self >= py::self, "Compares two MultiOccSwap")
+      .def(py::self == py::self, "Compares two MultiOccSwap")
+      .def(py::self != py::self, "Compares two MultiOccSwap")
+      .def("__copy__",
+           [](monte::MultiOccSwap const &self) {
+             return monte::MultiOccSwap(self);
+           })
+      .def("__deepcopy__", [](monte::MultiOccSwap const &self,
+                              py::dict) { return monte::MultiOccSwap(self); })
+      .def(
+          "to_dict",
+          [](monte::MultiOccSwap const &self,
+             monte::Conversions const &convert) {
+            jsonParser json;
+            to_json(self, json, convert);
+            return json;
+          },
+          R"pbdoc(
+         Represent the MultiOccSwap as a Python dict
+
+         Parameters
+         ----------
+         convert : :class:`~libcasm.monte.Conversions`
+             Provides index conversions
+
+         Returns
+         -------
+         data : dict
+              The MultiOccSwap as a Python dict
+         )pbdoc")
+      .def_static(
+          "from_dict",
+          [](const nlohmann::json &data,
+             monte::Conversions const &convert) -> monte::MultiOccSwap {
+            jsonParser json{data};
+            return jsonConstructor<monte::MultiOccSwap>::from_json(json,
+                                                                   convert);
+          },
+          R"pbdoc(
+         Construct a MultiOccSwap from a Python dict
+
+         Parameters
+         ----------
+         data : dict
+             The MultiOccSwap representation
+
+         convert : :class:`~libcasm.monte.Conversions`
+             Provides index conversions
+
+         Returns
+         -------
+         multiswap : :class:`~libcasm.monte.events.MultiOccSwap`
+              The MultiOccSwap
          )pbdoc");
 
   py::class_<monte::OccCandidateList>(m, "OccCandidateList", R"pbdoc(
@@ -888,7 +995,7 @@ PYBIND11_MODULE(_monte_events, m) {
           [](monte::OccCandidateList const &self,
              monte::Conversions const &convert) {
             jsonParser json;
-            to_json(self, convert, json);
+            to_json(self, json, convert);
             return json;
           },
           R"pbdoc(
@@ -1021,6 +1128,26 @@ PYBIND11_MODULE(_monte_events, m) {
             This does include both forward and reverse swaps.
         )pbdoc",
         py::arg("convert"), py::arg("occ_candidate_list"));
+
+  m.def("make_multiswaps", &monte::make_multiswaps,
+        R"pbdoc(
+        Construct unique MultiOccSwap
+
+        Parameters
+        ----------
+        single_swaps: list[:class:`~libcasm.monte.events.OccSwap`]
+            A list of allowed OccSwap to make MultiOccSwap from. This should
+            include both forward and reverse swaps.
+        max_total_count: int
+            The maximum number of single OccSwap making up the MultiOccSwap
+
+        Returns
+        -------
+        multiswaps : List[:class:`~libcasm.monte.events.MultiOccSwap`]
+            A list of unique MultiOccSwap made up of the `single_swaps`.
+            This does include both forward and reverse multi-occ swaps.
+        )pbdoc",
+        py::arg("single_swaps"), py::arg("max_total_count"));
 
   m.def("swaps_allowed_per_unitcell", &monte::get_n_allowed_per_unitcell,
         R"pbdoc(
@@ -1390,6 +1517,103 @@ PYBIND11_MODULE(_monte_events, m) {
         )pbdoc",
       py::arg("event"), py::arg("occ_location"),
       py::arg("semigrand_canonical_swaps"), py::arg("random_number_generator"));
+
+  // ~~~
+
+  m.def(
+      "choose_semigrand_canonical_multiswap",
+      [](monte::OccLocation const &occ_location,
+         std::vector<monte::MultiOccSwap> const &semigrand_canonical_multiswaps,
+         generator_type &random_number_generator) {
+        return monte::choose_semigrand_canonical_multiswap(
+            occ_location, semigrand_canonical_multiswaps,
+            random_number_generator);
+      },
+      R"pbdoc(
+        Choose a swap type from a list of allowed semi-grand canonical swap types
+
+        Parameters
+        ----------
+        occ_location: :class:`~libcasm.monte.OccLocation`
+            Current occupant location list
+        semigrand_canonical_multiswaps : List[:class:`~libcasm.monte.events.MultiOccSwap`]
+            A list of allowed MultiOccSwap for semi-grand canonical Monte Carlo events.
+            This should include both forward and reverse swaps.
+        random_number_generator: :class:`~libcasm.monte.RandomNumberGenerator`
+            Random number generator.
+
+        Returns
+        -------
+        multiswap: :class:`~libcasm.monte.events.MultiOccSwap`
+            Chosen multi-occ swap type.
+        )pbdoc",
+      py::arg("occ_location"), py::arg("semigrand_canonical_multiswaps"),
+      py::arg("random_number_generator"));
+
+  m.def(
+      "propose_semigrand_canonical_event_from_multiswap",
+      [](monte::OccEvent &e, monte::OccLocation const &occ_location,
+         monte::MultiOccSwap const &multiswap,
+         generator_type &random_number_generator) {
+        return monte::propose_semigrand_canonical_event_from_multiswap(
+            e, occ_location, multiswap, random_number_generator);
+      },
+      R"pbdoc(
+        Propose semi-grand canonical OccEvent of particular multi-occ swap type
+
+        Parameters
+        ----------
+        event: :class:`~libcasm.monte.events.OccEvent`
+            Event to update based on the chosen OccSwap.
+        occ_location: :class:`~libcasm.monte.events.OccLocation`
+            Current occupant location list
+        multiswap : :class:`~libcasm.monte.events.MultiOccSwap`
+            Chosen multi-occ swap type.
+        random_number_generator: :class:`~libcasm.monte.RandomNumberGenerator`
+            Random number generator.
+
+        Returns
+        -------
+        event: :class:`~libcasm.monte.events.OccEvent`
+            Updated event based on the chosen multi-occ swap type and particular event.
+
+        )pbdoc",
+      py::arg("event"), py::arg("occ_location"), py::arg("multiswap"),
+      py::arg("random_number_generator"));
+
+  m.def(
+      "propose_semigrand_canonical_multiswap_event",
+      [](monte::OccEvent &e, monte::OccLocation const &occ_location,
+         std::vector<monte::MultiOccSwap> const &semigrand_canonical_multiswaps,
+         generator_type &random_number_generator) {
+        return monte::propose_semigrand_canonical_multiswap_event(
+            e, occ_location, semigrand_canonical_multiswaps,
+            random_number_generator);
+      },
+      R"pbdoc(
+        Propose semi-grand canonical OccEvent from list of multi-occ swap types
+
+        Parameters
+        ----------
+        event: :class:`~libcasm.monte.events.OccEvent`
+            Event to update.
+        occ_location: :class:`~libcasm.monte.events.OccLocation`
+            Current occupant location list
+        semigrand_canonical_multiswaps : List[:class:`~libcasm.monte.events.MultiOccSwap`]
+            A list of allowed MultiOccSwap for semi-grand canonical Monte Carlo events.
+            This should include both forward and reverse swaps.
+        random_number_generator: :class:`~libcasm.monte.RandomNumberGenerator`
+            Random number generator.
+
+        Returns
+        -------
+        event: :class:`~libcasm.monte.events.OccEvent`
+            Updated event based on the chosen multi-occ swap type and particular event.
+
+        )pbdoc",
+      py::arg("event"), py::arg("occ_location"),
+      py::arg("semigrand_canonical_multiswaps"),
+      py::arg("random_number_generator"));
 
 #ifdef VERSION_INFO
   m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
