@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.x'
+          python-version: '3.11'
 
       - name: Set up requirements & configuration variables
         run: |
@@ -24,7 +24,7 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           path: CASMcode_global/dist
-          key: ${{ runner.os }}-libcasm-global-v2-0-3
+          key: ${{ runner.os }}-libcasm-global-v2-0-4
 
       - name: checkout libcasm-global
         if: steps.cache-libcasm-global-restore.outputs.cache-hit != 'true'
@@ -32,7 +32,7 @@ jobs:
         with:
           repository: prisms-center/CASMcode_global
           path: CASMcode_global
-          ref: v2.0.3
+          ref: v2.0.4
 
       - name: make global
         if: steps.cache-libcasm-global-restore.outputs.cache-hit != 'true'
@@ -58,7 +58,7 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           path: CASMcode_composition/dist
-          key: ${{ runner.os }}-libcasm-composition-v2-0a1
+          key: ${{ runner.os }}-libcasm-composition-v2-0a2
 
       - name: checkout libcasm-composition
         if: steps.cache-libcasm-composition-restore.outputs.cache-hit != 'true'
@@ -66,7 +66,7 @@ jobs:
         with:
           repository: prisms-center/CASMcode_composition
           path: CASMcode_composition
-          ref: v2.0a1
+          ref: v2.0a2
 
       - name: make composition
         if: steps.cache-libcasm-composition-restore.outputs.cache-hit != 'true'
@@ -91,7 +91,7 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           path: CASMcode_crystallography/dist
-          key: ${{ runner.os }}-libcasm-xtal-v2-0a2
+          key: ${{ runner.os }}-libcasm-xtal-v2-0a9
 
       - name: checkout libcasm-xtal
         if: steps.cache-libcasm-xtal-restore.outputs.cache-hit != 'true'
@@ -99,7 +99,7 @@ jobs:
         with:
           repository: prisms-center/CASMcode_crystallography
           path: CASMcode_crystallography
-          ref: v2.0a2
+          ref: v2.0a9
 
       - name: make xtal
         if: steps.cache-libcasm-xtal-restore.outputs.cache-hit != 'true'
