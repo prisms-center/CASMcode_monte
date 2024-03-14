@@ -98,7 +98,7 @@ jobs:
 
       - name: upload test log
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: libcasm-monte-cxx-test-log
           path: build_cxx_test/Testing/Temporary/LastTest.log
