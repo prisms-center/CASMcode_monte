@@ -2,6 +2,7 @@
 #define CASM_monte_StateSamplingFunction
 
 #include "casm/monte/definitions.hh"
+#include "casm/monte/sampling/Sampler.hh"
 
 namespace CASM {
 namespace monte {
