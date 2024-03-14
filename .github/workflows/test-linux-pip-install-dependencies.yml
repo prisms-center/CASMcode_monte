@@ -29,7 +29,7 @@ jobs:
         shell: bash
         run: |
           cd CASMcode_global
-          pip install libcasm-global==2.0.3
+          pip install libcasm-global==2.0.4
           pip install -r test_requirements.txt
           python -m pytest -rsap python/tests
 
@@ -46,7 +46,7 @@ jobs:
         shell: bash
         run: |
           cd CASMcode_composition
-          pip install libcasm-composition==2.0a1
+          pip install libcasm-composition==2.0a2
           pip install -r test_requirements.txt
           python -m pytest -rsap python/tests
 
@@ -62,6 +62,6 @@ jobs:
         shell: bash
         run: |
           cd CASMcode_crystallography
-          pip install libcasm-xtal==2.0a2
+          pip install libcasm-xtal==2.0a9
           pip install -r test_requirements.txt
           python -m pytest -rsap python/tests
