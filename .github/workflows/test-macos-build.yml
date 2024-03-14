@@ -37,7 +37,7 @@ jobs:
 
       - name: upload libcasm-monte-macos-latest-x86_64-dist
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: libcasm-monte-macos-latest-x86_64-dist
           path: dist
