@@ -29,7 +29,7 @@ jobs:
       ### libcasm-global ###
       - name: restore libcasm-global cache
         id: cache-libcasm-global-restore
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: CASMcode_global/dist
           key: ${{ runner.os }}-libcasm-global-v2-0-3
@@ -37,7 +37,7 @@ jobs:
       ### libcasm-composition ###
       - name: restore libcasm-composition cache
         id: cache-libcasm-composition-restore
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: CASMcode_composition/dist
           key: ${{ runner.os }}-libcasm-composition-v2-0a1
@@ -45,7 +45,7 @@ jobs:
       ### libcasm-xtal ###
       - name: restore libcasm-xtal cache
         id: cache-libcasm-xtal-restore
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: CASMcode_crystallography/dist
           key: ${{ runner.os }}-libcasm-xtal-v2-0a2
