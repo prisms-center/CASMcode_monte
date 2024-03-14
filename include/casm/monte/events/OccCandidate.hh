@@ -2,6 +2,7 @@
 #define CASM_monte_OccCandidate
 
 #include <map>
+#include <stdexcept>
 #include <tuple>
 #include <utility>
 #include <vector>
