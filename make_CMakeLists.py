@@ -132,7 +132,7 @@ def unit_test_source_files(search_dir, additional):
 
 def as_cmake_file_strings(files):
     cmake_file_strings = ""
-    for file in files:
+    for file in sorted(files):
         cmake_file_strings += "  ${PROJECT_SOURCE_DIR}/" + str(file) + "\n"
     return cmake_file_strings
 

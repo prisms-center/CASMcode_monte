@@ -1,118 +1,174 @@
 #ifndef CASM_monte_RequestedPrecisionConstructor
 #define CASM_monte_RequestedPrecisionConstructor
 
-#include "casm/monte/sampling/Sampler.hh"
+#include <set>
+
+#include "casm/monte/checks/CompletionCheck.hh"
+#include "casm/monte/sampling/StateSamplingFunction.hh"
 
 namespace CASM {
 namespace monte {
 
-struct RequestedPrecisionConstructor;
-
-/// \brief Helps to specify requested precision
-///
-/// Example code:
-/// \code
-/// // Given some samplers:
-/// std::map<std::string, std::shared_ptr<Sampler>> &samplers;
-///
-/// // Construct map of SamplerComponent -> RequestedPrecision precision:
-/// std::map<SamplerComponent, RequestedPrecision> requested_precision =
-///     merge(
-///         converge(samplers, "formation_energy").precision(0.001),
-///         converge(samplers, "comp_n").component("O").precision(0.001),
-///         converge(samplers, "comp_n").component("Va").precision(0.01),
-///         converge(samplers, "corr").component_index(1).precision(0.001),
-///         converge(samplers, "corr").component_index(2).precision(0.001),
-///         converge(samplers, "comp").precision(0.001));
-/// \endcode
-///
-/// Notes:
-/// - Example converging all components to the same absolute precision:
-///   \code
-///   converge(samplers, "corr").precision(0.001)
-///   \endcode
-/// - Example converging a particular component (by index) to particular
-///   absolute precision:
-///   \code
-///   converge(samplers, "corr").component(1).precision(0.001)
-///   \endcode
-/// - Example converging a particular component (by name) to particular
-///   absolute precision:
-///   \code
-///   converge(samplers, "comp_n").component("Mg").precision(0.001)
-///   \endcode
-///
-/// - Default precision if `.precision()` is left off is
-///   `std::numeric_limits<double>::infinity` (essentially no convergence
-///   requested)
-///
-RequestedPrecisionConstructor converge(
-    std::map<std::string, std::shared_ptr<Sampler>> const &samplers,
-    std::string sampler_name);
-
 /// \brief Helper for compact construction of requested precision
 ///
-/// Usage:
-/// - This class is intended as a temporary intermediate constructed by the
-/// `converge` function. See `converge` documentation for intended usage.
+/// Allows setting absolute or relative precision to the specified level for
+/// the specified quantities. By default, all components are converged to
+/// the same level. If `component_name` or `component_index` are specified,
+/// then only the specified components are requested to converge to that level.
+///
+/// As a shortcut, this class is constructed using the `converge` method.
+/// For example:
+/// \code
+/// converge(sampling_functions, completion_check_params)
+///         .set_abs_precision("formation_energy", 0.001)
+///         .set_rel_precision("parametric_composition", 0.001, {"a"})
+///         .set_abs_and_rel_precision("corr", 0.001, 0.001 {0,1,2,3})
+/// \endcode
+///
+template <typename StatisticsType>
 struct RequestedPrecisionConstructor {
   /// \brief Constructor
-  RequestedPrecisionConstructor(std::string _sampler_name,
-                                Sampler const &_sampler);
+  RequestedPrecisionConstructor(
+      StateSamplingFunctionMap const &_sampling_functions,
+      CompletionCheckParams<StatisticsType> &_completion_check_params)
+      : sampling_functions(_sampling_functions),
+        completion_check_params(_completion_check_params) {}
 
-  /// \brief Select only the specified component - by index
-  RequestedPrecisionConstructor &component(Index component_index);
+  RequestedPrecisionConstructor &set_abs_precision(std::string sampler_name,
+                                                   double abs_precision) {
+    return set_abs_precision(sampler_name, abs_precision,
+                             all_component_index(sampler_name));
+  }
 
-  /// \brief Select only the specified component - by name
-  RequestedPrecisionConstructor &component(std::string component_name);
+  RequestedPrecisionConstructor &set_rel_precision(std::string sampler_name,
+                                                   double rel_precision) {
+    return set_rel_precision(sampler_name, rel_precision,
+                             all_component_index(sampler_name));
+  }
 
-  /// \brief Set the requested convergence absolute precision for selected
-  /// components
-  RequestedPrecisionConstructor &precision(double _abs_precision);
+  RequestedPrecisionConstructor &set_abs_and_rel_precision(
+      std::string sampler_name, double abs_precision, double rel_precision) {
+    return set_abs_and_rel_precision(sampler_name, abs_precision, rel_precision,
+                                     all_component_index(sampler_name));
+  }
 
-  /// \brief Set the requested convergence absolute precision for selected
-  /// components
-  RequestedPrecisionConstructor &abs_precision(double _value);
+  RequestedPrecisionConstructor &set_abs_precision(
+      std::string sampler_name, double abs_precision,
+      std::set<int> component_index) {
+    auto const &f = sampling_functions.at(sampler_name);
+    for (int i : component_index) {
+      SamplerComponent key(sampler_name, i, f.component_names[i]);
+      completion_check_params.requested_precision[key] =
+          RequestedPrecision::abs(abs_precision);
+    }
+    return *this;
+  }
 
-  /// \brief Set the requested convergence relative precision for selected
-  /// components
-  RequestedPrecisionConstructor &rel_precision(double _value);
+  RequestedPrecisionConstructor &set_rel_precision(
+      std::string sampler_name, double rel_precision,
+      std::set<int> component_index) {
+    auto const &f = sampling_functions.at(sampler_name);
+    for (int i : component_index) {
+      SamplerComponent key(sampler_name, i, f.component_names[i]);
+      completion_check_params.requested_precision[key] =
+          RequestedPrecision::rel(rel_precision);
+    }
+    return *this;
+  }
 
-  /// \brief Set the requested convergence absolute and relative precision for
-  /// selected components
-  RequestedPrecisionConstructor &abs_and_rel_precision(double _abs_value,
-                                                       double _rel_value);
+  RequestedPrecisionConstructor &set_abs_and_rel_precision(
+      std::string sampler_name, double abs_precision, double rel_precision,
+      std::set<int> component_index) {
+    auto const &f = sampling_functions.at(sampler_name);
+    for (int i : component_index) {
+      SamplerComponent key(sampler_name, i, f.component_names[i]);
+      completion_check_params.requested_precision[key] =
+          RequestedPrecision::abs_and_rel(abs_precision, rel_precision);
+    }
+    return *this;
+  }
+
+  RequestedPrecisionConstructor &set_abs_precision(
+      std::string sampler_name, double abs_precision,
+      std::set<std::string> component_name) {
+    return set_abs_precision(
+        sampler_name, abs_precision,
+        component_index_from_names(sampler_name, component_name));
+  }
+
+  RequestedPrecisionConstructor &set_rel_precision(
+      std::string sampler_name, double rel_precision,
+      std::set<std::string> component_name) {
+    return set_rel_precision(
+        sampler_name, rel_precision,
+        component_index_from_names(sampler_name, component_name));
+  }
+
+  RequestedPrecisionConstructor &set_abs_and_rel_precision(
+      std::string sampler_name, double abs_precision, double rel_precision,
+      std::set<std::string> component_name) {
+    return set_abs_and_rel_precision(
+        sampler_name, abs_precision, rel_precision,
+        component_index_from_names(sampler_name, component_name));
+  }
 
   /// \brief Conversion operator
-  operator std::map<SamplerComponent, RequestedPrecision> const &() const;
+  operator std::map<SamplerComponent, RequestedPrecision> const &() const {
+    return completion_check_params.requested_precision;
+  }
 
-  std::string sampler_name;
-  Sampler const &sampler;
-  std::map<SamplerComponent, RequestedPrecision> requested_precision;
+  StateSamplingFunctionMap const &sampling_functions;
+  CompletionCheckParams<StatisticsType> &completion_check_params;
+
+  std::set<int> all_component_index(std::string sampler_name) {
+    std::set<int> component_index;
+    for (int i = 0;
+         i < sampling_functions.at(sampler_name).component_names.size(); ++i) {
+      component_index.insert(i);
+    }
+    return component_index;
+  }
+
+  std::set<int> component_index_from_names(
+      std::string sampler_name, std::set<std::string> component_name) {
+    std::set<int> component_index;
+    int i = 0;
+    for (std::string _name :
+         sampling_functions.at(sampler_name).component_names) {
+      if (component_name.count(_name)) {
+        component_index.insert(i);
+      }
+      ++i;
+    }
+    return component_index;
+  }
 };
 
-/// \brief Merge
+/// \brief Helper for setting completion_check_params.requested_precision
 ///
-/// See `converge` for example usage
-inline RequestedPrecisionConstructor &merge(
-    RequestedPrecisionConstructor &A, RequestedPrecisionConstructor const &B) {
-  for (auto const &pair : B.requested_precision) {
-    A.requested_precision.insert(pair);
-  }
-  return A;
-}
-
-/// \brief Merge
+/// Example usage:
+/// \code
+/// converge(sampling_functions, completion_check_params)
+///         .set_abs_precision("formation_energy", 0.001)
+///         .set_rel_precision("parametric_composition", 0.001, {"a"})
+///         .set_abs_and_rel_precision("corr", 0.001, 0.001 {0,1,2,3})
+/// \endcode
 ///
-/// See `converge` for example usage
-template <typename T, typename... Args>
-RequestedPrecisionConstructor &merge(RequestedPrecisionConstructor &A,
-                                     RequestedPrecisionConstructor const &B,
-                                     Args &&...args) {
-  for (auto const &pair : B.requested_precision) {
-    A.requested_precision.insert(pair);
-  }
-  return merge(A, std::forward<Args>(args)...);
+/// Allows setting absolute or relative precision to the specified level for
+/// the specified quantities. By default, all components are converged to
+/// the same level. If `component_name` or `component_index` are specified,
+/// then only the specified components are requested to converge to that level.
+///
+/// \param sampling_functions State sampling function map
+/// \param completion_check_param Completion check parameters to set
+///     requested_precision
+/// \return rpc, A RequestedPrecisionConstructor
+template <typename StatisticsType>
+RequestedPrecisionConstructor<StatisticsType> converge(
+    StateSamplingFunctionMap const &sampling_functions,
+    CompletionCheckParams<StatisticsType> &completion_check_params) {
+  return RequestedPrecisionConstructor<StatisticsType>(sampling_functions,
+                                                       completion_check_params);
 }
 
 }  // namespace monte

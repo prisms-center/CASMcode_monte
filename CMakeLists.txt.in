@@ -202,4 +202,89 @@ if(DEFINED SKBUILD)
       _monte PROPERTIES INSTALL_RPATH "$ORIGIN/../lib")
   endif()
 
+  ### libcasm.monte.events._monte_events ###
+  pybind11_add_module(_monte_events MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_events.cpp")
+  target_link_libraries(_monte_events PRIVATE
+    CASM::casm_global
+    CASM::casm_crystallography
+    casm_monte
+  )
+  install(TARGETS _monte_events DESTINATION monte/events)
+  if(APPLE)
+    set_target_properties(
+      _monte_events PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_events PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
+  ### libcasm.monte.methods._monte_methods ###
+  pybind11_add_module(_monte_methods MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_methods.cpp")
+  target_link_libraries(_monte_methods PRIVATE
+    CASM::casm_global
+    CASM::casm_crystallography
+    casm_monte
+  )
+  install(TARGETS _monte_methods DESTINATION monte/methods)
+  if(APPLE)
+    set_target_properties(
+      _monte_methods PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_methods PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
+  ### libcasm.monte.ising_cpp._monte_ising_cpp ###
+  pybind11_add_module(_monte_ising_cpp MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_ising_cpp.cpp")
+  target_link_libraries(_monte_ising_cpp PRIVATE
+    CASM::casm_global
+    CASM::casm_crystallography
+    casm_monte
+  )
+  install(TARGETS _monte_ising_cpp DESTINATION monte/ising_cpp)
+  if(APPLE)
+    set_target_properties(
+      _monte_ising_cpp PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_ising_cpp PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
+  ### libcasm.monte.ising_cpp.semigrand_canonical._monte_ising_cpp_semigrand_canonical ###
+  pybind11_add_module(_monte_ising_cpp_semigrand_canonical MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_ising_cpp_semigrand_canonical.cpp")
+  target_link_libraries(_monte_ising_cpp_semigrand_canonical PRIVATE
+    CASM::casm_global
+    CASM::casm_crystallography
+    casm_monte
+  )
+  install(TARGETS _monte_ising_cpp_semigrand_canonical DESTINATION monte/ising_cpp/semigrand_canonical)
+  if(APPLE)
+    set_target_properties(
+      _monte_ising_cpp_semigrand_canonical PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_ising_cpp_semigrand_canonical PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
+  ### libcasm.monte.sampling._monte_sampling ###
+  pybind11_add_module(_monte_sampling MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_sampling.cpp")
+  target_link_libraries(_monte_sampling PRIVATE
+    CASM::casm_global
+    casm_monte
+  )
+  install(TARGETS _monte_sampling DESTINATION monte/sampling)
+  if(APPLE)
+    set_target_properties(
+      _monte_sampling PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_sampling PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
+
 endif()

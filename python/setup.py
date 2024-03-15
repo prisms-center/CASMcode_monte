@@ -67,6 +67,31 @@ ext_modules_params = {
 
 ext_modules = [
     Pybind11Extension("libcasm.monte._monte", ["src/monte.cpp"], **ext_modules_params),
+    Pybind11Extension(
+        "libcasm.monte.events._monte_events",
+        ["src/monte_events.cpp"],
+        **ext_modules_params,
+    ),
+    Pybind11Extension(
+        "libcasm.monte.methods._monte_methods",
+        ["src/monte_methods.cpp"],
+        **ext_modules_params,
+    ),
+    Pybind11Extension(
+        "libcasm.monte.ising_cpp._monte_ising_cpp",
+        ["src/monte_ising_cpp.cpp"],
+        **ext_modules_params,
+    ),
+    Pybind11Extension(
+        "libcasm.monte.ising_cpp.semigrand_canonical._monte_ising_cpp_semigrand_canonical",
+        ["src/monte_ising_cpp_semigrand_canonical.cpp"],
+        **ext_modules_params,
+    ),
+    Pybind11Extension(
+        "libcasm.monte.sampling._monte_sampling",
+        ["src/monte_sampling.cpp"],
+        **ext_modules_params,
+    ),
 ]
 
 
@@ -76,12 +101,19 @@ setup(
     packages=[
         "libcasm",
         "libcasm.monte",
+        "libcasm.monte.events",
+        "libcasm.monte.methods",
+        "libcasm.monte.ising_cpp",
+        "libcasm.monte.ising_cpp.semigrand_canonical",
+        "libcasm.monte.ising_py",
+        "libcasm.monte.ising_py.semigrand_canonical",
+        "libcasm.monte.sampling",
     ],
     install_requires=[
         "pybind11",
-        "libcasm-global>=2.0.2",
-        "libcasm-xtal>=2.0a2",
-        "libcasm-composition>=2.0a1",
+        "libcasm-global>=2.0.4",
+        "libcasm-xtal>=2.0a9",
+        "libcasm-composition>=2.0a2",
     ],
     ext_modules=ext_modules,
     cmdclass={"build_ext": build_ext},

@@ -79,73 +79,70 @@ ENDIF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 # create libcasm_monte
 set(
   libcasm_monte_HEADERS
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/RunManager.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/BasicStatistics.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/MethodLog.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/SamplingFixture.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/definitions.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/RandomNumberGenerator.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/Conversions.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/BasicStructureTools.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/math.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/occupation_metropolis.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/nfold.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/metropolis.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/kinetic_monte_carlo.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/calculator/LocalCalculatorTemplate.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/calculator/CalculatorTemplate.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/MethodLog.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/RandomNumberGenerator.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/ValueMap.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/CompletionCheck.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/ConvergenceCheck.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/CutoffCheck.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/EquilibrationCheck.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/ConvergenceCheck.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/CompletionCheck.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/io/json/CutoffCheck_json_io.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/io/json/ConvergenceCheck_json_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/io/json/CompletionCheck_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/io/json/ConvergenceCheck_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/io/json/CutoffCheck_json_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/checks/io/json/EquilibrationCheck_json_io.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/RequestedPrecisionConstructor.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/Sampler.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/SamplingParams.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/io/json/SamplingParams_json_io.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/io/json/Sampler_json_io.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/StateSampler.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/FixedConfigGenerator.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/IncrementalConditionsStateGenerator.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/ConfigGenerator.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/RunData.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/State.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/StateGenerator.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/StateModifyingFunction.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/ValueMap.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/io/json/ValueMap_json_io.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/state/io/json/RunData_json_io.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/results/Results.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/results/ResultsAnalysisFunction.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/results/io/ResultsIO.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/results/io/json/jsonResultsIO.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/results/io/json/jsonResultsIO_impl.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/definitions.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/events/OccCandidate.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/events/OccEvent.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/events/OccEventProposal.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/events/OccLocation.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/events/OccCandidate.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/events/io/OccCandidate_stream_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/events/io/OccCandidate_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/events/io/OccCandidate_stream_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/io/json/ValueMap_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/ising_cpp/basic_semigrand_canonical.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/ising_cpp/complete_semigrand_canonical.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/ising_cpp/model.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/basic_occupation_metropolis.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/kinetic_monte_carlo.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/metropolis.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/nfold.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/occupation_metropolis.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/BasicStructureTools.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/math.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/polymorphic_method_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/Results.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/ResultsAnalysisFunction.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/RunManager.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/SamplingFixture.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/State.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/ResultsIO.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/ResultsIO_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/SamplingFixtureParams_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/jsonResultsIO.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/jsonResultsIO_impl.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/RequestedPrecisionConstructor.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/Sampler.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/SamplingParams.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/StateSamplingFunction.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/io/json/Sampler_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/io/json/SamplingParams_json_io.hh
 )
 set(
   libcasm_monte_SOURCES
   ${PROJECT_SOURCE_DIR}/src/casm/monte/BasicStatistics.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/Conversions.cc
-  ${PROJECT_SOURCE_DIR}/src/casm/monte/misc/BasicStructureTools.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/checks/EquilibrationCheck.cc
-  ${PROJECT_SOURCE_DIR}/src/casm/monte/checks/io/json/EquilibrationCheck_json_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/checks/io/json/CutoffCheck_json_io.cc
-  ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/RequestedPrecisionConstructor.cc
-  ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/SamplingParams_json_io.cc
-  ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/Sampler_json_io.cc
-  ${PROJECT_SOURCE_DIR}/src/casm/monte/state/io/json/ValueMap_json_io.cc
+  ${PROJECT_SOURCE_DIR}/src/casm/monte/checks/io/json/EquilibrationCheck_json_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/events/OccCandidate.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/events/OccLocation.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/events/io/OccCandidate_json_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/events/io/OccCandidate_stream_io.cc
+  ${PROJECT_SOURCE_DIR}/src/casm/monte/io/json/ValueMap_json_io.cc
+  ${PROJECT_SOURCE_DIR}/src/casm/monte/misc/BasicStructureTools.cc
+  ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/Sampler_json_io.cc
+  ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/SamplingParams_json_io.cc
 )
 add_library(casm_monte SHARED ${libcasm_monte_SOURCES})
 target_include_directories(casm_monte
@@ -265,5 +262,90 @@ if(DEFINED SKBUILD)
     set_target_properties(
       _monte PROPERTIES INSTALL_RPATH "$ORIGIN/../lib")
   endif()
+
+  ### libcasm.monte.events._monte_events ###
+  pybind11_add_module(_monte_events MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_events.cpp")
+  target_link_libraries(_monte_events PRIVATE
+    CASM::casm_global
+    CASM::casm_crystallography
+    casm_monte
+  )
+  install(TARGETS _monte_events DESTINATION monte/events)
+  if(APPLE)
+    set_target_properties(
+      _monte_events PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_events PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
+  ### libcasm.monte.methods._monte_methods ###
+  pybind11_add_module(_monte_methods MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_methods.cpp")
+  target_link_libraries(_monte_methods PRIVATE
+    CASM::casm_global
+    CASM::casm_crystallography
+    casm_monte
+  )
+  install(TARGETS _monte_methods DESTINATION monte/methods)
+  if(APPLE)
+    set_target_properties(
+      _monte_methods PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_methods PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
+  ### libcasm.monte.ising_cpp._monte_ising_cpp ###
+  pybind11_add_module(_monte_ising_cpp MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_ising_cpp.cpp")
+  target_link_libraries(_monte_ising_cpp PRIVATE
+    CASM::casm_global
+    CASM::casm_crystallography
+    casm_monte
+  )
+  install(TARGETS _monte_ising_cpp DESTINATION monte/ising_cpp)
+  if(APPLE)
+    set_target_properties(
+      _monte_ising_cpp PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_ising_cpp PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
+  ### libcasm.monte.ising_cpp.semigrand_canonical._monte_ising_cpp_semigrand_canonical ###
+  pybind11_add_module(_monte_ising_cpp_semigrand_canonical MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_ising_cpp_semigrand_canonical.cpp")
+  target_link_libraries(_monte_ising_cpp_semigrand_canonical PRIVATE
+    CASM::casm_global
+    CASM::casm_crystallography
+    casm_monte
+  )
+  install(TARGETS _monte_ising_cpp_semigrand_canonical DESTINATION monte/ising_cpp/semigrand_canonical)
+  if(APPLE)
+    set_target_properties(
+      _monte_ising_cpp_semigrand_canonical PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_ising_cpp_semigrand_canonical PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
+  ### libcasm.monte.sampling._monte_sampling ###
+  pybind11_add_module(_monte_sampling MODULE
+                      "${PROJECT_SOURCE_DIR}/python/src/monte_sampling.cpp")
+  target_link_libraries(_monte_sampling PRIVATE
+    CASM::casm_global
+    casm_monte
+  )
+  install(TARGETS _monte_sampling DESTINATION monte/sampling)
+  if(APPLE)
+    set_target_properties(
+      _monte_sampling PROPERTIES INSTALL_RPATH "@loader_path/../../lib")
+  else()
+    set_target_properties(
+      _monte_sampling PROPERTIES INSTALL_RPATH "$ORIGIN/../../lib")
+  endif()
+
 
 endif()

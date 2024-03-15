@@ -78,6 +78,15 @@ struct BasicStatisticsCalculator {
                              Eigen::VectorXd const &sample_weight) const;
 };
 
+template <typename StatisticsType>
+CalcStatisticsFunction<StatisticsType> default_statistics_calculator();
+
+template <>
+inline CalcStatisticsFunction<BasicStatistics>
+default_statistics_calculator<BasicStatistics>() {
+  return BasicStatisticsCalculator();
+}
+
 void append_statistics_to_json_arrays(
     std::optional<BasicStatistics> const &stats, jsonParser &json);
 

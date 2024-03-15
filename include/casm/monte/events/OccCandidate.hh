@@ -1,6 +1,8 @@
 #ifndef CASM_monte_OccCandidate
 #define CASM_monte_OccCandidate
 
+#include <map>
+#include <stdexcept>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -32,8 +34,7 @@ struct OccCandidate : public Comparisons<CRTPBase<OccCandidate>> {
   }
 };
 
-/// \brief Store swap type, mutating sites, and info for keeping OccLocation
-/// up-to-date
+/// \brief Represents a Monte Carlo event that swaps occupants
 ///
 /// This object does not specify which particular sites are changing, just the
 /// type of change (which occupant types on which asymmetric unit sites).
@@ -67,9 +68,7 @@ class OccSwap : public Comparisons<CRTPBase<OccSwap>> {
     return res;
   }
 
-  bool operator<(const OccSwap &B) const {
-    return this->sorted()._lt(B.sorted());
-  }
+  bool operator<(const OccSwap &B) const { return this->_lt(B); }
 
  private:
   bool _lt(const OccSwap &B) const { return this->tuple() < B.tuple(); }
@@ -77,6 +76,58 @@ class OccSwap : public Comparisons<CRTPBase<OccSwap>> {
   typedef std::tuple<OccCandidate, OccCandidate> tuple_type;
 
   tuple_type tuple() const { return std::make_tuple(cand_a, cand_b); }
+};
+
+class MultiOccSwap : public Comparisons<CRTPBase<MultiOccSwap>> {
+ public:
+  MultiOccSwap(std::map<OccSwap, int> const &_swaps)
+      : swaps(_swaps), total_count(0) {
+    if (!swaps.size()) {
+      throw std::runtime_error(
+          "Error constructing MultiOccSwap: "
+          "Empty multi-occ swap.");
+    }
+    for (auto const &pair : swaps) {
+      total_count += pair.second;
+    }
+  }
+
+  /// \brief {Swap, count}
+  std::map<OccSwap, int> swaps;
+
+  /// \brief Sum of swap counts (total number of single swaps)
+  int total_count;
+
+  void reverse() {
+    std::map<OccSwap, int> _reverse_swaps;
+    for (auto const &pair : swaps) {
+      OccSwap tmp = pair.first;
+      tmp.reverse();
+      _reverse_swaps.emplace(tmp, pair.second);
+    }
+    *this = MultiOccSwap(_reverse_swaps);
+  }
+
+  MultiOccSwap &sort() {
+    MultiOccSwap B(*this);
+    B.reverse();
+
+    if (B._lt(*this)) {
+      *this = B;
+    }
+    return *this;
+  }
+
+  MultiOccSwap sorted() const {
+    MultiOccSwap res(*this);
+    res.sort();
+    return res;
+  }
+
+  bool operator<(const MultiOccSwap &B) const { return this->_lt(B); }
+
+ private:
+  bool _lt(const MultiOccSwap &B) const { return this->swaps < B.swaps; }
 };
 
 /// List of asym / species_index pairs indicating allowed variable occupation
@@ -87,6 +138,11 @@ class OccCandidateList {
 
   OccCandidateList() {}
 
+  /// \brief Construct with custom list of OccCandidate
+  OccCandidateList(std::vector<OccCandidate> candidates,
+                   const Conversions &convert);
+
+  /// \brief Construct with all possible OccCandidate
   OccCandidateList(const Conversions &convert);
 
   /// Return index into std::vector<OccCandidate>, or _candidate.size() if not
@@ -132,7 +188,7 @@ bool is_valid(Conversions const &convert, OccCandidate const &cand_a,
 /// \brief Check that swap is valid (won't cause segfaults)
 bool is_valid(Conversions const &convert, OccSwap const &swap);
 
-/// \brief Check that species are different and allowed on both sites
+/// \brief Check that candidates form an allowed canonical Monte Carlo event
 bool allowed_canonical_swap(Conversions const &convert, OccCandidate cand_a,
                             OccCandidate cand_b);
 
@@ -140,19 +196,24 @@ bool allowed_canonical_swap(Conversions const &convert, OccCandidate cand_a,
 std::vector<OccSwap> make_canonical_swaps(
     Conversions const &convert, OccCandidateList const &occ_candidate_list);
 
-/// \brief Check that species are different and allowed on both sites
-bool allowed_grand_canonical_swap(Conversions const &convert,
-                                  OccCandidate cand_a, OccCandidate cand_b);
+/// \brief Check that candidates form an allowed semi-grand canonical Monte
+/// Carlo event
+bool allowed_semigrand_canonical_swap(Conversions const &convert,
+                                      OccCandidate cand_a, OccCandidate cand_b);
 
 /// \brief Construct OccSwap allowed for grand canonical Monte Carlo
-std::vector<OccSwap> make_grand_canonical_swaps(
+std::vector<OccSwap> make_semigrand_canonical_swaps(
     const Conversions &convert, OccCandidateList const &occ_candidate_list);
 
 /// \brief For grand canonical swaps, get the number of possible events
 ///     that can be chosen from at any one time
 Index get_n_allowed_per_unitcell(
     Conversions const &convert,
-    std::vector<OccSwap> const &grand_canonical_swaps);
+    std::vector<OccSwap> const &semigrand_canonical_swaps);
+
+/// \brief Construct unique MultiOccSwap
+std::vector<MultiOccSwap> make_multiswaps(
+    std::vector<OccSwap> const &single_swaps, int max_total_count);
 
 }  // namespace monte
 }  // namespace CASM

@@ -6,9 +6,9 @@ requires = [
     "cmake>=3.20",
     "ninja",
     "pybind11>=2.6",
-    "libcasm-global>=2.0.2",
-    "libcasm-xtal>=2.0a2",
-    "libcasm-composition>=2.0a1",
+    "libcasm-global>=2.0.4",
+    "libcasm-xtal>=2.0a9",
+    "libcasm-composition>=2.0a2",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -30,9 +30,10 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 dependencies = [
-  "libcasm-global>=2.0.2",
-  "libcasm-xtal>=2.0a2",
-  "numpy",
+    "libcasm-global>=2.0.4",
+    "libcasm-xtal>=2.0a9",
+    "libcasm-composition>=2.0a2",
+    "numpy",
 ]
 
 [project.urls]
@@ -51,8 +52,8 @@ known-first-party = ["libcasm", "casm"]
 
 
 [tool.cibuildwheel]
-# Build for python3.9, 3.10, 3.11
-build = "cp39-* cp310-* cp311-*"
+# Build for python3.9, 3.10, 3.11, 3.12
+build = "cp39-* cp310-* cp311-* cp312-*"
 # Build for cpython only
 skip =  "pp*"
 

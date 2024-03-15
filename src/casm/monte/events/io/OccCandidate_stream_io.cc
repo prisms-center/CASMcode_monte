@@ -73,9 +73,10 @@ std::ostream &operator<<(std::ostream &sout,
   sout << "\n";
 
   sout << "Grand canonical swaps: " << std::endl;
-  auto grand_canonical_swaps = make_grand_canonical_swaps(convert, list);
-  for (auto it = grand_canonical_swaps.begin();
-       it != grand_canonical_swaps.end(); ++it) {
+  auto semigrand_canonical_swaps =
+      make_semigrand_canonical_swaps(convert, list);
+  for (auto it = semigrand_canonical_swaps.begin();
+       it != semigrand_canonical_swaps.end(); ++it) {
     sout << "  " << cand_pair(it->cand_a, convert) << " -> "
          << cand_pair(it->cand_b, convert) << "\n";
   }

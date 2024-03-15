@@ -9,7 +9,7 @@ jobs:
     steps:
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.11'
 
       - name: Set up requirements & configuration variables
         run: |
@@ -23,13 +23,13 @@ jobs:
         with:
           repository: prisms-center/CASMcode_global
           path: CASMcode_global
-          ref: v2.0.3
+          ref: v2.0.4
 
       - name: test libcasm-global
         shell: bash
         run: |
           cd CASMcode_global
-          pip install libcasm-global==2.0.3
+          pip install libcasm-global==2.0.4
           pip install -r test_requirements.txt
           python -m pytest -rsap python/tests
 
@@ -39,14 +39,14 @@ jobs:
         with:
           repository: prisms-center/CASMcode_composition
           path: CASMcode_composition
-          ref: v2.0a1
+          ref: v2.0a2
 
       - name: test libcasm-composition
         if: steps.cache-libcasm-composition-restore.outputs.cache-hit != 'true'
         shell: bash
         run: |
           cd CASMcode_composition
-          pip install libcasm-composition==2.0a1
+          pip install libcasm-composition==2.0a2
           pip install -r test_requirements.txt
           python -m pytest -rsap python/tests
 
@@ -56,12 +56,12 @@ jobs:
         with:
           repository: prisms-center/CASMcode_crystallography
           path: CASMcode_crystallography
-          ref: v2.0a2
+          ref: v2.0a9
 
       - name: test libcasm-xtal
         shell: bash
         run: |
           cd CASMcode_crystallography
-          pip install libcasm-xtal==2.0a2
+          pip install libcasm-xtal==2.0a9
           pip install -r test_requirements.txt
           python -m pytest -rsap python/tests

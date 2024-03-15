@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 
+#include "casm/casm_io/json/jsonParser.hh"
 #include "casm/global/eigen.hh"
 #include "casm/monte/definitions.hh"
 
@@ -110,6 +111,13 @@ class Sampler {
   Eigen::MatrixXd m_values;
 };
 
+typedef std::map<std::string, std::shared_ptr<monte::Sampler>> SamplerMap;
+
+/// \brief jsonSampler stores a vector of JSON-valued samples
+struct jsonSampler {
+  std::vector<jsonParser> values;
+};
+
 /// \brief Construct vector of component_names
 std::vector<std::string> default_component_names(std::vector<Index> shape);
 
@@ -186,6 +194,9 @@ std::map<std::string, std::shared_ptr<Sampler>>::const_iterator find_or_throw(
 /// (else 0)
 CountType get_n_samples(
     std::map<std::string, std::shared_ptr<Sampler>> const &samplers);
+
+/// \brief Holds sampled JSON data
+typedef std::map<std::string, jsonSampler> jsonSamplerMap;
 
 }  // namespace monte
 }  // namespace CASM

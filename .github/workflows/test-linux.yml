@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.11'
 
       - name: Set up requirements & configuration variables
         run: |
@@ -32,7 +32,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: CASMcode_global/dist
-          key: ${{ runner.os }}-libcasm-global-v2-0-3
+          key: ${{ runner.os }}-libcasm-global-v2-0-4
 
       ### libcasm-composition ###
       - name: restore libcasm-composition cache
@@ -40,7 +40,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: CASMcode_composition/dist
-          key: ${{ runner.os }}-libcasm-composition-v2-0a1
+          key: ${{ runner.os }}-libcasm-composition-v2-0a2
 
       ### libcasm-xtal ###
       - name: restore libcasm-xtal cache
@@ -48,7 +48,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: CASMcode_crystallography/dist
-          key: ${{ runner.os }}-libcasm-xtal-v2-0a2
+          key: ${{ runner.os }}-libcasm-xtal-v2-0a9
 
       - name: Install CASM dependencies
         run: |

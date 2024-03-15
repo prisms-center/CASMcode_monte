@@ -1,3 +1,11 @@
+/// An implementation of a kinetic Monte Carlo main loop
+/// that makes use of the RunManager provided by
+/// casm/monte/run_management to implement sampling
+/// fixtures and results data structures and input/output
+/// methods and a data structure that allows sampling
+/// atomic displacements for kinetic coefficient
+/// calculations.
+
 #ifndef CASM_monte_methods_kinetic_monte_carlo
 #define CASM_monte_methods_kinetic_monte_carlo
 
@@ -13,24 +21,26 @@ namespace CASM {
 namespace monte {
 
 /// \brief Data that can be used by sampling functions
-template <typename ConfigType, typename EngineType>
+template <typename ConfigType, typename StatisticsType, typename EngineType>
 struct KMCData {
   /// \brief This will be set to the current sampling
   ///     fixture label before sampling data.
   std::string sampling_fixture_label;
 
-  /// \brief This will be set to point to the current state
-  ///     sampler sampling data.
-  monte::StateSampler<ConfigType, EngineType> const *state_sampler;
+  /// \brief This will be set to point to the current sampling fixture
+  monte::SamplingFixture<ConfigType, StatisticsType, EngineType> const
+      *sampling_fixture;
 
   /// \brief This will be set to the total event rate at sampling time
   double total_rate;
 
-  /// \brief Current simulation time
+  /// \brief Current simulation time when sampling occurs
   ///
-  /// For time-based sampling this will be equal to the time the
-  /// For count-based sampling, this will be equal to the time the
-  /// event occurred.
+  /// For time-based sampling this will be equal to the sampling time
+  /// and not determined by the time any event occurred.
+  /// For count-based sampling, this will be equal to the time the n-th
+  /// (by step or pass) event occurred, where n is the step or pass when
+  /// sampling is due.
   double time;
 
   /// \brief Simulation time at last sample, by sampling fixture label
@@ -45,8 +55,9 @@ struct KMCData {
   /// When sampling, this will hold the atom name index for each column of the
   /// atom position matrices. Currently atom names only; does not distinguish
   /// atoms with different properties. Not set by monte::kinetic_monte_carlo,
-  /// this must be set beforehand. TODO: KMC with atoms that move to/from
-  /// resevoir will need to update this
+  /// this must be set beforehand.
+  ///
+  /// TODO: KMC with atoms that move to/from resevoir will need to update this
   std::vector<Index> atom_name_index_list;
 
   /// \brief Current atom positions
@@ -74,7 +85,7 @@ template <typename EventIDType, typename ConfigType, typename EventSelectorType,
           typename GetEventType, typename StatisticsType, typename EngineType>
 void kinetic_monte_carlo(
     State<ConfigType> &state, OccLocation &occ_location,
-    KMCData<ConfigType, EngineType> &kmc_data,
+    KMCData<ConfigType, StatisticsType, EngineType> &kmc_data,
     EventSelectorType &event_selector, GetEventType get_event_f,
     RunManager<ConfigType, StatisticsType, EngineType> &run_manager);
 
@@ -113,14 +124,14 @@ template <typename EventIDType, typename ConfigType, typename EventSelectorType,
           typename GetEventType, typename StatisticsType, typename EngineType>
 void kinetic_monte_carlo(
     State<ConfigType> &state, OccLocation &occ_location,
-    KMCData<ConfigType, EngineType> &kmc_data,
+    KMCData<ConfigType, StatisticsType, EngineType> &kmc_data,
     EventSelectorType &event_selector, GetEventType get_event_f,
     RunManager<ConfigType, StatisticsType, EngineType> &run_manager) {
   // Used within the main loop:
   double total_rate;
   double event_time;
   double time_increment;
-  clexmonte::EventID selected_event_id;
+  EventIDType selected_event_id;
 
   // Initialize atom positions & time
   kmc_data.time = 0.0;
@@ -141,11 +152,12 @@ void kinetic_monte_carlo(
           State<ConfigType> const &state) {
         // set data that can be used in sampling functions
         kmc_data.sampling_fixture_label = fixture.label();
-        kmc_data.state_sampler = &fixture.state_sampler();
+        kmc_data.sampling_fixture = &fixture;
         kmc_data.atom_positions_cart = occ_location.atom_positions_cart();
         kmc_data.total_rate = total_rate;
-        if (kmc_data.state_sampler->sample_mode == SAMPLE_MODE::BY_TIME) {
-          kmc_data.time = kmc_data.state_sampler->next_sample_time;
+        if (fixture.params().sampling_params.sample_mode ==
+            SAMPLE_MODE::BY_TIME) {
+          kmc_data.time = fixture.next_sample_time();
         }
       };
 
@@ -159,7 +171,7 @@ void kinetic_monte_carlo(
       };
 
   // Main loop
-  run_manager.initialize(state, occ_location.mol_size());
+  run_manager.initialize(occ_location.mol_size());
   run_manager.update_next_sampling_fixture();
   while (!run_manager.is_complete()) {
     run_manager.write_status_if_due();

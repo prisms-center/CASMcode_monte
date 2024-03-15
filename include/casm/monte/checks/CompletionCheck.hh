@@ -18,36 +18,85 @@ namespace monte {
 /// \brief Parameters that determine if a calculation is complete
 template <typename StatisticsType>
 struct CompletionCheckParams {
+  /// \brief Default constructor
+  CompletionCheckParams();
+
   /// \brief Completion check parameters that don't depend on the sampled values
   CutoffCheckParams cutoff_params;
 
   /// \brief Function that performs equilibration checking
+  ///
+  /// Defaults to monte::default_equilibration_check
   EquilibrationCheckFunction equilibration_check_f;
 
   /// \brief Function to calculate statistics
+  ///
+  /// Defaults to monte::default_statistics_calculator<StatisticsType>()
   CalcStatisticsFunction<StatisticsType> calc_statistics_f;
 
   /// \brief Sampler components that must be checked for convergence, and the
   ///     estimated precision to which the mean must be converged
   std::map<SamplerComponent, RequestedPrecision> requested_precision;
 
-  //  For "linear" spacing, the n-th check will be taken when:
+  //  For "linear" spacing, the n-th check (n=0,1,2,...) will be taken when:
   //
-  //      sample = round( check_begin + (check_period / checks_per_period) * n )
+  //      sample_check_linear(n) = round( check_begin + check_period * n )
   //
   //  For "log" spacing, the n-th check will be taken when:
   //
-  //      sample = round( check_begin + check_period ^ ( (n + check_shift) /
-  //                      checks_per_period ) )
+  //      sample_check_log(n) = round( check_begin + check_base ^ (n +
+  //      check_shift) )
+  //
+  //  However, if sample(n) - sample(n-1) > check_period_max; then subsequent
+  //  samples are taken every `check_period_max` samples.
 
-  /// Logirithmic checking or linear check spacing
-  bool log_spacing = true;
+  /// Logarithmic checking or linear check spacing
+  bool log_spacing = false;
 
   // Check spacing parameters
-  double check_begin = 0.0;
-  double check_period = 10.0;
-  double checks_per_period = 1.0;
-  double check_shift = 1.0;
+  CountType check_begin = 100;
+  CountType check_period = 100;
+  double check_base = 10.0;
+  double check_shift = 2.0;
+  CountType check_period_max = 10000;
+
+  /// \brief Sample at which to perform the n-th completion check, for
+  /// linear-checking
+  CountType sample_check_linear(Index n) const {
+    return check_begin + check_period * n;
+  }
+
+  /// \brief Sample at which to perform the n-th completion check, for
+  /// log-checking
+  CountType sample_check_log(Index n) const {
+    return check_begin + static_cast<CountType>(std::round(
+                             std::pow(check_base, (n + check_shift))));
+  }
+
+  /// \brief For log-checking with a maximum check period, find when to switch
+  /// to linear checking
+  Index find_n_begin_linear() const {
+    Index n_begin_linear = 0;
+    auto check_delta = [&](Index n) {
+      return sample_check_log(n) - sample_check_log(n - 1);
+    };
+    while (check_delta(n_begin_linear + 1) <= check_period_max) {
+      n_begin_linear += 1;
+    }
+    return n_begin_linear;
+  }
+
+  /// \brief Sample at which to perform the n-th completion check, for
+  /// log-checking
+  ///     with a maximum check period
+  CountType sample_check_log(Index n, Index n_begin_linear) const {
+    if (n <= n_begin_linear) {
+      return sample_check_log(n);
+    } else {
+      return sample_check_log(n_begin_linear) +
+             check_period_max * (n - n_begin_linear);
+    }
+  }
 };
 
 /// \brief Stores completion check results
@@ -112,9 +161,9 @@ struct CompletionCheckResults {
   /// - params
   void full_reset(std::optional<CountType> _count = std::nullopt,
                   std::optional<TimeType> _time = std::nullopt,
-                  CountType _n_samples = 0) {
+                  TimeType _clocktime = 0.0, CountType _n_samples = 0) {
     // params: do not reset
-    partial_reset(_count, _time, _n_samples);
+    partial_reset(_count, _time, _clocktime, _n_samples);
     n_samples_at_convergence_check = std::nullopt;
     equilibration_check_results = EquilibrationCheckResults();
     convergence_check_results = ConvergenceCheckResults<StatisticsType>();
@@ -126,6 +175,10 @@ template <typename StatisticsType>
 class CompletionCheck {
  public:
   CompletionCheck(CompletionCheckParams<StatisticsType> params);
+
+  CompletionCheckParams<StatisticsType> const &params() const {
+    return m_params;
+  }
 
   void reset();
 
@@ -163,7 +216,8 @@ class CompletionCheck {
 
   CompletionCheckResults<StatisticsType> m_results;
 
-  double m_n_checks = 0.0;
+  Index m_n_checks = 0;
+  Index m_n_begin_linear = 0;
 
   Index m_last_n_samples = 0;
 
@@ -172,10 +226,17 @@ class CompletionCheck {
 
 // --- Inline definitions ---
 
+/// \brief Default constructor
+template <typename StatisticsType>
+CompletionCheckParams<StatisticsType>::CompletionCheckParams()
+    : cutoff_params(),
+      equilibration_check_f(default_equilibration_check),
+      calc_statistics_f(default_statistics_calculator<StatisticsType>()) {}
+
 template <typename StatisticsType>
 void CompletionCheck<StatisticsType>::reset() {
   m_results.full_reset();
-  m_n_checks = 0.0;
+  m_n_checks = 0;
   m_last_n_samples = 0;
   m_last_clocktime = 0.0;
 }
@@ -247,19 +308,14 @@ bool CompletionCheck<StatisticsType>::_is_complete(
   }
 
   // if maximums not met, check equilibration and convergence if due
-  double check_at;
+  Index check_at;
   if (m_params.log_spacing) {
-    check_at =
-        m_params.check_begin +
-        std::pow(m_params.check_period, (m_n_checks + m_params.check_shift) /
-                                            m_params.checks_per_period);
+    check_at = m_params.sample_check_log(m_n_checks, m_n_begin_linear);
   } else {
-    check_at =
-        m_params.check_begin +
-        (m_params.check_period / m_params.checks_per_period) * m_n_checks;
+    check_at = m_params.sample_check_linear(m_n_checks);
   }
-  if (n_samples >= static_cast<CountType>(std::round(check_at))) {
-    m_n_checks += 1.0;
+  if (n_samples >= check_at) {
+    m_n_checks += 1;
     _check_convergence(samplers, sample_weight, n_samples);
   }
 
@@ -274,7 +330,7 @@ bool CompletionCheck<StatisticsType>::_is_complete(
 template <typename StatisticsType>
 CompletionCheck<StatisticsType>::CompletionCheck(
     CompletionCheckParams<StatisticsType> params)
-    : m_params(params) {
+    : m_params(params), m_n_begin_linear(m_params.find_n_begin_linear()) {
   m_results.params = m_params;
   m_results.is_complete = false;
 

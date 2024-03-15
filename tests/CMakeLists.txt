@@ -135,6 +135,8 @@ enable_testing()
 # casm_unit_monte
 add_executable(casm_unit_monte
   ${PROJECT_SOURCE_DIR}/unit/gtest_main_run_all.cpp
+  ${PROJECT_SOURCE_DIR}/unit/monte/Ising_basic_semigrand_canonical_test.cpp
+  ${PROJECT_SOURCE_DIR}/unit/monte/Ising_complete_semigrand_canonical_test.cpp
   ${PROJECT_SOURCE_DIR}/unit/monte/OccLocation_test.cpp
   ${PROJECT_SOURCE_DIR}/unit/monte/Sampling_test.cpp
 )

@@ -1,7 +1,116 @@
-:root[data-theme='light'],
-:root[data-theme='dark'] {
+:root[data-theme='light']  {
   --pst-color-primary: #0072b5;
+  --pst-color-secondary: #febc15;
   --pst-color-link: #0072b5;
   --pst-color-inline-code: #0072b5;
   --sd-color-card-border-hover: #0072b5;
+
+  dt {
+    background-color: #eaeaea;
+  }
+
+}
+
+:root[data-theme='dark'] {
+  --pst-color-primary: #6DC8BF;
+  --pst-color-secondary: #CBDB2A;
+  --pst-color-link: #6DC8BF;
+  --pst-color-inline-code: #6DC8BF;
+  --sd-color-card-border-hover: #6DC8BF;
+
+  dt {
+    background-color: #6A4729F7;
+  }
+
+  /* note */
+  .admonition.note > .admonition-title::before, div.admonition.note > .admonition-title::before {
+    background-color: #8739b3;
+  }
+
+  .admonition.note > .admonition-title::after, div.admonition.note > .admonition-title::after {
+    color: #c695c5;
+    content: var(--pst-icon-admonition-note);
+  }
+
+  .admonition.note, div.admonition.note {
+    border-color: #c695c5;
+  }
+
+  /* deprecated */
+  --pst-color-danger: #f9e1e4;
+  --pst-color-danger-bg: #d72d47;
+}
+
+
+
+/* Fix breadcrumb overlap https://github.com/holoviz/panel/issues/5199 */
+.header-article__inner .header-article-item {
+  height: unset;
+}
+
+/* Homepage Showcase */
+
+.showcase-table {
+  border-spacing: 15px;
+}
+
+.showcase-table td {
+  border: 0px;
+  vertical-align: top;
+}
+
+/* Homepage sponsors */
+
+.sd-card-body.sponsor-logo {
+  flex-grow: unset;
+  margin: auto;
+}
+
+.sponsor-logo img {
+  min-height: 80px;
+  object-fit: contain;
+}
+
+/* Tweaks for code cell rendering */
+
+.highlight {
+  border-radius: 4px;
+}
+
+html[data-theme='light'] .highlight {
+  background-color: #263238;
+  color: #f8f8f2;
+}
+
+pre[id^='codecell'] {
+  background-color: unset;
+  border: none;
+  border-radius: 0.5em;
+  color: #f8f8f2;
+  box-shadow: none;
+  padding: 1.5em;
+}
+
+div.highlight button.copybtn.o-tooltip--left:after {
+  background-color: #263235;
+  border: 1px solid gray;
+  border-radius: 4px;
+  padding: 5px;
+}
+
+button.copybtn {
+  background-color: #263238;
+}
+
+button.copybtn:hover {
+  background-color: #263238;
+  color: #f8f8f2;
+}
+
+.highlight button.copybtn:hover {
+  background: none;
+}
+
+.o-tooltip--left:after {
+  background: none;
 }
