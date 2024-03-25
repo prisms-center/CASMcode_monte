@@ -18,8 +18,13 @@ template <typename StatisticsType>
 struct CompletionCheckParams;
 
 /// \brief Construct CompletionCheckParams<BasicStatistics> from JSON
-inline void parse(InputParser<CompletionCheckParams<BasicStatistics>> &parser,
-                  StateSamplingFunctionMap const &sampling_functions);
+void parse(InputParser<CompletionCheckParams<BasicStatistics>> &parser,
+           StateSamplingFunctionMap const &sampling_functions);
+
+/// \brief Convert CompletionCheckParams<BasicStatistics> to JSON
+jsonParser &to_json(
+    CompletionCheckParams<BasicStatistics> const &completion_check_params,
+    jsonParser &json);
 
 /// \brief CompletionCheckResults to JSON
 template <typename StatisticsType>
@@ -363,6 +368,59 @@ inline void parse(InputParser<CompletionCheckParams<BasicStatistics>> &parser,
     parser.value = std::make_unique<CompletionCheckParams<BasicStatistics>>(
         completion_check_params);
   }
+}
+
+/// \brief Convert CompletionCheckParams<BasicStatistics> to JSON
+inline jsonParser &to_json(
+    CompletionCheckParams<BasicStatistics> const &completion_check_params,
+    jsonParser &json) {
+  // TODO: write out calc_statistics_f parameters
+  //  to_json["calc_statistics_f_confidence"] = 0.95;
+  //  to_json["calc_statistics_f_weighted_observations_method"] = 1;
+  //  to_json["calc_statistics_f_n_resamples"] = 10000;
+
+  json["cutoff"] = completion_check_params.cutoff_params;
+
+  json["convergence"] = jsonParser::array();
+  for (auto const &pair : completion_check_params.requested_precision) {
+    auto const &key = pair.first;
+    auto const &req_prec = pair.second;
+
+    jsonParser tmp;
+    tmp["quantity"] = key.sampler_name;
+
+    std::vector<int> component_index;
+    component_index.push_back(key.component_index);
+    tmp["component_index"] = component_index;
+
+    std::vector<std::string> component_name;
+    component_name.push_back(key.component_name);
+    tmp["component_name"] = component_index;
+
+    to_json(req_prec, tmp);
+
+    json["convergence"].push_back(tmp);
+  }
+
+  // "spacing"
+  if (completion_check_params.log_spacing == false) {
+    json["spacing"] = "linear";
+  } else {
+    json["spacing"] = "log";
+  }
+
+  // "begin"
+  json["begin"] = completion_check_params.check_begin;
+
+  // linear check spacing:
+  json["period"] = completion_check_params.check_period;
+
+  // log check spacing:
+  json["base"] = completion_check_params.check_base;
+  json["shift"] = completion_check_params.check_shift;
+  json["period_max"] = completion_check_params.check_period_max;
+
+  return json;
 }
 
 /// \brief CompletionCheckResults to JSON

@@ -1,6 +1,7 @@
 #ifndef CASM_monte_results_io_jsonResultsIO
 #define CASM_monte_results_io_jsonResultsIO
 
+#include "casm/casm_io/json/jsonParser.hh"
 #include "casm/misc/cloneable_ptr.hh"
 #include "casm/monte/run_management/ResultsAnalysisFunction.hh"
 #include "casm/monte/run_management/State.hh"
@@ -26,6 +27,9 @@ class jsonResultsIO : public ResultsIO<_ResultsType> {
   /// \brief Write results
   void write(results_type const &results, ValueMap const &conditions,
              Index run_index) override;
+
+  /// \brief Write input parameters to JSON
+  jsonParser to_json() override;
 
  protected:
   /// \brief Write summary.json with results from each individual run

@@ -325,6 +325,16 @@ void jsonResultsIO<_ResultsType>::write(results_type const &results,
   }
 }
 
+/// \brief Write input parameters to JSON
+template <typename _ResultsType>
+jsonParser jsonResultsIO<_ResultsType>::to_json() {
+  jsonParser json;
+  json["output_dir"] = m_output_dir.string();
+  json["write_trajectory"] = m_write_trajectory;
+  json["write_observations"] = m_write_observations;
+  return json;
+}
+
 /// \brief Write summary.json with results from each individual run
 ///
 /// The summary format appends each new run result to form arrays of values for
@@ -467,8 +477,8 @@ void jsonResultsIO<_ResultsType>::write_observations(
     json[pair.first]["shape"] = pair.second->shape();
     bool is_scalar = (pair.second->shape().size() == 0);
     if (is_scalar) {
-      to_json(pair.second->values().col(0), json[pair.first]["value"],
-              jsonParser::as_array());
+      CASM::to_json(pair.second->values().col(0), json[pair.first]["value"],
+                    jsonParser::as_array());
     } else {
       json[pair.first]["component_names"] = pair.second->component_names();
       json[pair.first]["value"] = pair.second->values();

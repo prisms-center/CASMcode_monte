@@ -3,6 +3,7 @@
 
 #include <vector>
 
+#include "casm/casm_io/json/jsonParser.hh"
 #include "casm/global/definitions.hh"
 #include "casm/misc/cloneable_ptr.hh"
 
@@ -19,6 +20,8 @@ class ResultsIO : public notstd::Cloneable {
 
   virtual void write(results_type const &results, ValueMap const &conditions,
                      Index run_index) = 0;
+
+  virtual jsonParser to_json() = 0;
 };
 
 }  // namespace monte

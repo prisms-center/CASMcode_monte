@@ -54,11 +54,10 @@ namespace monte {
 ///     type of Monte Carlo calculation and should be keys in the
 ///     sampling_functions map.
 ///
-///   save_initial_state: bool (optional, default=false)
-///     If true, request that the initial configuration is saved.
-///
-///   save_final_state: bool (optional, default=false)
-///     If true, request that the final configuration is saved.
+///   json_quantities: array of string (optional)
+///     Specifies which JSON quantities will be sampled. Options depend on the
+///     type of Monte Carlo calculation and should be keys in the
+///     json_sampling_functions map.
 ///
 ///   sample_trajectory: bool (optional, default=false)
 ///     If true, request that the entire configuration is saved each time
@@ -66,6 +65,7 @@ namespace monte {
 ///
 void parse(InputParser<SamplingParams> &parser,
            std::set<std::string> const &sampling_function_names,
+           std::set<std::string> const &json_sampling_function_names,
            bool time_sampling_allowed) {
   SamplingParams sampling_params;
 
@@ -145,6 +145,16 @@ void parse(InputParser<SamplingParams> &parser,
     }
   }
 
+  // "json_quantities"
+  parser.optional(sampling_params.json_sampler_names, "json_quantities");
+  for (std::string name : sampling_params.json_sampler_names) {
+    if (!json_sampling_function_names.count(name)) {
+      std::stringstream msg;
+      msg << "Error: \"" << name << "\" is not a JSON sampling option.";
+      parser.insert_error("json_quantities", msg.str());
+    }
+  }
+
   // "sample_trajectory"
   parser.optional(sampling_params.do_sample_trajectory, "sample_trajectory");
 
@@ -153,6 +163,42 @@ void parse(InputParser<SamplingParams> &parser,
   if (parser.valid()) {
     parser.value = std::make_unique<SamplingParams>(sampling_params);
   }
+}
+
+/// \brief Convert SamplingParams to JSON
+jsonParser &to_json(SamplingParams const &sampling_params, jsonParser &json) {
+  // "sample_by"
+  if (sampling_params.sample_mode == SAMPLE_MODE::BY_PASS) {
+    json["sample_by"] = "pass";
+  } else if (sampling_params.sample_mode == SAMPLE_MODE::BY_STEP) {
+    json["sample_by"] = "step";
+  } else if (sampling_params.sample_mode == SAMPLE_MODE::BY_TIME) {
+    json["sample_by"] = "time";
+  } else {
+    throw std::runtime_error(
+        "Error converting SamplingParams to json: invalid sample_mode");
+  }
+
+  // "spacing"
+  if (sampling_params.sample_method == SAMPLE_METHOD::LINEAR) {
+    json["spacing"] = "linear";
+  } else if (sampling_params.sample_method == SAMPLE_METHOD::LOG) {
+    json["spacing"] = "log";
+  } else {
+    throw std::runtime_error(
+        "Error converting SamplingParams to json: invalid sample_method");
+  }
+
+  json["begin"] = sampling_params.begin;
+  json["period"] = sampling_params.period;
+  json["base"] = sampling_params.base;
+  json["shift"] = sampling_params.shift;
+  json["stochastic_sample_period"] = sampling_params.stochastic_sample_period;
+  json["quantities"] = sampling_params.sampler_names;
+  json["json_quantities"] = sampling_params.json_sampler_names;
+  json["sample_trajectory"] = sampling_params.do_sample_trajectory;
+
+  return json;
 }
 
 }  // namespace monte

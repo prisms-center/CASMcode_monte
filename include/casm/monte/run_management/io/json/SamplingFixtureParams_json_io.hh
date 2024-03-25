@@ -28,6 +28,10 @@ void parse(
         &results_io_methods,
     bool time_sampling_allowed);
 
+template <typename ConfigType, typename StatisticsType>
+jsonParser &to_json(SamplingFixtureParams<ConfigType, StatisticsType> params,
+                    jsonParser &json);
+
 // ~~~ Definition ~~~
 
 /// \brief Construct sampling_fixture_params_type from JSON
@@ -81,23 +85,19 @@ void parse(
   for (auto const &element : sampling_functions) {
     sampling_function_names.insert(element.first);
   }
+  std::set<std::string> json_sampling_function_names;
+  for (auto const &element : json_sampling_functions) {
+    json_sampling_function_names.insert(element.first);
+  }
   auto sampling_params_subparser =
       parser.template subparse<monte::SamplingParams>(
-          "sampling", sampling_function_names, time_sampling_allowed);
+          "sampling", sampling_function_names, json_sampling_function_names,
+          time_sampling_allowed);
   if (!parser.valid()) {
     return;
   }
   monte::SamplingParams const &sampling_params =
       *sampling_params_subparser->value;
-  StateSamplingFunctionMap selected_sampling_functions;
-  for (auto const &name : sampling_params.sampler_names) {
-    selected_sampling_functions.emplace(name, sampling_functions.at(name));
-  }
-  jsonStateSamplingFunctionMap selected_json_sampling_functions;
-  for (auto const &name : sampling_params.json_sampler_names) {
-    selected_json_sampling_functions.emplace(name,
-                                             json_sampling_functions.at(name));
-  }
 
   // Read completion check params
   auto completion_check_params_subparser =
@@ -105,17 +105,13 @@ void parse(
           "completion_check", sampling_functions);
 
   // Read analysis functions
-  std::vector<std::string> function_names;
+  std::vector<std::string> analysis_names;
   fs::path functions_path = fs::path("analysis") / "functions";
-  parser.optional(function_names, functions_path);
+  parser.optional(analysis_names, functions_path);
 
-  ResultsAnalysisFunctionMap<ConfigType, StatisticsType>
-      selected_analysis_functions;
-  for (auto const &name : function_names) {
+  for (auto const &name : analysis_names) {
     auto it = analysis_functions.find(name);
-    if (it != analysis_functions.end()) {
-      selected_analysis_functions.insert(*it);
-    } else {
+    if (it == analysis_functions.end()) {
       std::stringstream msg;
       msg << "Error: function '" << name << "' not recognized";
       parser.insert_error(functions_path, msg.str());
@@ -144,10 +140,34 @@ void parse(
   if (parser.valid()) {
     parser.value =
         std::make_unique<SamplingFixtureParams<ConfigType, StatisticsType>>(
-            label, selected_sampling_functions,
-            selected_json_sampling_functions, selected_analysis_functions,
-            sampling_params, *completion_check_params_subparser->value,
+            label, sampling_functions, json_sampling_functions,
+            analysis_functions, sampling_params,
+            *completion_check_params_subparser->value, analysis_names,
             std::move(results_io_subparser->value), method_log);
+  }
+}
+
+template <typename ConfigType, typename StatisticsType>
+jsonParser &to_json(SamplingFixtureParams<ConfigType, StatisticsType> params,
+                    jsonParser &json) {
+  json.put_obj();
+
+  to_json(params.completion_check_params, json["completion_check"]);
+
+  json["analysis"] = jsonParser::object();
+  json["analysis"]["functions"] = jsonParser::array();
+  for (std::string name : params.analysis_names) {
+    json["analysis"]["functions"].push_back(name);
+  }
+
+  if (params.results_io) {
+    json["results_io"] = params.results_io->to_json();
+  }
+
+  if (params.method_log.logfile_path.has_value()) {
+    json["log"] = jsonParser::object();
+    json["log"]["file"] = params.method_log.logfile_path.value();
+    json["log"]["frequency_in_s"] = params.method_log.frequency_in_s;
   }
 }
 
