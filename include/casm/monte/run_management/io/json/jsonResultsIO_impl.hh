@@ -329,9 +329,11 @@ void jsonResultsIO<_ResultsType>::write(results_type const &results,
 template <typename _ResultsType>
 jsonParser jsonResultsIO<_ResultsType>::to_json() {
   jsonParser json;
-  json["output_dir"] = m_output_dir.string();
-  json["write_trajectory"] = m_write_trajectory;
-  json["write_observations"] = m_write_observations;
+  json["method"] = "json";
+  json["kwargs"] = jsonParser::object();
+  json["kwargs"]["output_dir"] = m_output_dir.string();
+  json["kwargs"]["write_trajectory"] = m_write_trajectory;
+  json["kwargs"]["write_observations"] = m_write_observations;
   return json;
 }
 

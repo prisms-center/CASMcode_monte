@@ -121,17 +121,15 @@ void _parse_components(
       (parser.self.find_at(option / "component_index") != parser.self.end());
   bool has_name =
       (parser.self.find_at(option / "component_name") != parser.self.end());
-  if (has_index && has_name) {
-    parser.insert_error(option,
-                        "Error: cannot specify both \"component_index\" and "
-                        "\"component_name\"");
-  } else if (has_index) {
+  if (has_index) {
     _parse_component_index(parser, option, function, precision,
                            requested_precision);
-  } else if (has_name) {
+  }
+  if (has_name) {
     _parse_component_name(parser, option, function, precision,
                           requested_precision);
-  } else {
+  }
+  if (!has_index && !has_name) {
     // else, converge all components
     for (Index index = 0; index < function.component_names.size(); ++index) {
       requested_precision.emplace(
@@ -395,7 +393,7 @@ inline jsonParser &to_json(
 
     std::vector<std::string> component_name;
     component_name.push_back(key.component_name);
-    tmp["component_name"] = component_index;
+    tmp["component_name"] = component_name;
 
     to_json(req_prec, tmp);
 
@@ -405,20 +403,15 @@ inline jsonParser &to_json(
   // "spacing"
   if (completion_check_params.log_spacing == false) {
     json["spacing"] = "linear";
+    json["begin"] = completion_check_params.check_begin;
+    json["period"] = completion_check_params.check_period;
   } else {
     json["spacing"] = "log";
+    json["begin"] = completion_check_params.check_begin;
+    json["base"] = completion_check_params.check_base;
+    json["shift"] = completion_check_params.check_shift;
+    json["period_max"] = completion_check_params.check_period_max;
   }
-
-  // "begin"
-  json["begin"] = completion_check_params.check_begin;
-
-  // linear check spacing:
-  json["period"] = completion_check_params.check_period;
-
-  // log check spacing:
-  json["base"] = completion_check_params.check_base;
-  json["shift"] = completion_check_params.check_shift;
-  json["period_max"] = completion_check_params.check_period_max;
 
   return json;
 }

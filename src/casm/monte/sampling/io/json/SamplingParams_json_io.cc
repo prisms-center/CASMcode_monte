@@ -184,21 +184,39 @@ jsonParser &to_json(SamplingParams const &sampling_params, jsonParser &json) {
   // "spacing"
   if (sampling_params.sample_method == SAMPLE_METHOD::LINEAR) {
     json["spacing"] = "linear";
+
+    auto check_if_integral = [&](double value, std::string key) {
+      if (std::abs(value - std::round(value)) < CASM::TOL) {
+        json[key] = static_cast<CountType>(std::round(value));
+      } else {
+        json[key] = value;
+      }
+    };
+    check_if_integral(sampling_params.begin, "begin");
+    check_if_integral(sampling_params.period, "period");
   } else if (sampling_params.sample_method == SAMPLE_METHOD::LOG) {
     json["spacing"] = "log";
+    json["begin"] = sampling_params.begin;
+    json["base"] = sampling_params.base;
+    json["shift"] = sampling_params.shift;
   } else {
     throw std::runtime_error(
         "Error converting SamplingParams to json: invalid sample_method");
   }
 
-  json["begin"] = sampling_params.begin;
-  json["period"] = sampling_params.period;
-  json["base"] = sampling_params.base;
-  json["shift"] = sampling_params.shift;
-  json["stochastic_sample_period"] = sampling_params.stochastic_sample_period;
-  json["quantities"] = sampling_params.sampler_names;
-  json["json_quantities"] = sampling_params.json_sampler_names;
-  json["sample_trajectory"] = sampling_params.do_sample_trajectory;
+  if (sampling_params.stochastic_sample_period == true) {
+    json["stochastic_sample_period"] = sampling_params.stochastic_sample_period;
+  }
+  if (!sampling_params.sampler_names.empty()) {
+    json["quantities"] = sampling_params.sampler_names;
+  }
+  if (!sampling_params.json_sampler_names.empty()) {
+    json["json_quantities"] = sampling_params.json_sampler_names;
+  }
+
+  if (sampling_params.do_sample_trajectory == true) {
+    json["sample_trajectory"] = sampling_params.do_sample_trajectory;
+  }
 
   return json;
 }
