@@ -167,6 +167,8 @@ void parse(InputParser<SamplingParams> &parser,
 
 /// \brief Convert SamplingParams to JSON
 jsonParser &to_json(SamplingParams const &sampling_params, jsonParser &json) {
+  json.put_obj();
+
   // "sample_by"
   if (sampling_params.sample_mode == SAMPLE_MODE::BY_PASS) {
     json["sample_by"] = "pass";

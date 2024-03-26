@@ -152,6 +152,7 @@ jsonParser &to_json(SamplingFixtureParams<ConfigType, StatisticsType> params,
                     jsonParser &json) {
   json.put_obj();
 
+  to_json(params.sampling_params, json["sampling"]);
   to_json(params.completion_check_params, json["completion_check"]);
 
   json["analysis"] = jsonParser::object();
@@ -162,13 +163,18 @@ jsonParser &to_json(SamplingFixtureParams<ConfigType, StatisticsType> params,
 
   if (params.results_io) {
     json["results_io"] = params.results_io->to_json();
+  } else {
+    json["results_io"].put_null();
   }
 
-  if (params.method_log.logfile_path.has_value()) {
+  if (!params.method_log.logfile_path.empty()) {
     json["log"] = jsonParser::object();
-    json["log"]["file"] = params.method_log.logfile_path.value();
-    json["log"]["frequency_in_s"] = params.method_log.frequency_in_s;
+    json["log"]["file"] = params.method_log.logfile_path.string();
+    if (params.method_log.log_frequency.has_value()) {
+      json["log"]["frequency_in_s"] = params.method_log.log_frequency.value();
+    }
   }
+  return json;
 }
 
 }  // namespace monte
