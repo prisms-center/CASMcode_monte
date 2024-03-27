@@ -35,7 +35,7 @@ struct RunManager {
   std::shared_ptr<engine_type> engine;
 
   /// Sampling fixtures
-  std::vector<sampling_fixture_type> sampling_fixtures;
+  std::vector<std::shared_ptr<sampling_fixture_type>> sampling_fixtures;
 
   /// \brief If true, the run is complete if any sampling fixture
   ///     is complete. Otherwise, all sampling fixtures must be
@@ -83,13 +83,14 @@ struct RunManager {
         next_sample_time(0.0),
         break_point_set(false) {
     for (auto const &params : _sampling_fixture_params) {
-      sampling_fixtures.emplace_back(params, engine);
+      sampling_fixtures.emplace_back(
+          std::make_shared<sampling_fixture_type>(params, engine));
     }
   }
 
   void initialize(Index steps_per_pass) {
-    for (auto &fixture : sampling_fixtures) {
-      fixture.initialize(steps_per_pass);
+    for (auto &fixture_ptr : sampling_fixtures) {
+      fixture_ptr->initialize(steps_per_pass);
     }
     break_point_set = false;
   }
@@ -102,8 +103,8 @@ struct RunManager {
     // check results
     bool all_complete = true;
     bool any_complete = false;
-    for (auto &fixture : sampling_fixtures) {
-      if (fixture.is_complete()) {
+    for (auto &fixture_ptr : sampling_fixtures) {
+      if (fixture_ptr->is_complete()) {
         any_complete = true;
       } else {
         all_complete = false;
@@ -116,32 +117,32 @@ struct RunManager {
   }
 
   void write_status_if_due() {
-    for (auto &fixture : sampling_fixtures) {
-      fixture.write_status_if_due(run_index);
+    for (auto &fixture_ptr : sampling_fixtures) {
+      fixture_ptr->write_status_if_due(run_index);
     }
   }
 
   void increment_n_accept() {
-    for (auto &fixture : sampling_fixtures) {
-      fixture.increment_n_accept();
+    for (auto &fixture_ptr : sampling_fixtures) {
+      fixture_ptr->increment_n_accept();
     }
   }
 
   void increment_n_reject() {
-    for (auto &fixture : sampling_fixtures) {
-      fixture.increment_n_reject();
+    for (auto &fixture_ptr : sampling_fixtures) {
+      fixture_ptr->increment_n_reject();
     }
   }
 
   void increment_step() {
-    for (auto &fixture : sampling_fixtures) {
-      fixture.increment_step();
+    for (auto &fixture_ptr : sampling_fixtures) {
+      fixture_ptr->increment_step();
     }
   }
 
   void set_time(double event_time) {
-    for (auto &fixture : sampling_fixtures) {
-      fixture.set_time(event_time);
+    for (auto &fixture_ptr : sampling_fixtures) {
+      fixture_ptr->set_time(event_time);
     }
   }
 
@@ -151,7 +152,8 @@ struct RunManager {
       state_type const &state,
       PreSampleActionType pre_sample_f = PreSampleActionType(),
       PostSampleActionType post_sample_f = PostSampleActionType()) {
-    for (auto &fixture : sampling_fixtures) {
+    for (auto &fixture_ptr : sampling_fixtures) {
+      auto &fixture = *fixture_ptr;
       if (fixture.params().sampling_params.sample_mode !=
           SAMPLE_MODE::BY_TIME) {
         if (fixture.counter().count == fixture.next_sample_count()) {
@@ -193,7 +195,8 @@ struct RunManager {
   void update_next_sampling_fixture() {
     // update next_sample_time and next_sampling_fixture
     next_sampling_fixture = nullptr;
-    for (auto &fixture : sampling_fixtures) {
+    for (auto &fixture_ptr : sampling_fixtures) {
+      auto &fixture = *fixture_ptr;
       if (fixture.params().sampling_params.sample_mode ==
           SAMPLE_MODE::BY_TIME) {
         if (next_sampling_fixture == nullptr ||
@@ -210,8 +213,8 @@ struct RunManager {
   /// Notes:
   /// - Calls `finalize` for all sampling fixtures
   void finalize(state_type const &final_state) {
-    for (auto &fixture : sampling_fixtures) {
-      fixture.finalize(final_state, run_index);
+    for (auto &fixture_ptr : sampling_fixtures) {
+      fixture_ptr->finalize(final_state, run_index);
     }
   }
 };
