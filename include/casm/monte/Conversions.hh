@@ -100,6 +100,7 @@ class Conversions {
 
   Index species_size() const;
   Index species_index(std::string species_name) const;
+  std::vector<xtal::Molecule> const &species_list() const;
   xtal::Molecule const &species_to_mol(Index species_index) const;
   std::string const &species_name(Index species_index) const;
   Index components_size(Index species_index) const;
@@ -122,14 +123,14 @@ class Conversions {
 
   Index m_Nasym;
   std::vector<Index> m_unitl_to_asym;
-  std::vector<std::set<Index> > m_asym_to_unitl;
-  std::vector<std::set<Index> > m_asym_to_b;
+  std::vector<std::set<Index>> m_asym_to_unitl;
+  std::vector<std::set<Index>> m_asym_to_b;
 
   /// m_occ_to_species[asym][occ_index] -> species_index
-  std::vector<std::vector<Index> > m_occ_to_species;
+  std::vector<std::vector<Index>> m_occ_to_species;
 
   /// m_species_to_occ[asym][species_index] -> occ_index
-  std::vector<std::vector<Index> > m_species_to_occ;
+  std::vector<std::vector<Index>> m_species_to_occ;
 };
 
 }  // namespace monte

@@ -260,6 +260,10 @@ Index Conversions::species_index(Index asym, Index occ_index) const {
   return m_occ_to_species[asym][occ_index];
 }
 
+std::vector<xtal::Molecule> const &Conversions::species_list() const {
+  return m_struc_mol;
+}
+
 Index Conversions::occ_index(Index asym, Index species_index) const {
   // returns occ_size(asym) if species not allowed
   return m_species_to_occ[asym][species_index];

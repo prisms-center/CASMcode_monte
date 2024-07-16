@@ -35,12 +35,27 @@ using namespace CASM;
 typedef std::mt19937_64 engine_type;
 typedef monte::RandomNumberGenerator<engine_type> generator_type;
 
-monte::MethodLog make_MethodLog(std::string logfile_path,
+monte::ValueMap make_ValueMap(std::optional<nlohmann::json> data) {
+  if (!data.has_value()) {
+    data = nlohmann::json{};
+  }
+  jsonParser json{static_cast<const nlohmann::json &>(*data)};
+  monte::ValueMap values;
+  from_json(values, json);
+  return values;
+}
+
+monte::MethodLog make_MethodLog(std::optional<std::string> logfile_path,
                                 std::optional<double> log_frequency) {
   monte::MethodLog method_log;
-  method_log.logfile_path = logfile_path;
-  method_log.log_frequency = log_frequency;
-  method_log.reset();
+  if (logfile_path.has_value()) {
+    method_log.logfile_path = logfile_path.value();
+    method_log.log_frequency = log_frequency;
+    method_log.reset();
+  } else {
+    method_log.log_frequency = log_frequency;
+    method_log.reset_to_stdout();
+  }
   return method_log;
 }
 
@@ -103,12 +118,13 @@ PYBIND11_MODULE(_monte, m) {
 
           Parameters
           ----------
-          logfile_path : str
-              File location for log output
+          logfile_path : Optional[str]
+              File location for log output. If None, log to stdout.
           log_frequency : Optional[float]
               How often to log method status, in seconds
           )pbdoc",
-           py::arg("logfile_path"), py::arg("log_frequency") = std::nullopt)
+           py::arg("logfile_path") = std::nullopt,
+           py::arg("log_frequency") = std::nullopt)
       .def(
           "logfile_path",
           [](monte::MethodLog const &x) { return x.logfile_path.string(); },
@@ -124,6 +140,10 @@ PYBIND11_MODULE(_monte, m) {
       .def("reset", &monte::MethodLog::reset,
            R"pbdoc(
           Reset log file, creating parent directories as necessary
+          )pbdoc")
+      .def("reset_to_stdout", &monte::MethodLog::reset_to_stdout,
+           R"pbdoc(
+          Reset to print to stdout.
           )pbdoc")
       //
       .def(
@@ -371,12 +391,23 @@ PYBIND11_MODULE(_monte, m) {
       different type. Conversions for input/output are made
       to/from a single combined dict.
       )pbdoc")
-      .def(py::init<>(),
+      .def(py::init<>(&make_ValueMap),
            R"pbdoc(
           .. rubric:: Constructor
 
-          Default constructor only.
-          )pbdoc")
+          Notes
+          -----
+
+          - The constructor is equivalent to :func:`ValueMap.from_dict`, except
+            that it also accepts ``None``.
+
+          Parameters
+          ----------
+          data: Optional[dict] = None
+              A dict with keys of type `str` and boolean, scalar, vector, or
+              matrix values.
+          )pbdoc",
+           py::arg("data") = std::nullopt)
       .def_readwrite("boolean_values", &monte::ValueMap::boolean_values,
                      R"pbdoc(
           :class:`~libcasm.monte.BooleanValueMap`: A Dict[str, bool]-like object.

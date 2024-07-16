@@ -75,17 +75,26 @@ inline jsonParser &append_condition_to_json(
   // write shape
   j["shape"] = shape;
 
-  // write component names
-  j["component_names"] = component_names;
-
-  // write value for each component separately
-  Index i = 0;
-  for (auto const &component_name : component_names) {
-    if (!j.contains(component_name)) {
-      j[component_name].put_array();
+  if (shape.size() == 0) {
+    // scalar
+    if (!j.contains("value")) {
+      j["value"].put_array();
     }
-    j[component_name].push_back(value(i));
-    ++i;
+    j["value"].push_back(value(0));
+
+  } else {
+    // write component names
+    j["component_names"] = component_names;
+
+    // write value for each component separately
+    Index i = 0;
+    for (auto const &component_name : component_names) {
+      if (!j.contains(component_name)) {
+        j[component_name].put_array();
+      }
+      j[component_name].push_back(value(i));
+      ++i;
+    }
   }
   return json;
 }
@@ -124,11 +133,24 @@ inline jsonParser &append_matrix_condition_to_json(
 
 /// \brief Append sampled data quantity to summary JSON
 ///
+/// For non-scalar values:
 /// \code
 /// <quantity>: {
 ///   "shape": [...],   // Scalar: [], Vector: [rows], Matrix: [rows, cols]
 ///   "component_names": ["0", "1", "2", "3", ...],
 ///   <component_name>: {
+///     "mean": [...], <-- appends to
+///     "calculated_precision": [...]  <-- appends to
+///     "is_converged": [...] <-- appends to, only if requested to converge
+///   }
+/// }
+/// \endcode
+///
+/// For scalar values:
+/// \code
+/// <quantity>: {
+///   "shape": [...],   // Scalar: [], Vector: [rows], Matrix: [rows, cols]
+///   "value": {
 ///     "mean": [...], <-- appends to
 ///     "calculated_precision": [...]  <-- appends to
 ///     "is_converged": [...] <-- appends to, only if requested to converge
@@ -158,7 +180,8 @@ jsonParser &append_statistics_to_json(
   };
 
   if (qstats.is_scalar) {
-    append(quantity_json, 0);
+    ensure_initialized_objects(quantity_json, {"value"});
+    append(quantity_json["value"], 0);
   } else {
     // write component names - if not scalar
     quantity_json["component_names"] = qstats.component_names;
@@ -325,6 +348,18 @@ void jsonResultsIO<_ResultsType>::write(results_type const &results,
   }
 }
 
+/// \brief Write input parameters to JSON
+template <typename _ResultsType>
+jsonParser jsonResultsIO<_ResultsType>::to_json() {
+  jsonParser json;
+  json["method"] = "json";
+  json["kwargs"] = jsonParser::object();
+  json["kwargs"]["output_dir"] = m_output_dir.string();
+  json["kwargs"]["write_trajectory"] = m_write_trajectory;
+  json["kwargs"]["write_observations"] = m_write_observations;
+  return json;
+}
+
 /// \brief Write summary.json with results from each individual run
 ///
 /// The summary format appends each new run result to form arrays of values for
@@ -353,6 +388,8 @@ void jsonResultsIO<_ResultsType>::write(results_type const &results,
 ///     },
 ///   },
 ///   "analyzed_data": {
+///     "shape": [...],
+///     "component_names": [...],
 ///     <name>: [...],
 ///   },
 ///   "completion_check_results": {
@@ -467,8 +504,8 @@ void jsonResultsIO<_ResultsType>::write_observations(
     json[pair.first]["shape"] = pair.second->shape();
     bool is_scalar = (pair.second->shape().size() == 0);
     if (is_scalar) {
-      to_json(pair.second->values().col(0), json[pair.first]["value"],
-              jsonParser::as_array());
+      CASM::to_json(pair.second->values().col(0), json[pair.first]["value"],
+                    jsonParser::as_array());
     } else {
       json[pair.first]["component_names"] = pair.second->component_names();
       json[pair.first]["value"] = pair.second->values();

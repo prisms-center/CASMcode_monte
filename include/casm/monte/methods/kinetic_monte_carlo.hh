@@ -137,9 +137,9 @@ void kinetic_monte_carlo(
   kmc_data.time = 0.0;
   kmc_data.atom_positions_cart = occ_location.atom_positions_cart();
   kmc_data.prev_atom_positions_cart.clear();
-  for (auto &fixture : run_manager.sampling_fixtures) {
-    kmc_data.prev_time.emplace(fixture.label(), kmc_data.time);
-    kmc_data.prev_atom_positions_cart.emplace(fixture.label(),
+  for (auto &fixture_ptr : run_manager.sampling_fixtures) {
+    kmc_data.prev_time.emplace(fixture_ptr->label(), kmc_data.time);
+    kmc_data.prev_atom_positions_cart.emplace(fixture_ptr->label(),
                                               kmc_data.atom_positions_cart);
   }
 

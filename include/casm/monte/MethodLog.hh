@@ -30,6 +30,11 @@ struct MethodLog {
       log.reset(*fout);
     }
   }
+
+  void reset_to_stdout() {
+    fout.reset();
+    log.reset();
+  }
 };
 
 }  // namespace monte

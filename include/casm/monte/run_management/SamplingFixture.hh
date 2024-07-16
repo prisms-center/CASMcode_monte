@@ -36,6 +36,7 @@ struct SamplingFixtureParams {
           _analysis_functions,
       monte::SamplingParams _sampling_params,
       monte::CompletionCheckParams<StatisticsType> _completion_check_params,
+      std::vector<std::string> _analysis_names,
       std::unique_ptr<results_io_type> _results_io = nullptr,
       monte::MethodLog _method_log = monte::MethodLog())
       : label(_label),
@@ -44,6 +45,7 @@ struct SamplingFixtureParams {
         analysis_functions(_analysis_functions),
         sampling_params(_sampling_params),
         completion_check_params(_completion_check_params),
+        analysis_names(_analysis_names),
         results_io(std::move(_results_io)),
         method_log(_method_log) {
     for (auto const &name : sampling_params.sampler_names) {
@@ -83,6 +85,9 @@ struct SamplingFixtureParams {
 
   /// Completion check params
   monte::CompletionCheckParams<StatisticsType> completion_check_params;
+
+  /// Analysis functions to evaluate
+  std::vector<std::string> analysis_names;
 
   /// Results I/O implementation -- May be empty
   notstd::cloneable_ptr<results_io_type> results_io;
@@ -408,7 +413,8 @@ class SamplingFixture {
     Log &log = m_params.method_log.log;
     m_results.elapsed_clocktime = log.time_s();
     m_results.completion_check_results = m_completion_check.results();
-    m_results.analysis = make_analysis(m_results, m_params.analysis_functions);
+    m_results.analysis = make_analysis(m_results, m_params.analysis_functions,
+                                       m_params.analysis_names);
     m_results.n_accept = m_counter.n_accept;
     m_results.n_reject = m_counter.n_reject;
 

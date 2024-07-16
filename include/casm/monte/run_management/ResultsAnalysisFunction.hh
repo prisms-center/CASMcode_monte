@@ -69,7 +69,8 @@ template <typename ConfigType, typename StatisticsType>
 std::map<std::string, Eigen::VectorXd> make_analysis(
     Results<ConfigType, StatisticsType> const &results,
     ResultsAnalysisFunctionMap<ConfigType, StatisticsType> const
-        &analysis_functions);
+        &analysis_functions,
+    std::vector<std::string> analysis_names);
 
 // --- Implementation ---
 
@@ -110,9 +111,15 @@ template <typename ConfigType, typename StatisticsType>
 std::map<std::string, Eigen::VectorXd> make_analysis(
     Results<ConfigType, StatisticsType> const &results,
     ResultsAnalysisFunctionMap<ConfigType, StatisticsType> const
-        &analysis_functions) {
+        &analysis_functions,
+    std::vector<std::string> analysis_names) {
   std::map<std::string, Eigen::VectorXd> analysis;
-  for (auto const &pair : analysis_functions) {
+  for (std::string name : analysis_names) {
+    auto it = analysis_functions.find(name);
+    if (it == analysis_functions.end()) {
+      continue;
+    }
+    auto const &pair = *it;
     auto const &f = pair.second;
     try {
       analysis.emplace(f.name, f(results));
