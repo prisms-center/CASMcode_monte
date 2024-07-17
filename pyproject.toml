@@ -6,15 +6,15 @@ requires = [
     "cmake>=3.20",
     "ninja",
     "pybind11>=2.6",
-    "libcasm-global>=2.0.4",
-    "libcasm-xtal>=2.0a9",
-    "libcasm-composition>=2.0a2",
+    "libcasm-global>=2.0.5",
+    "libcasm-xtal>=2.0a10",
+    "libcasm-composition>=2.0a3",
 ]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "libcasm-monte"
-version = "2.0a1"
+version = "2.0a2"
 authors = [
   { name="CASM developers", email="casm-developers@lists.engr.ucsb.edu" },
 ]
@@ -30,9 +30,9 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 dependencies = [
-    "libcasm-global>=2.0.4",
-    "libcasm-xtal>=2.0a9",
-    "libcasm-composition>=2.0a2",
+    "libcasm-global>=2.0.5",
+    "libcasm-xtal>=2.0a10",
+    "libcasm-composition>=2.0a3",
     "numpy",
 ]
 
@@ -41,13 +41,13 @@ Homepage = "https://prisms-center.github.io/CASMcode_docs/"
 Repository = "https://github.com/prisms-center/CASMcode_monte"
 
 
-[tool.ruff]
-select = ["E", "F", "I"]
+[tool.ruff.lint]
+select = ["NPY201", "E", "F", "I"]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["libcasm", "casm"]
 
 

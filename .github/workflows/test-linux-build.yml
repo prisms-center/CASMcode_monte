@@ -1,6 +1,10 @@
 name: Testing build on ubuntu-latest
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 12 * * 0'
 
 env:
   SKBUILD_BUILD_OPTIONS: --verbose
@@ -32,7 +36,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: CASMcode_global/dist
-          key: ${{ runner.os }}-libcasm-global-v2-0-4
+          key: ${{ runner.os }}-libcasm-global-v2-0-5
 
       ### libcasm-composition ###
       - name: restore libcasm-composition cache
@@ -40,7 +44,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: CASMcode_composition/dist
-          key: ${{ runner.os }}-libcasm-composition-v2-0a2
+          key: ${{ runner.os }}-libcasm-composition-v2-0a3
 
       ### libcasm-xtal ###
       - name: restore libcasm-xtal cache
@@ -48,7 +52,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: CASMcode_crystallography/dist
-          key: ${{ runner.os }}-libcasm-xtal-v2-0a9
+          key: ${{ runner.os }}-libcasm-xtal-v2-0a10
 
       - name: Install CASM dependencies
         run: |

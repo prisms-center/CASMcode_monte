@@ -1,6 +1,10 @@
 name: Test CASM dependencies from PyPI on Ubuntu
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 12 * * 0'
 
 jobs:
   install-and-test:
@@ -23,13 +27,13 @@ jobs:
         with:
           repository: prisms-center/CASMcode_global
           path: CASMcode_global
-          ref: v2.0.4
+          ref: v2.0.5
 
       - name: test libcasm-global
         shell: bash
         run: |
           cd CASMcode_global
-          pip install libcasm-global==2.0.4
+          pip install libcasm-global==2.0.5
           pip install -r test_requirements.txt
           python -m pytest -rsap python/tests
 
@@ -39,14 +43,14 @@ jobs:
         with:
           repository: prisms-center/CASMcode_composition
           path: CASMcode_composition
-          ref: v2.0a2
+          ref: v2.0a3
 
       - name: test libcasm-composition
         if: steps.cache-libcasm-composition-restore.outputs.cache-hit != 'true'
         shell: bash
         run: |
           cd CASMcode_composition
-          pip install libcasm-composition==2.0a2
+          pip install libcasm-composition==2.0a3
           pip install -r test_requirements.txt
           python -m pytest -rsap python/tests
 
@@ -56,12 +60,12 @@ jobs:
         with:
           repository: prisms-center/CASMcode_crystallography
           path: CASMcode_crystallography
-          ref: v2.0a9
+          ref: v2.0a10
 
       - name: test libcasm-xtal
         shell: bash
         run: |
           cd CASMcode_crystallography
-          pip install libcasm-xtal==2.0a9
+          pip install libcasm-xtal==2.0a10
           pip install -r test_requirements.txt
           python -m pytest -rsap python/tests
