@@ -70,3 +70,100 @@ def test_constructor_2():
     assert convert.bijk_to_l(bijk(1, 0, 0, 0) + trans(1, 0, 0)) == convert.bijk_to_l(
         bijk(1, 1, 0, 0)
     )
+
+
+def test_constructor_3():
+    T = np.array(
+        [
+            [3, 0, 0],
+            [0, 3, 0],
+            [0, 0, 3],
+        ]
+    )
+
+    mol_x = xtal.Occupant(
+        name="mol",
+        atoms=[
+            xtal.AtomComponent(name="B", coordinate=[-0.1, 0.0, 0.0], properties={}),
+            xtal.AtomComponent(name="B", coordinate=[0.1, 0.0, 0.0], properties={}),
+        ],
+    )
+    mol_y = xtal.Occupant(
+        name="mol",
+        atoms=[
+            xtal.AtomComponent(name="B", coordinate=[0.0, -0.1, 0.0], properties={}),
+            xtal.AtomComponent(name="B", coordinate=[0.0, 0.1, 0.0], properties={}),
+        ],
+    )
+    mol_z = xtal.Occupant(
+        name="mol",
+        atoms=[
+            xtal.AtomComponent(name="B", coordinate=[0.0, 0.0, -0.1], properties={}),
+            xtal.AtomComponent(name="B", coordinate=[0.0, 0.0, 0.1], properties={}),
+        ],
+    )
+    atom_A = xtal.Occupant(
+        name="A",
+        atoms=[
+            xtal.AtomComponent(name="A", coordinate=[0.0, 0.0, 0.0], properties={}),
+        ],
+    )
+    occupants = {"mol.x": mol_x, "mol.y": mol_y, "mol.z": mol_z, "A": atom_A}
+
+    ## Initial prim ##
+    occ_dof = [
+        ["A"],
+        ["A", "mol.x", "mol.y", "mol.z"],
+        ["A", "mol.x", "mol.y", "mol.z"],
+        ["A", "mol.x", "mol.y", "mol.z"],
+    ]
+    xtal_prim = xtal.Prim(
+        lattice=xtal.Lattice(
+            column_vector_matrix=np.eye(3),
+        ),
+        coordinate_frac=np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [0.0, 0.5, 0.5],
+                [0.5, 0.0, 0.5],
+                [0.5, 0.5, 0.0],
+            ]
+        ).T,
+        occ_dof=occ_dof,
+        occupants=occupants,
+    )
+    convert = mcevents.Conversions(
+        xtal_prim=xtal_prim, transformation_matrix_to_super=T
+    )
+
+    assert convert.l_size() == 27 * 4
+    assert convert.asym_size() == 2
+
+    ## Same symmetry, different order of occupants on one site ##
+    occ_dof = [
+        ["A"],
+        ["A", "mol.x", "mol.y", "mol.z"],
+        ["mol.x", "mol.y", "mol.z", "A"],
+        ["A", "mol.x", "mol.y", "mol.z"],
+    ]
+    xtal_prim = xtal.Prim(
+        lattice=xtal.Lattice(
+            column_vector_matrix=np.eye(3),
+        ),
+        coordinate_frac=np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [0.0, 0.5, 0.5],
+                [0.5, 0.0, 0.5],
+                [0.5, 0.5, 0.0],
+            ]
+        ).T,
+        occ_dof=occ_dof,
+        occupants=occupants,
+    )
+    convert = mcevents.Conversions(
+        xtal_prim=xtal_prim, transformation_matrix_to_super=T
+    )
+
+    assert convert.l_size() == 27 * 4
+    assert convert.asym_size() == 3

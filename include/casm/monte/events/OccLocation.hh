@@ -19,6 +19,12 @@ class OccCandidateList;
 /// \brief Stores data to enable efficient proposal and update of occupation
 /// mutation
 ///
+/// Note:
+/// - In the context of OccLocation, Mol, Atom, OccTransform, OccEvent,
+///   OccCandidate, etc. the "asymmetric unit" must be sites that are *both*
+///   equivalent by symmetry, and have the same occupation index to species
+///   index mapping.
+///
 /// What data it has:
 /// - Input Conversions provides information about conversions between site
 ///   indices and asymmetric unit indices, species indices and site occupant

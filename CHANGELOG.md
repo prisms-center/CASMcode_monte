@@ -5,6 +5,12 @@ All notable changes to `libcasm-monte` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- Fixed Conversions constructor to differentiate sublattices by symmetry and order of occupants. Documentation has been updated to reflect that the `asym` unit index used by Conversions, Mol, OccTransform, OccCandidate, OccCandidateList, etc. indicates sites that are equivalent by symmetry and order of occupants.
+
 
 ## [2.0a2] - 2024-07-17
 

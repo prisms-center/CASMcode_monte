@@ -28,7 +28,8 @@ namespace monte {
 /// - unitl: ref config basis site index (site_index in supercell speficied by
 ///   `unit_transformation_matrix_to_super()`)
 /// - asym: asymmetric unit orbit index (value is the same for all sites which
-///   are symmetrically equivalent according to some group)
+///   are symmetrically equivalent *and* have  occupants listed in the same
+///   order)
 /// - occ_index: Index into occupant list for a site (index into
 ///   prim.basis()[b].occupant_dof(), for some b or asym)
 /// - species_index: Index into the molecule list for the prim (index into

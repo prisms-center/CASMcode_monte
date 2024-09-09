@@ -100,7 +100,8 @@ PYBIND11_MODULE(_monte_events, m) {
     - `bijk`, :math:`(b, i, j, k)`: Integral site coordinates (sublattice index and
       integer unit cell indices)
     - `asym`, :math:`a`: Asymmetric unit orbit index (value is the same for all
-      sites which are symmetrically equivalent)
+      sites which are symmetrically equivalent and have occupants listed in the
+      same order)
     - `occ_index`, :math:`s`: Index into occupant list for a particular site
     - `species_index`: Index into the molecule list for a particular
       :class:`~libcasm.xtal.Prim`. If there are orientational variants,
@@ -142,7 +143,7 @@ PYBIND11_MODULE(_monte_events, m) {
             The transformation matrix, :math:`T`, relating the superstructure lattice vectors, :math:`S`, to the prim lattice vectors, :math:`P`, according to :math:`S = P T`, where :math:`S` and :math:`P` are shape=(3,3) matrices with lattice vectors as columns.
 
         b_to_asym: List[int]
-            Specifies the asymmetric unit orbit index corresponding to each sublattice in the prim. Asymmetric unit orbit indices are distinct indices `(0, 1, ...)` indicating that sites with the same index map onto each other via symmetry operations.
+            Specifies the asymmetric unit orbit index corresponding to each sublattice in the prim. Asymmetric unit orbit indices are distinct indices `(0, 1, ...)` indicating that sites with the same index map onto each other via symmetry operations and have occupants listed in the same order.
 
             This option allows specifying lower symmetry than the prim factor group
              (but same periodicity) to determine the asymmetric unit.
@@ -179,7 +180,7 @@ PYBIND11_MODULE(_monte_events, m) {
             This defines a sub-supercell lattice, :math:`U = P T_{unit}`, where :math:`U` is the sub-supercell lattice column matrix, :math:`P` is the prim lattice column matrix, :math:`T_{unit}` = unit_transformation_matrix_to_super. The sub-supercell :math:`U` must tile into the supercell :math:`S` (i.e. :math:`S = U \tilde{T}`', where :math:`\tilde{T}` is an integer matrix). This option allows specifying an asymmetric unit which does not fit in the primitive cell.
 
         unitl_to_asym: List[int]
-           This specifies the asymmetric unit orbit index corresponding to each site in the sub-supercell :math:`U`. Asymmetric unit orbit indices are distinct indices `(0, 1, ...)` indicating that sites with the same index map onto each other via symmetry operations.
+           This specifies the asymmetric unit orbit index corresponding to each site in the sub-supercell :math:`U`. Asymmetric unit orbit indices are distinct indices `(0, 1, ...)` indicating that sites with the same index map onto each other via symmetry operations and have occupants listed in the same order.
 
         )pbdoc",
           py::arg("xtal_prim"), py::arg("species_list"),

@@ -9,19 +9,46 @@ namespace CASM {
 namespace monte {
 
 namespace {
-/// Return indices of equivalent basis sites
-std::vector<Index> make_b_to_asym(const xtal::BasicStructure &struc) {
+
+/// Return indices of equivalent basis sites by symmetry and order of occupants
+std::vector<Index> make_b_to_asym(
+    const xtal::BasicStructure &struc,
+    std::vector<xtal::Molecule> const &species_list) {
   std::vector<Index> b_to_asym(struc.basis().size());
   std::set<std::set<Index>> asym_unit = xtal::make_asymmetric_unit(struc);
-  Index asym = 0;
+
+  // [b][occ] -> species
+  auto index_converter = xtal::make_index_converter(struc, species_list);
+
+  // { asym by symmetry, occ->species }
+  typedef std::pair<Index, std::vector<Index>> sublat_type;
+  typedef Index sublat_index;
+  std::map<sublat_type, std::vector<sublat_index>> asym_by_sym_and_occ;
+
+  Index asym_by_symmetry = 0;
   for (auto const &orbit : asym_unit) {
     for (Index b : orbit) {
+      sublat_type key = std::make_pair(asym_by_symmetry, index_converter[b]);
+      asym_by_sym_and_occ[key].push_back(b);
+    }
+    ++asym_by_symmetry;
+  }
+
+  Index asym = 0;
+  for (auto const &pair : asym_by_sym_and_occ) {
+    for (Index b : pair.second) {
       b_to_asym[b] = asym;
     }
     ++asym;
   }
   return b_to_asym;
 }
+
+/// Return indices of equivalent basis sites
+std::vector<Index> make_b_to_asym(const xtal::BasicStructure &struc) {
+  return make_b_to_asym(struc, molecule_list_all_orientations(struc));
+}
+
 }  // namespace
 
 /// \brief Constructor (uses asymmetric unit determined from prim factor group)
@@ -48,7 +75,8 @@ Conversions::Conversions(xtal::BasicStructure const &prim,
 /// \param b_to_asym Specifies the asymmetric unit orbit index
 ///     corresponding to each sublattice in the prim. Asymmetric unit orbit
 ///     indices are distinct indices `(0, 1, ...)` indicating that sites with
-///     the same index map onto each other via symmetry operations.
+///     the same index map onto each other via symmetry operations *and* have
+///     occupants listed in the same order.
 ///
 /// This overload allows specifying lower symmetry than the prim factor group
 /// (but same periodicity) to determine the asymmetric unit.
@@ -77,7 +105,8 @@ Conversions::Conversions(xtal::BasicStructure const &prim,
 /// \param unitl_to_asym Specifies the asymmetric unit orbit index
 ///     corresponding to each site in the supercell U. Asymmetric unit orbit
 ///     indices are distinct indices `(0, 1, ...)` indicating that sites with
-///     the same index map onto each other via symmetry operations.
+///     the same index map onto each other via symmetry operations *and* have
+///     occupants listed in the same order.
 ///
 /// This overload allows specifying an asymmetric unit which does not fit in
 /// the primitive cell.
