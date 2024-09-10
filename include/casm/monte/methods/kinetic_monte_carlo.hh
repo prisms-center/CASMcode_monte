@@ -49,6 +49,19 @@ struct KMCData {
   /// was taken, with key equal to sampling fixture label.
   std::map<std::string, double> prev_time;
 
+  /// \brief Unique atom ID for each atom currently in the system
+  ///
+  /// The ID unique_atom_id[l] is the unique atom ID for the atom at the
+  /// position given by atom_positions_cart.col(l).
+  std::vector<Index> unique_atom_id;
+
+  /// \brief Unique atom ID for each atom at last sample, by sampling fixture
+  /// label
+  ///
+  /// The ID prev_unique_atom_id.at(label)[l] is the unique atom ID for the
+  /// atom at the position given by prev_atom_positions_cart.at(label).col(l).
+  std::map<std::string, std::vector<Index>> prev_unique_atom_id;
+
   /// \brief Set this to hold atom names for each column of the
   ///     atom_positions_cart matrix
   ///
@@ -57,7 +70,7 @@ struct KMCData {
   /// atoms with different properties. Not set by monte::kinetic_monte_carlo,
   /// this must be set beforehand.
   ///
-  /// TODO: KMC with atoms that move to/from resevoir will need to update this
+  /// TODO: KMC with atoms that move to/from reservoir will need to update this
   std::vector<Index> atom_name_index_list;
 
   /// \brief Current atom positions

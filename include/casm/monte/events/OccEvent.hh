@@ -38,7 +38,7 @@ struct OccTransform {
   Index to_species;    ///< Species index after transformation
 };
 
-/// Note, for resevoir positions, use l == -1, and mol_id = species_index
+/// Note, for reservoir positions, use l == -1, and mol_id = species_index
 struct AtomLocation {
   Index l;         ///< Config occupant that is being transformed
   Index mol_id;    ///< Location in OccLocation.m_mol

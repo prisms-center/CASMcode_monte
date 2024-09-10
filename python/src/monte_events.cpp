@@ -63,6 +63,7 @@ PYBIND11_MAKE_OPAQUE(std::vector<CASM::monte::AtomTraj>);
 PYBIND11_MAKE_OPAQUE(std::vector<CASM::monte::Mol>);
 PYBIND11_MAKE_OPAQUE(std::vector<CASM::monte::OccTransform>);
 PYBIND11_MAKE_OPAQUE(std::map<CASM::monte::OccSwap, int>);
+PYBIND11_MAKE_OPAQUE(std::map<CASM::Index, CASM::monte::AtomInfo>);
 
 PYBIND11_MODULE(_monte_events, m) {
   using namespace CASMpy;
@@ -451,6 +452,51 @@ PYBIND11_MODULE(_monte_events, m) {
     AtomVector is a list[:class:`Atom`]-like object.
     )pbdoc");
 
+  py::class_<monte::AtomInfo>(m, "AtomInfo", R"pbdoc(
+      Holds atom position and time information
+
+      )pbdoc")
+      .def(py::init<monte::Atom, Index, Index, double>(),
+           R"pbdoc(
+          .. rubric:: Constructor
+
+          Parameters
+          ----------
+          atom: Atom
+              Atom translation and jumps information
+          species_index: int
+              Species index, as defined by :class:`~libcasm.monte.Conversions`, specifying the Occupant the atom is a component of.
+          position_index: int
+              Index of atom in Mol.component_id and Occupant.atoms.
+          time: Optional[float] = None
+              Time of the event
+          )pbdoc")
+      .def_readwrite("atom", &monte::AtomInfo::atom,
+                     R"pbdoc(
+          Atom: Atom translation and jumps information
+          )pbdoc")
+      .def_readwrite("species_index", &monte::AtomInfo::species_index,
+                     R"pbdoc(
+          int: Species index, as defined by \
+          :class:`~libcasm.monte.Conversions`, specifying the Occupant the \
+          atom is a component of.
+          )pbdoc")
+      .def_readwrite("position_index", &monte::AtomInfo::position_index,
+                     R"pbdoc(
+          int: Index of atom in Mol.component_id and Occupant.atoms.
+          )pbdoc");
+
+  py::bind_map<std::map<Index, monte::AtomInfo>>(m, "AtomInfoMap",
+                                                 R"pbdoc(
+    AtomInfoMap stores :class:`~libcasm.monte.events.AtomInfo` by unique atom
+    id.
+
+    Notes
+    -----
+    AtomInfoMap is a Dict[int, :class:`~libcasm.monte.events.AtomInfo`]-like object.
+    )pbdoc",
+                                                 py::module_local(false));
+
   py::class_<monte::Mol>(m, "Mol", R"pbdoc(
       Represents the occupant on a site
 
@@ -476,6 +522,12 @@ PYBIND11_MODULE(_monte_events, m) {
       .def_readwrite("asymmetric_unit_index", &monte::Mol::asym,
                      R"pbdoc(
           int: Current site asymmetric unit index. Must be consistent with `linear_site_index`.
+          )pbdoc")
+      .def_readwrite("species_index", &monte::Mol::species_index,
+                     R"pbdoc(
+          int: Species index, as defined by \
+          :class:`~libcasm.monte.Conversions`, specifying the Occupant the \
+          Mol is representing.
           )pbdoc")
       .def_readwrite("mol_location_index", &monte::Mol::loc,
                      R"pbdoc(
@@ -840,7 +892,7 @@ PYBIND11_MODULE(_monte_events, m) {
 
     Notes
     -----
-    OccSwapCountMapp is a Dict[:class:`~libcasm.monte.events.OccSwap`, int]-like object.
+    OccSwapCountMap is a Dict[:class:`~libcasm.monte.events.OccSwap`, int]-like object.
     )pbdoc",
                                               py::module_local(false));
 
@@ -1187,21 +1239,47 @@ PYBIND11_MODULE(_monte_events, m) {
               species.
           occ_candidate_list: :class:`~libcasm.monte.events.OccCandidateList`
               A list of candidate occupant types for Monte Carlo events.
-          update_species: bool
-
+          update_atoms: bool = False
+              If True, update atom location information when updating occupation.
+              This can be used by kinetic Monte Carlo methods for measuring
+              diffusion.
+          save_atom_info: bool = False
+              If True, save initial and final atom position, type, and time
+              information. This can be used by kinetic Monte Carlo
+              methods to record the exact deposition / dissolution events.
           )pbdoc",
            py::arg("convert"), py::arg("occ_candidate_list"),
            py::arg("update_species") = false)
       .def("initialize", &monte::OccLocation::initialize,
            R"pbdoc(
           Fill tables with current occupation info
+
+          Parameters
+          ----------
+          occupation: np.ndarray[np.int[n_sites,]]
+              The occupation vector to initialize with
+          time: Optional[float] = None
+              If time has a value, and `save_atom_info` is true, then the
+              initial atom info will be stored with the given time.
           )pbdoc",
-           py::arg("occupation"))
+           py::arg("occupation"), py::arg("time") = std::nullopt)
       .def("apply", &monte::OccLocation::apply,
            R"pbdoc(
           Update occupation vector and this to reflect that `event` occurred.
+
+          Parameters
+          ----------
+          event: :class:`~libcasm.monte.events.OccEvent`
+              The event to apply
+          occupation: np.ndarray[np.int[n_sites,]]
+              The occupation vector to update
+          time: Optional[float] = None
+              The time the event occurred (for kinetic Monte Carlo). If time
+              has a value, and `save_atom_info` is true, then the
+              initial/final atom info will be stored with the given time.
           )pbdoc",
-           py::arg("event"), py::arg("occupation"))
+           py::arg("event"), py::arg("occupation"),
+           py::arg("time") = std::nullopt)
       .def(
           "choose_mol_by_candidate_index",
           [](monte::OccLocation const &self, Index cand_index,
@@ -1254,6 +1332,42 @@ PYBIND11_MODULE(_monte_events, m) {
            &monte::OccLocation::atom_positions_cart_within,
            R"pbdoc(
           Return current atom positions in cartesian coordinates, shape=(3, atom_size).
+          )pbdoc")
+      .def("unique_atom_id", &monte::OccLocation::unique_atom_id,
+           R"pbdoc(
+          Return unique atom id for each atom in atom position matrices
+          )pbdoc")
+      .def("atom_info_initial", &monte::OccLocation::atom_info_initial,
+           R"pbdoc(
+          Return the initial position, type, and time when atom are added to the
+          supercell, stored by unique atom id
+
+          Returns
+          -------
+          atom_info_initial : dict[int, AtomInfo]
+              Dictionary with unique atom id as key and
+              :class:`~libcasm.monte.events.AtomInfo` as value, where the
+              AtomInfo gives the initial position, type, and time when atoms
+              are added to the supercell.
+          )pbdoc")
+      .def("atom_info_final", &monte::OccLocation::atom_info_final,
+           R"pbdoc(
+          Return the final position, type, and time when atom are removed from the
+          supercell, stored by unique atom id
+
+          Returns
+          -------
+          atom_info_initial : dict[int, AtomInfo]
+              Dictionary with unique atom id as key and
+              :class:`~libcasm.monte.events.AtomInfo` as value, where the
+              AtomInfo gives the final position, type, and time when atoms
+              are removed from the supercell.
+          )pbdoc")
+      .def("clear_atom_info_final", &monte::OccLocation::clear_atom_info_final,
+           R"pbdoc(
+          Clear information about atoms that have been removed from the supercell
+
+          This also clears the initial information for the removed atoms.
           )pbdoc")
       .def("initial_atom_species_index",
            &monte::OccLocation::initial_atom_species_index,

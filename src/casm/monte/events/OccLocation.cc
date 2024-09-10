@@ -17,16 +17,17 @@ namespace monte {
 ///     applying OccEvent
 OccLocation::OccLocation(const Conversions &_convert,
                          const OccCandidateList &_candidate_list,
-                         bool _update_atoms)
+                         bool _update_atoms, bool _save_atom_info)
     : m_convert(_convert),
       m_candidate_list(_candidate_list),
       m_loc(_candidate_list.size()),
-      m_update_atoms(_update_atoms) {
+      m_update_atoms(_update_atoms),
+      m_save_atom_info(_save_atom_info) {
   if (m_update_atoms) {
-    m_resevoir_mol.resize(m_convert.species_size());
+    m_reservoir_mol.resize(m_convert.species_size());
     for (Index species_index = 0; species_index < m_convert.species_size();
          ++species_index) {
-      Mol &mol = m_resevoir_mol[species_index];
+      Mol &mol = m_reservoir_mol[species_index];
       mol.id = species_index;
       mol.l = -1;
       mol.asym = -1;
@@ -39,7 +40,12 @@ OccLocation::OccLocation(const Conversions &_convert,
 }
 
 /// Fill tables with occupation info
-void OccLocation::initialize(Eigen::VectorXi const &occupation) {
+///
+/// \param occupation Current occupation vector
+/// \param time If time has a value, and `save_atom_info` is true, then the
+///     initial atom info will be stored with the given time.
+void OccLocation::initialize(Eigen::VectorXi const &occupation,
+                             std::optional<double> time) {
   m_mol.clear();
   m_atoms.clear();
   m_l_to_mol.clear();
@@ -52,6 +58,17 @@ void OccLocation::initialize(Eigen::VectorXi const &occupation) {
     Index asym = m_convert.l_to_asym(l);
     if (m_convert.occ_size(asym) > 1) {
       Nmut++;
+    }
+  }
+
+  if (m_update_atoms) {
+    m_next_unique_atom_id = 0;
+    m_unique_atom_id.clear();
+    m_available_atom_id.clear();
+
+    if (m_save_atom_info) {
+      m_atom_info_initial.clear();
+      m_atom_info_final.clear();
     }
   }
 
@@ -81,6 +98,14 @@ void OccLocation::initialize(Eigen::VectorXi const &occupation) {
           atom.translation = m_convert.l_to_ijk(mol.l);
           atom.n_jumps = 0;
           m_atoms.push_back(atom);
+          m_unique_atom_id.push_back(m_next_unique_atom_id);
+
+          if (m_save_atom_info && time.has_value()) {
+            m_atom_info_initial.emplace(
+                m_next_unique_atom_id,
+                AtomInfo(atom, species_index, atom_index, time.value()));
+          }
+          ++m_next_unique_atom_id;
           m_initial_atom_species_index.push_back(species_index);
           m_initial_atom_position_index.push_back(atom_index);
         }
@@ -95,8 +120,109 @@ void OccLocation::initialize(Eigen::VectorXi const &occupation) {
   }
 }
 
-/// Update occupation vector and this to reflect that event 'e' occurred
-void OccLocation::apply(const OccEvent &e, Eigen::VectorXi &occupation) {
+///// Update occupation vector and this to reflect that event 'e' occurred
+// void OccLocation::apply(const OccEvent &e,
+//                         Eigen::Ref<Eigen::VectorXi> occupation) {
+//   static std::vector<Index> updating_atoms;
+//
+//   // copy original Mol.component
+//   if (m_update_atoms) {
+//     if (updating_atoms.size() < e.atom_traj.size()) {
+//       updating_atoms.resize(e.atom_traj.size());
+//     }
+//     Index i_updating_atom = 0;
+//     for (const auto &traj : e.atom_traj) {
+//       if (traj.from.l == -1) {
+//         // move from reservoir -- create a new atom
+//         Atom atom;
+//         atom.translation = m_convert.l_to_ijk(traj.to.l);
+//         atom.n_jumps = 0;
+//         Index species_index = traj.from.mol_id;
+//         xtal::Molecule molecule = m_convert.species_to_mol(species_index);
+//         Index atom_position_index = traj.from.mol_comp;
+//         m_reservoir_mol[species_index].component[atom_position_index] =
+//             m_atoms.size();
+//         updating_atoms[i_updating_atom] = m_atoms.size();
+//         m_atoms.push_back(atom);
+//         m_initial_atom_species_index.push_back(species_index);
+//         m_initial_atom_position_index.push_back(atom_position_index);
+//       } else {  // move from within supercell
+//         updating_atoms[i_updating_atom] =
+//             m_mol[traj.from.mol_id].component[traj.from.mol_comp];
+//       }
+//       ++i_updating_atom;
+//     }
+//   }
+//
+//   // update Mol and config occupation
+//   for (const auto &occ : e.occ_transform) {
+//     auto &mol = m_mol[occ.mol_id];
+//
+//     if (mol.species_index != occ.from_species) {
+//       throw std::runtime_error("Error in OccLocation::apply: species
+//       mismatch");
+//     }
+//
+//     occupation[mol.l] = m_convert.occ_index(mol.asym, occ.to_species);
+//
+//     // remove from m_loc
+//     Index cand_index = m_candidate_list.index(mol.asym, mol.species_index);
+//     Index back = m_loc[cand_index].back();
+//     m_loc[cand_index][mol.loc] = back;
+//     m_mol[back].loc = mol.loc;
+//     m_loc[cand_index].pop_back();
+//
+//     // set Mol.species index
+//     mol.species_index = occ.to_species;
+//
+//     if (m_update_atoms) {
+//       mol.component.resize(m_convert.components_size(mol.species_index));
+//     }
+//
+//     // add to m_loc
+//     cand_index = m_candidate_list.index(mol.asym, mol.species_index);
+//     mol.loc = m_loc[cand_index].size();
+//     m_loc[cand_index].push_back(mol.id);
+//   }
+//
+//   if (m_update_atoms) {
+//     Index i_updating_atom = 0;
+//     for (const auto &traj : e.atom_traj) {
+//       if (traj.to.l != -1) {
+//         // move to position in supercell
+//         Index atom_id = updating_atoms[i_updating_atom];
+//
+//         // update Mol.component
+//         m_mol[traj.to.mol_id].component[traj.to.mol_comp] = atom_id;
+//
+//         // update atom translation
+//         m_atoms[atom_id].translation += traj.delta_ijk;
+//
+//         // update number of atom jumps
+//         m_atoms[atom_id].n_jumps += 1;
+//       }
+//       // else {
+//       //   // move to reservoir
+//       //   // mark explicitly?
+//       //   // or know implicitly (because not found in
+//       //   m_mol[mol_id]->component)?
+//       // }
+//       ++i_updating_atom;
+//     }
+//   }
+// }
+
+/// Update occupation vector and this to reflect that event 'e' occurred at
+/// specified 'time'
+///
+/// \param e The event to apply
+/// \param occupation Current occupation vector
+/// \param time If time has a value, and `save_atom_info` is true, then the
+///     initial/final atom info will be stored with the given time.
+void OccLocation::apply(OccEvent const &e,
+                        Eigen::Ref<Eigen::VectorXi> occupation,
+                        std::optional<double> time) {
+  // current `atom_id` (position in m_atoms) of updating atoms
   static std::vector<Index> updating_atoms;
 
   // copy original Mol.component
@@ -107,22 +233,23 @@ void OccLocation::apply(const OccEvent &e, Eigen::VectorXi &occupation) {
     Index i_updating_atom = 0;
     for (const auto &traj : e.atom_traj) {
       if (traj.from.l == -1) {
-        // move from resevoir -- create a new atom
-        Atom atom;
-        atom.translation = m_convert.l_to_ijk(traj.to.l);
-        atom.n_jumps = 0;
-        Index species_index = traj.from.mol_id;
-        xtal::Molecule molecule = m_convert.species_to_mol(species_index);
+        // move from reservoir -- will create a new atom
+        updating_atoms[i_updating_atom] = -1;
+      } else {
+        // move from within supercell
+        auto &mol = m_mol[traj.from.mol_id];
         Index atom_position_index = traj.from.mol_comp;
-        m_resevoir_mol[species_index].component[atom_position_index] =
-            m_atoms.size();
-        updating_atoms[i_updating_atom] = m_atoms.size();
-        m_atoms.push_back(atom);
-        m_initial_atom_species_index.push_back(species_index);
-        m_initial_atom_position_index.push_back(atom_position_index);
-      } else {  // move from within supercell
-        updating_atoms[i_updating_atom] =
-            m_mol[traj.from.mol_id].component[traj.from.mol_comp];
+        Index atom_id = mol.component[atom_position_index];
+
+        if (traj.to.l == -1 && m_save_atom_info && time.has_value()) {
+          // if move to reservoir, store final atom info using current mol info
+          m_atom_info_final.emplace(
+              m_unique_atom_id[atom_id],
+              AtomInfo(m_atoms[atom_id], mol.species_index, atom_position_index,
+                       time.value()));
+        }
+
+        updating_atoms[i_updating_atom] = atom_id;
       }
       ++i_updating_atom;
     }
@@ -159,10 +286,83 @@ void OccLocation::apply(const OccEvent &e, Eigen::VectorXi &occupation) {
   }
 
   if (m_update_atoms) {
-    Index i_updating_atom = 0;
+    Index i_updating_atom;
+
+    // Atoms moving to the reservoir
+    i_updating_atom = 0;
     for (const auto &traj : e.atom_traj) {
-      if (traj.to.l != -1) {
-        // move to position in supercell
+      if (traj.to.l == -1 && traj.from.l != -1) {
+        // move to reservoir
+        Index atom_id = updating_atoms[i_updating_atom];
+        Index unique_atom_id = m_unique_atom_id[atom_id];
+
+        m_atoms[atom_id].translation[0] = std::numeric_limits<long>::min();
+        m_atoms[atom_id].translation[1] = std::numeric_limits<long>::min();
+        m_atoms[atom_id].translation[2] = std::numeric_limits<long>::min();
+        m_atoms[atom_id].n_jumps = std::numeric_limits<long>::min();
+        m_unique_atom_id[atom_id] = -1;
+        m_initial_atom_species_index[atom_id] = -1;
+        m_initial_atom_position_index[atom_id] = -1;
+
+        m_available_atom_id.insert(atom_id);
+      }
+      ++i_updating_atom;
+    }
+
+    // Atoms moving from the reservoir
+    i_updating_atom = 0;
+    for (const auto &traj : e.atom_traj) {
+      if (traj.to.l != -1 && traj.from.l == -1) {
+        // move from reservoir -- create a new atom
+        Atom atom;
+        atom.translation = m_convert.l_to_ijk(traj.to.l);
+        atom.n_jumps = 0;
+        Index species_index = traj.to.mol_id;
+        xtal::Molecule molecule = m_convert.species_to_mol(species_index);
+        Index atom_position_index = traj.to.mol_comp;
+
+        Index atom_id;
+        if (m_available_atom_id.size() > 0) {
+          // If there is an empty position in `m_atoms`,
+          // put the added atom there
+          atom_id = *m_available_atom_id.begin();
+          m_available_atom_id.erase(m_available_atom_id.begin());
+
+          m_atoms[atom_id] = atom;
+          m_unique_atom_id[atom_id] = m_next_unique_atom_id;
+
+          m_initial_atom_species_index[atom_id] = species_index;
+          m_initial_atom_position_index[atom_id] = atom_position_index;
+
+        } else {
+          // Else, add atom to end of m_atoms
+          atom_id = m_atoms.size();
+          m_atoms.push_back(atom);
+          m_unique_atom_id.push_back(m_next_unique_atom_id);
+
+          m_initial_atom_species_index.push_back(species_index);
+          m_initial_atom_position_index.push_back(atom_position_index);
+        }
+
+        if (m_save_atom_info && time.has_value()) {
+          m_atom_info_initial.emplace(
+              m_next_unique_atom_id,
+              AtomInfo(atom, species_index, atom_position_index, time.value()));
+        }
+
+        // update Mol.component
+        m_mol[traj.to.mol_id].component[traj.to.mol_comp] = atom_id;
+
+        ++m_next_unique_atom_id;
+      }
+      ++i_updating_atom;
+    }
+
+    // Atoms moving within the supercell
+    i_updating_atom = 0;
+    for (const auto &traj : e.atom_traj) {
+      if (traj.to.l != -1 && traj.from.l != -1) {
+        // move to position in supercell from position in supercell
         Index atom_id = updating_atoms[i_updating_atom];
 
         // update Mol.component
@@ -174,12 +374,6 @@ void OccLocation::apply(const OccEvent &e, Eigen::VectorXi &occupation) {
         // update number of atom jumps
         m_atoms[atom_id].n_jumps += 1;
       }
-      // else {
-      //   // move to resevoir
-      //   // mark explicitly?
-      //   // or know implicitly (because not found in
-      //   m_mol[mol_id]->component)?
-      // }
       ++i_updating_atom;
     }
   }
@@ -192,7 +386,7 @@ void OccLocation::apply(const OccEvent &e, Eigen::VectorXi &occupation) {
 /// - Positions are returned with translations included as if no periodic
 /// boundaries
 Eigen::MatrixXd OccLocation::atom_positions_cart() const {
-  Eigen::MatrixXd R(3, this->atom_size());
+  Eigen::MatrixXd R = Eigen::MatrixXd::Zero(3, this->atom_size());
 
   auto const &convert = this->convert();
   Eigen::Matrix3d const &L = convert.lat_column_mat();
@@ -219,7 +413,7 @@ Eigen::MatrixXd OccLocation::atom_positions_cart() const {
 /// Notes:
 /// - Positions are returned within periodic boundaries
 Eigen::MatrixXd OccLocation::atom_positions_cart_within() const {
-  Eigen::MatrixXd R(3, this->atom_size());
+  Eigen::MatrixXd R = Eigen::MatrixXd::Zero(3, this->atom_size());
 
   auto const &convert = this->convert();
 
