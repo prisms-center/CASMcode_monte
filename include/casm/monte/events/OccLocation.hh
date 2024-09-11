@@ -1,6 +1,7 @@
 #ifndef CASM_monte_OccLocation
 #define CASM_monte_OccLocation
 
+#include <optional>
 #include <set>
 #include <vector>
 
