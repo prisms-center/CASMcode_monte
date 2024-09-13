@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- Added `SamplingParams.json_sampler_names`, `SamplingParams.append_to_sampler_names`, `SamplingParams.remove_from_sampler_names`, `SamplingParams.extend_sampler_names`, `SamplingParams.append_to_json_sampler_names`, `SamplingParams.remove_from_json_sampler_names`, and `SamplingParams.extend_json_sampler_names`.
+- Added `jsonSampler` and `jsonSamplerMap` to `libcasm.monte.sampling`.
+
 ### Fixed
 
 - Fixed Conversions constructor to differentiate sublattices by symmetry and order of occupants. Documentation has been updated to reflect that the `asym` unit index used by Conversions, Mol, OccTransform, OccCandidate, OccCandidateList, etc. indicates sites that are equivalent by symmetry and order of occupants.

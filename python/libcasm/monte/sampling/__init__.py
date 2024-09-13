@@ -31,6 +31,8 @@ from ._monte_sampling import (
     default_component_names,
     default_equilibration_check,
     get_n_samples,
+    jsonSampler,
+    jsonSamplerMap,
     jsonStateSamplingFunction,
     jsonStateSamplingFunctionMap,
     matrix_as_vector,

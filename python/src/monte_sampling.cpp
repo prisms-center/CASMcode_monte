@@ -43,7 +43,8 @@ using namespace CASM;
 typedef monte::BasicStatistics statistics_type;
 
 monte::SamplingParams make_sampling_params(
-    std::vector<std::string> sampler_names, monte::SAMPLE_MODE sample_mode,
+    std::vector<std::string> sampler_names,
+    std::vector<std::string> json_sampler_names, monte::SAMPLE_MODE sample_mode,
     monte::SAMPLE_METHOD sample_method, double period,
     std::optional<double> begin, double base, double shift,
     std::optional<std::function<double(monte::CountType)>> custom_sample_at,
@@ -70,6 +71,7 @@ monte::SamplingParams make_sampling_params(
   }
   monte::SamplingParams s;
   s.sampler_names = sampler_names;
+  s.json_sampler_names = json_sampler_names;
   s.sample_mode = sample_mode;
   s.sample_method = sample_method;
   s.period = period;
@@ -487,6 +489,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
           ----------
           sampler_names: list[str] = []
               List of sampling functions to call when a sample is taken.
+          json_sampler_names: list[str] = []
+              List of JSON sampling functions to call when a sample is taken.
           sample_mode: :class:`SAMPLE_MODE` = :py:attr:`SAMPLE_MODE.BY_PASS`
               Sample by pass, step, or time.
           sample_method: :class:`SAMPLE_METHOD` = :py:attr:`SAMPLE_METHOD.LINEAR`
@@ -515,6 +519,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           )pbdoc",
            py::arg("sampler_names") = std::vector<std::string>(),
+           py::arg("json_sampler_names") = std::vector<std::string>(),
            py::arg("sample_mode") = monte::SAMPLE_MODE::BY_PASS,
            py::arg("sample_method") = monte::SAMPLE_METHOD::LINEAR,
            py::arg("period") = 1.0, py::arg("begin") = std::nullopt,
@@ -536,23 +541,106 @@ PYBIND11_MODULE(_monte_sampling, m) {
           The default value is :py:attr:`SAMPLE_METHOD.LINEAR`.
           )pbdoc")
       .def_readwrite("begin", &monte::SamplingParams::begin, R"pbdoc(
-          float: See `sample_method`. Default=``1.0``.
+          float: Sample spacing `begin` parameter.
           )pbdoc")
       .def_readwrite("period", &monte::SamplingParams::period, R"pbdoc(
-          float: See `sample_method`. Default=``1.0``.
+          float: Sample spacing `period` parameter.
           )pbdoc")
       .def_readwrite("base", &monte::SamplingParams::base,
                      R"pbdoc(
-          float: See `sample_method`. Default=``math.pow(10.0, 1.0/10.0)``.
+          float: Sample spacing `base` parameter (logarithmic sample spacing only).
           )pbdoc")
       .def_readwrite("shift", &monte::SamplingParams::shift, R"pbdoc(
-          float: See `sample_method`. Default=``10.0``.
+          float: Sample spacing `shift` parameter (logarithmic sample spacing only).
           )pbdoc")
       .def_readwrite("sampler_names", &monte::SamplingParams::sampler_names,
                      R"pbdoc(
-          List[str]: The names of quantities to sample (i.e. sampling function \
-          names). Default=``[]``.
+          List[str]: Get or set (as a copy) the names of quantities to sample
+          (i.e. sampling function names).
+
+          Note that this is a property that either (i) gets a copy of the
+          list, or (ii) sets the entire list. Doing `x.sampler_names.append(y)`
+          or `x.sampler_names += [y, z]` will not modify the SamplingParams
+          object. Instead, use `x.append_to_sampler_names(y)`,
+          `x.remove_from_sampler_names(y)`, or `x.extend_sampler_names([y, z])`.
           )pbdoc")
+      .def(
+          "append_to_sampler_names",
+          [](monte::SamplingParams &s, std::string name) {
+            s.sampler_names.push_back(name);
+          },
+          R"pbdoc(
+          Append a name to `sampler_names`.
+          )pbdoc",
+          py::arg("name"))
+      .def(
+          "remove_from_sampler_names",
+          [](monte::SamplingParams &s, std::string name) {
+            if (auto it = std::find(s.sampler_names.begin(),
+                                    s.sampler_names.end(), name);
+                it != s.sampler_names.end()) {
+              s.sampler_names.erase(it);
+            }
+          },
+          R"pbdoc(
+          Remove a name from `sampler_names`.
+          )pbdoc",
+          py::arg("name"))
+      .def(
+          "extend_sampler_names",
+          [](monte::SamplingParams &s, std::vector<std::string> names) {
+            s.sampler_names.insert(s.sampler_names.end(), names.begin(),
+                                   names.end());
+          },
+          R"pbdoc(
+          Append multiple names to `sampler_names`.
+          )pbdoc",
+          py::arg("names"))
+      .def_readwrite("json_sampler_names",
+                     &monte::SamplingParams::json_sampler_names,
+                     R"pbdoc(
+          List[str]: Get or set (as a copy) the names of JSON quantities to sample
+          (i.e. json sampling function names).
+
+          Note that this is a property that either (i) gets a copy of the
+          list, or (ii) sets the entire list. Doing `x.json_sampler_names.append(y)`
+          or `x.json_sampler_names += [y, z]` will not modify the SamplingParams
+          object. Instead, use `x.append_to_json_sampler_names(y)`,
+          `x.remove_from_json_sampler_names(y)`, or
+          `x.extend_json_sampler_names([y, z])`.
+          )pbdoc")
+      .def(
+          "append_to_json_sampler_names",
+          [](monte::SamplingParams &s, std::string name) {
+            s.json_sampler_names.push_back(name);
+          },
+          R"pbdoc(
+          Append a name to `json_sampler_names`.
+          )pbdoc",
+          py::arg("name"))
+      .def(
+          "remove_from_json_sampler_names",
+          [](monte::SamplingParams &s, std::string name) {
+            if (auto it = std::find(s.json_sampler_names.begin(),
+                                    s.json_sampler_names.end(), name);
+                it != s.json_sampler_names.end()) {
+              s.json_sampler_names.erase(it);
+            }
+          },
+          R"pbdoc(
+          Remove a name from `json_sampler_names`.
+          )pbdoc",
+          py::arg("name"))
+      .def(
+          "extend_json_sampler_names",
+          [](monte::SamplingParams &s, std::vector<std::string> names) {
+            s.json_sampler_names.insert(s.json_sampler_names.end(),
+                                        names.begin(), names.end());
+          },
+          R"pbdoc(
+          Append multiple names to `json_sampler_names`.
+          )pbdoc",
+          py::arg("names"))
       .def_readwrite("stochastic_sample_period",
                      &monte::SamplingParams::stochastic_sample_period, R"pbdoc(
           bool: If true, the sample period is stochastically chosen based on \
@@ -560,13 +648,12 @@ PYBIND11_MODULE(_monte_sampling, m) {
           )pbdoc")
       .def_readwrite("do_sample_trajectory",
                      &monte::SamplingParams::do_sample_trajectory, R"pbdoc(
-            bool: If true, save the configuration when a sample is taken. \
-            Default=``False``.
+            bool: If true, save the configuration when a sample is taken.
           )pbdoc")
       .def_readwrite("do_sample_time", &monte::SamplingParams::do_sample_time,
                      R"pbdoc(
             bool: If true, save current time when taking a sample, if \
-            applicable. Default=``False``.
+            applicable.
           )pbdoc");
 
   m.def(

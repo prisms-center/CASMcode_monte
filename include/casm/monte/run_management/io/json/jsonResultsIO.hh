@@ -49,9 +49,6 @@ class jsonResultsIO : public ResultsIO<_ResultsType> {
   fs::path m_output_dir;
   bool m_write_trajectory;
   bool m_write_observations;
-  bool m_write_conditions;
-  bool m_write_initial_states;
-  bool m_write_final_states;
 };
 
 }  // namespace monte
