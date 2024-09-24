@@ -109,6 +109,7 @@ set(
   ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/nfold.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/methods/occupation_metropolis.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/BasicStructureTools.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/LexicographicalCompare.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/math.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/polymorphic_method_json_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/Results.hh
@@ -121,12 +122,15 @@ set(
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/SamplingFixtureParams_json_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/jsonResultsIO.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/io/json/jsonResultsIO_impl.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/HistogramFunction.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/RequestedPrecisionConstructor.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/Sampler.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/SamplingParams.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/SelectedEventData.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/StateSamplingFunction.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/io/json/Sampler_json_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/io/json/SamplingParams_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/io/json/SelectedEventData_json_io.hh
 )
 set(
   libcasm_monte_SOURCES
@@ -141,8 +145,10 @@ set(
   ${PROJECT_SOURCE_DIR}/src/casm/monte/events/io/OccCandidate_stream_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/io/json/ValueMap_json_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/misc/BasicStructureTools.cc
+  ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/SelectedEventData.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/Sampler_json_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/SamplingParams_json_io.cc
+  ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/SelectedEventData_json_io.cc
 )
 add_library(casm_monte SHARED ${libcasm_monte_SOURCES})
 target_include_directories(casm_monte

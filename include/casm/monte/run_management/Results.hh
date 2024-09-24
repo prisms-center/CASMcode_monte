@@ -6,6 +6,7 @@
 #include "casm/monte/checks/CompletionCheck.hh"
 #include "casm/monte/run_management/ResultsAnalysisFunction.hh"
 #include "casm/monte/run_management/State.hh"
+#include "casm/monte/sampling/SelectedEventData.hh"
 #include "casm/monte/sampling/StateSamplingFunction.hh"
 
 namespace CASM {
@@ -63,6 +64,9 @@ struct Results {
   /// Map of <sampler name>:<json sampler>
   std::map<std::string, std::shared_ptr<jsonSampler>> json_samplers;
 
+  /// Optional SelectedEventData - collected with each event occurance
+  std::optional<SelectedEventData> selected_event_data;
+
   /// Map of <analysis name>:<value>
   std::map<std::string, Eigen::VectorXd> analysis;
 
@@ -85,15 +89,16 @@ struct Results {
   CompletionCheckResults<StatisticsType> completion_check_results;
 
   /// Number of acceptances
-  long long n_accept;
+  BigCountType n_accept;
 
   /// Number of rejections
-  long long n_reject;
+  BigCountType n_reject;
 
   void reset() {
     elapsed_clocktime.reset();
     samplers.clear();
     json_samplers.clear();
+    selected_event_data.reset();
     analysis.clear();
     sample_count.clear();
     sample_time.clear();

@@ -1223,7 +1223,8 @@ PYBIND11_MODULE(_monte_events, m) {
         )pbdoc",
         py::arg("convert"), py::arg("occ_candidate_list"));
 
-  py::class_<monte::OccLocation>(m, "OccLocation", R"pbdoc(
+  py::class_<monte::OccLocation, std::shared_ptr<monte::OccLocation>>(
+      m, "OccLocation", R"pbdoc(
     Specify a specific atom location, on a site, or in a molecule
 
     )pbdoc")

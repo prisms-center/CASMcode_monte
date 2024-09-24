@@ -1,0 +1,477 @@
+#ifndef CASM_monte_SelectedEventData
+#define CASM_monte_SelectedEventData
+
+#include <map>
+#include <vector>
+
+#include "casm/global/eigen.hh"
+#include "casm/monte/definitions.hh"
+#include "casm/monte/misc/LexicographicalCompare.hh"
+#include "casm/monte/sampling/HistogramFunction.hh"
+
+namespace CASM {
+namespace monte {
+
+/// \brief Parameters for collecting hop correlations data (not basis function
+/// correlations)
+struct CorrelationsDataParams {
+  /// Every `jumps_per_position_sample` steps of an individual atom, store
+  /// its position.
+  Index jumps_per_position_sample = 1;
+
+  /// The maximum number of positions to store for each atom.
+  Index max_n_position_samples = 100;
+
+  /// If false, only output data when all atoms have jumped the necessary
+  /// number of times. If true, output matrices with 0.0 values for atoms that
+  /// have not jumped enough times to be sampled.
+  bool output_incomplete_samples = false;
+
+  /// If true, stop the run when the maximum number of positions have been
+  /// sampled for all atoms. If false, continue running until the standard
+  /// completion check is met, but do not collect any more position samples.
+  bool stop_run_when_complete = false;
+};
+
+/// \brief Hop correlations data (not basis function correlations)
+struct CorrelationsData {
+  /// Every `jumps_per_position_sample` steps of an individual atom, store
+  /// its position in this object
+  Index jumps_per_position_sample;
+
+  /// Maximum number of position samples for any atom
+  CountType max_n_position_samples;
+
+  /// If false, only output data when all atoms have jumped the necessary
+  /// number of times. If true, output matrices with 0.0 values for atoms that
+  /// have not jumped enough times to be sampled.
+  bool output_incomplete_samples;
+
+  /// If true, stop the run when the maximum number of positions have been
+  /// sampled for all atoms. If false, continue running until the standard
+  /// completion check is met, but do not collect any more position samples.
+  bool stop_run_when_complete;
+
+  /// For each atom, the number of positions stored in this object
+  std::vector<CountType> n_position_samples;
+
+  /// Number of position samples completed for all atoms
+  CountType n_complete_samples;
+
+  /// Store when atom positions were sampled (step, pass, sample, time)
+  // X[position_sample_index][atom_index]
+
+  Eigen::MatrixXl step;
+  Eigen::MatrixXl pass;
+  Eigen::MatrixXl sample;
+  Eigen::MatrixXd time;
+
+  /// Store atom positions
+  // X[position_sample_index][x/y/z][atom_index]
+  std::vector<Eigen::MatrixXd> atom_positions_cart;
+
+  void initialize(Index _n_atoms, Index _jumps_per_position_sample,
+                  Index _max_n_position_samples,
+                  bool _output_incomplete_samples);
+
+  void insert(Index atom_id, Index n_jumps,
+              Eigen::VectorXd const &position_cart, CountType _step,
+              CountType _pass, CountType _sample, double _time);
+
+ private:
+  /// \brief Update the number of complete samples
+  ///
+  /// \param n_samples The number of position samples that have been taken for
+  ///     most recent atom (before the current sample)
+  void _update_n_complete_samples(Index n_samples);
+};
+
+/// \brief Histogram of a discrete integral vector variable
+///
+/// - The histogram is stored as a map of counts, where the key is the vector
+///   value and the value is the count.
+/// - A maximum size restricts the number of unique values that can be stored.
+/// - If the maximum size is reached, a flag is set and the count for new key
+///   values are stored in the `out_of_range_count`.
+class DiscreteVectorIntHistogram {
+ public:
+  DiscreteVectorIntHistogram(std::vector<std::string> const &_component_names,
+                             std::vector<Index> _shape,
+                             Index _max_size = 10000);
+
+  /// \brief Return the shape of the quantity
+  std::vector<Index> const &shape() const { return this->m_shape; }
+
+  /// \brief Return the component names of the quantity
+  std::vector<std::string> const &component_names() const {
+    return this->m_component_names;
+  }
+
+  /// \brief Return the number of unique values in the histogram
+  Index size() const { return this->m_count.size(); }
+
+  /// \brief Return the maximum number of unique values that can be stored
+  Index max_size() const { return this->m_max_size; }
+
+  /// \brief Return true if the maximum number of unique values has been reached
+  bool max_size_exceeded() const { return this->m_max_size_exceeded; }
+
+  /// \brief Insert a value into the histogram, with an optional weight
+  void insert(Eigen::VectorXi const &value, double weight = 1.0);
+
+  /// \brief Return the sum of bin counts + out-of-range counts
+  double sum() const;
+
+  /// \brief Return the values as a vector
+  std::vector<Eigen::VectorXi> values() const;
+
+  /// \brief Return the count as a vector
+  std::vector<double> count() const;
+
+  /// The number of values (total weight) that was not binned because the
+  /// max_size was exceeded
+  double out_of_range_count() const { return this->m_out_of_range_count; }
+
+  /// \brief Return the count as a vector containing fractions of the sum
+  std::vector<double> fraction() const;
+
+ private:
+  /// \brief Shape of quantity, with column-major unrolling
+  ///
+  /// Scalar: [], Vector: [n], Matrix: [m, n], etc.
+  std::vector<Index> m_shape;
+
+  /// \brief A name for each component of the resulting Eigen::VectorXd
+  ///
+  /// Can be string representing an index (i.e "0", "1", "2", etc.) or can
+  /// be a descriptive string (i.e. "Mg", "Va", "O", etc.)
+  std::vector<std::string> m_component_names;
+
+  /// The maximum number of key values to store
+  /// - If the max_size is reached, a flag is set and new key values are ignored
+  Index m_max_size;
+
+  /// Flag to indicate that the max_size has been reached
+  bool m_max_size_exceeded;
+
+  /// The number of values (total weight) in each bin
+  std::map<Eigen::VectorXi, double, LexicographicalCompare> m_count;
+
+  /// The number of values (total weight) that was not binned because the
+  /// max_size was exceeded
+  double m_out_of_range_count;
+};
+
+class DiscreteVectorFloatHistogram {
+ public:
+  DiscreteVectorFloatHistogram(std::vector<std::string> const &_component_names,
+                               std::vector<Index> _shape, double _tol,
+                               Index _max_size = 10000);
+
+  /// \brief Return the shape of the quantity
+  std::vector<Index> const &shape() const { return this->m_shape; }
+
+  /// \brief Return the component names of the quantity
+  std::vector<std::string> const &component_names() const {
+    return this->m_component_names;
+  }
+
+  /// \brief Return the number of unique values in the histogram
+  Index size() const { return this->m_count.size(); }
+
+  /// \brief Return the maximum number of unique values that can be stored
+  Index max_size() const { return this->m_max_size; }
+
+  /// \brief Return true if the maximum number of unique values has been reached
+  bool max_size_exceeded() const { return this->m_max_size_exceeded; }
+
+  /// \brief Insert a value into the histogram, with an optional weight
+  void insert(Eigen::VectorXd const &value, double weight = 1.0);
+
+  /// \brief Return the sum of bin counts + out-of-range counts
+  double sum() const;
+
+  /// \brief Return the values as a vector
+  std::vector<Eigen::VectorXd> values() const;
+
+  /// \brief Return the count as a vector
+  std::vector<double> count() const;
+
+  /// The number of values (total weight) that was not binned because the
+  /// max_size was exceeded
+  double out_of_range_count() const { return this->m_out_of_range_count; }
+
+  /// \brief Return the count as a vector containing fractions of the sum
+  std::vector<double> fraction() const;
+
+ private:
+  /// \brief Shape of quantity, with column-major unrolling
+  ///
+  /// Scalar: [], Vector: [n], Matrix: [m, n], etc.
+  std::vector<Index> m_shape;
+
+  /// \brief A name for each component of the resulting Eigen::VectorXd
+  ///
+  /// Can be string representing an index (i.e "0", "1", "2", etc.) or can
+  /// be a descriptive string (i.e. "Mg", "Va", "O", etc.)
+  std::vector<std::string> m_component_names;
+
+  /// The maximum number of key values to store
+  Index m_max_size;
+
+  /// Flag to indicate that the max_size has been reached
+  bool m_max_size_exceeded;
+
+  /// The number of values (total weight) in each bin
+  std::map<Eigen::VectorXd, double, FloatLexicographicalCompare> m_count;
+
+  /// The number of values (total weight) that was not binned because the
+  /// max_size was exceeded
+  double m_out_of_range_count;
+};
+
+/// \brief Histogram of a single continuous variable with fixed bin width
+///
+/// - The histogram is stored as a vector of counts, where the index of the
+///     count corresponds to the bin number.
+/// - The bin number is calculated as `(value - begin) / bin_width`, so the
+///   range for bin `i` is [begin, begin + i*bin_width).
+/// - If the value is less than `begin`, the bins are reset to prepend the
+///     necessary number of bins to the beginning of the histogram.
+class Histogram1D {
+ public:
+  /// \brief Constructor
+  Histogram1D(double _initial_begin, double _bin_width, bool _is_log,
+              Index _max_size = 10000);
+
+  /// The width of each bin in the histogram
+  double bin_width() const { return this->m_bin_width; }
+
+  /// If true, the histogram (including bin width and `begin` value)
+  /// is in log space (using base 10)
+  bool is_log() const { return this->m_is_log; }
+
+  /// The maximum number of bins to store
+  Index max_size() const { return this->m_max_size; }
+
+  /// Flag to indicate that the max_size has been reached
+  bool max_size_exceeded() const { return this->m_max_size_exceeded; }
+
+  /// The first bin is for the range `[begin, begin + bin_width)`
+  double begin() const { return this->m_begin; }
+
+  /// The number of values (total weight) in each bin
+  std::vector<double> const &count() const { return this->m_count; }
+
+  /// The number of values (total weight) that was not binned because the
+  /// max_size was exceeded
+  double out_of_range_count() const { return this->m_out_of_range_count; }
+
+  /// \brief Insert a value into the histogram, with an optional weight
+  void insert(double value, double weight = 1.0);
+
+  /// \brief Return the coordinates of the beginning of each bin range
+  std::vector<double> bin_coords() const;
+
+  /// \brief Return the sum of bin counts
+  double sum() const;
+
+  /// \brief Return the count as a probability density, such that the area
+  ///     under the histogram integrates to 1 (if no out-of-range count)
+  std::vector<double> density() const;
+
+  /// \brief Merge another histogram into this one
+  void merge(Histogram1D const &other);
+
+ private:
+  /// \brief Reset histogram bins if this is the first value being added,
+  /// or if `value` is less than `begin`
+  void _reset_bins(double value);
+
+  /// The type used to store counts in the histogram
+  double m_initial_begin;
+
+  /// The width of each bin in the histogram
+  double m_bin_width;
+
+  /// If true, the histogram (including bin width and `begin` value)
+  /// is in log space (using base 10)
+  bool m_is_log;
+
+  /// The maximum number of bins to store
+  Index m_max_size;
+
+  /// Flag to indicate that the max_size has been reached
+  bool m_max_size_exceeded;
+
+  /// The first bin is for the range `[begin, begin + bin_width)`
+  double m_begin;
+
+  /// The number of values (total weight) in each bin
+  std::vector<double> m_count;
+
+  /// The number of values (total weight) that was not binned because the
+  /// max_size was exceeded
+  double m_out_of_range_count;
+};
+
+/// \brief Combine 1D histograms from multiple partitions into a single 1d
+/// histogram
+Histogram1D combine(std::vector<Histogram1D> const &histograms);
+
+/// \brief Histogram of a single continuous variable with fixed bin width
+///
+/// - The histogram is stored as a vector of counts, where the index of the
+///     count corresponds to the bin number.
+/// - The bin number is calculated as `(value - begin) / bin_width`, so the
+///   range for bin `i` is [begin, begin + i*bin_width).
+/// - If the value is less than `begin`, the bins are reset to prepend the
+///   necessary number of bins to the beginning of the histogram.
+/// - The histogram is partitioned into multiple individual histograms, where
+///   each partition corresponds to a different value of the partition index.
+/// - A combined histogram is generated on request.
+/// - When the combined or individual histograms are requested, the combined
+///   histogram is generated if it is not up to date, and the bin ranges for
+///   each partition are updated to match the bin ranges of the combined
+///   histogram.
+class PartitionedHistogram1D {
+ public:
+  /// \brief Constructor
+  PartitionedHistogram1D(std::vector<std::string> const &_partion_names,
+                         double _initial_begin, double _bin_width, bool _is_log,
+                         Index _max_size = 10000)
+      : m_partition_names(_partion_names),
+        m_histograms(
+            _partion_names.size(),
+            Histogram1D(_initial_begin, _bin_width, _is_log, _max_size)) {}
+
+  /// \brief Return the names of the partitions
+  std::vector<std::string> const &partition_names() const {
+    return this->m_partition_names;
+  }
+
+  /// \brief Access the individual histograms
+  std::vector<Histogram1D> const &histograms() const {
+    if (!m_up_to_date) {
+      _make_combined_histogram();
+    }
+    return this->m_histograms;
+  }
+
+  /// \brief Insert a value into an individual histogram, with an optional
+  /// weight
+  void insert(int partition, double value, double weight = 1.0) {
+    bool m_up_to_date = false;
+    if (partition < 0 || partition >= m_histograms.size()) {
+      throw std::runtime_error("Partition index out of range");
+    }
+    m_histograms[partition].insert(value, weight);
+  }
+
+  /// \brief Access the combined histogram
+  Histogram1D const &combined_histogram() const {
+    if (!m_up_to_date) {
+      _make_combined_histogram();
+    }
+    return this->m_combined_histogram.value();
+  }
+
+ private:
+  /// \brief Make the combined histogram from the partitioned histograms
+  void _make_combined_histogram() const {
+    m_combined_histogram = combine(m_histograms);
+    std::vector<double> bin_coords = m_combined_histogram->bin_coords();
+    if (!bin_coords.empty()) {
+      auto &hist = const_cast<std::vector<Histogram1D> &>(m_histograms);
+      for (Index i = 0; i < hist.size(); ++i) {
+        hist[i].insert(bin_coords.front(), 0.0);
+        hist[i].insert(bin_coords.back(), 0.0);
+      }
+    }
+    m_up_to_date = true;
+  }
+
+  /// The names of the partitions
+  std::vector<std::string> m_partition_names;
+
+  /// The histograms for each partition
+  std::vector<Histogram1D> m_histograms;
+
+  /// If true, the combined histogram is up to date
+  mutable bool m_up_to_date;
+
+  /// The combined histogram
+  mutable std::optional<Histogram1D> m_combined_histogram;
+};
+
+struct SelectedEventDataFunctions {
+  std::map<std::string, HistogramFunction<Eigen::VectorXi>>
+      discrete_vector_int_functions;
+  std::map<std::string, HistogramFunction<Eigen::VectorXd>>
+      discrete_vector_float_functions;
+  std::map<std::string, PartitionedHistogramFunction<double>>
+      continuous_1d_functions;
+};
+
+struct SelectedEventDataParams {
+  // -- Jump Correlations --------------------------------------------
+
+  /// Optional parameters for collecting correlations data
+  std::optional<CorrelationsDataParams> correlations_data_params;
+
+  // -- Histograms ----------------------------------------------
+
+  // -- Which histograms to collect --
+
+  /// The data to collect and construct histograms for
+  std::vector<std::string> function_names;
+
+  // -- The following allow overriding default values for the histograms --
+
+  /// Tolerances for comparing floating point values for discrete float values,
+  /// by function name
+  std::map<std::string, double> tol;
+
+  /// Bin width for continuous variables, by function name
+  std::map<std::string, double> bin_width;
+
+  /// Initial value for continuous variables, by function name
+  std::map<std::string, double> initial_begin;
+
+  /// If true, the histogram (including bin width and `begin` value)
+  /// is in log space (using base 10), by function name
+  std::map<std::string, bool> is_log;
+
+  /// Maximum number of bins / discrete values, by function name
+  std::map<std::string, Index> max_size;
+};
+
+/// \brief Statistics for events that have been selected
+struct SelectedEventData {
+  /// \brief Hop correlations data (not basis function correlations)
+  std::optional<CorrelationsData> correlations_data;
+
+  /// \brief Histogram of discrete integer vector variables
+  std::map<std::string, DiscreteVectorIntHistogram>
+      discrete_vector_int_histograms;
+
+  /// \brief Histogram of discrete floating point vector variables
+  std::map<std::string, DiscreteVectorFloatHistogram>
+      discrete_vector_float_histograms;
+
+  /// \brief Histograms of continuous variables
+  ///
+  /// - The key is the name of the function that was evaluated
+  /// - The value is a PartitionedHistogram1D.
+  /// - For example, the partition value may always be 1, or may correspond to
+  ///   the event type, or the event equivalent index, to save a single
+  ///   histogram of Ekra or to save separate histograms by event type, or
+  ///   by event orientation.
+  ///
+  std::map<std::string, PartitionedHistogram1D> continuous_1d_histograms;
+};
+
+}  // namespace monte
+}  // namespace CASM
+
+#endif

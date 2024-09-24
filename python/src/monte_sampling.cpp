@@ -24,8 +24,10 @@
 #include "casm/monte/checks/io/json/EquilibrationCheck_json_io.hh"
 #include "casm/monte/definitions.hh"
 #include "casm/monte/io/json/ValueMap_json_io.hh"
+#include "casm/monte/sampling/HistogramFunction.hh"
 #include "casm/monte/sampling/Sampler.hh"
 #include "casm/monte/sampling/SamplingParams.hh"
+#include "casm/monte/sampling/SelectedEventData.hh"
 #include "casm/monte/sampling/StateSamplingFunction.hh"
 #include "casm/monte/sampling/io/json/Sampler_json_io.hh"
 #include "casm/monte/sampling/io/json/SamplingParams_json_io.hh"
@@ -144,6 +146,60 @@ monte::jsonStateSamplingFunction make_json_state_sampling_function(
       });
 }
 
+monte::HistogramFunction<Eigen::VectorXi> make_vector_int_histogram_function(
+    std::string name, std::string description, std::vector<Index> shape,
+    std::function<Eigen::VectorXi()> function,
+    std::optional<std::vector<std::string>> component_names, Index max_size) {
+  if (function == nullptr) {
+    throw std::runtime_error(
+        "Error constructing VectorIntHistogramFunction: function == nullptr");
+  }
+  if (!component_names.has_value()) {
+    return monte::HistogramFunction<Eigen::VectorXi>(name, description, shape,
+                                                     function, max_size);
+  } else {
+    return monte::HistogramFunction<Eigen::VectorXi>(
+        name, description, *component_names, shape, function, max_size);
+  }
+}
+
+monte::HistogramFunction<Eigen::VectorXd> make_vector_float_histogram_function(
+    std::string name, std::string description, std::vector<Index> shape,
+    std::function<Eigen::VectorXd()> function,
+    std::optional<std::vector<std::string>> component_names, Index max_size,
+    double tol) {
+  if (function == nullptr) {
+    throw std::runtime_error(
+        "Error constructing VectorFloatHistogramFunction: function == nullptr");
+  }
+  if (!component_names.has_value()) {
+    return monte::HistogramFunction<Eigen::VectorXd>(name, description, shape,
+                                                     function, max_size, tol);
+  } else {
+    return monte::HistogramFunction<Eigen::VectorXd>(
+        name, description, *component_names, shape, function, max_size, tol);
+  }
+}
+
+monte::PartitionedHistogramFunction<double> make_partitioned_histogram_function(
+    std::string name, std::string description, std::function<double()> function,
+    std::vector<std::string> partition_names,
+    std::function<int()> get_partition, bool is_log, double initial_begin,
+    double bin_width, Index max_size) {
+  if (function == nullptr) {
+    throw std::runtime_error(
+        "Error constructing PartitionedHistogramFunction: function == nullptr");
+  }
+  if (get_partition == nullptr) {
+    throw std::runtime_error(
+        "Error constructing PartitionedHistogramFunction: "
+        "get_partition_function == nullptr");
+  }
+  return monte::PartitionedHistogramFunction<double>(
+      name, description, function, partition_names, get_partition, is_log,
+      initial_begin, bin_width, max_size);
+}
+
 monte::CompletionCheckParams<statistics_type> make_completion_check_params(
     std::optional<monte::RequestedPrecisionMap> requested_precision =
         std::nullopt,
@@ -236,6 +292,12 @@ PYBIND11_MAKE_OPAQUE(CASM::monte::SamplerMap);
 PYBIND11_MAKE_OPAQUE(CASM::monte::jsonSamplerMap);
 PYBIND11_MAKE_OPAQUE(CASM::monte::StateSamplingFunctionMap);
 PYBIND11_MAKE_OPAQUE(CASM::monte::jsonStateSamplingFunctionMap);
+PYBIND11_MAKE_OPAQUE(
+    std::map<std::string, CASM::monte::HistogramFunction<Eigen::VectorXi>>);
+PYBIND11_MAKE_OPAQUE(
+    std::map<std::string, CASM::monte::HistogramFunction<Eigen::VectorXd>>);
+PYBIND11_MAKE_OPAQUE(
+    std::map<std::string, CASM::monte::PartitionedHistogramFunction<double>>);
 PYBIND11_MAKE_OPAQUE(CASM::monte::RequestedPrecisionMap);
 PYBIND11_MAKE_OPAQUE(
     CASM::monte::ConvergenceResultMap<CASM::monte::BasicStatistics>);
@@ -1046,9 +1108,6 @@ PYBIND11_MODULE(_monte_sampling, m) {
           description : str
               Description of the function.
 
-          component_index : int
-              Index into the unrolled vector of a sampled quantity.
-
           shape : List[int]
               Shape of quantity, with column-major unrolling
 
@@ -1100,7 +1159,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           R"pbdoc(
           Evaluates the state sampling function
 
-          Equivalent to calling :py::attr:`~libcasm.monte.StateSamplingFunction.function`.
+          Equivalent to calling :py::attr:`~libcasm.monte.sampling.StateSamplingFunction.function`.
           )pbdoc");
 
   py::class_<monte::jsonStateSamplingFunction>(m, "jsonStateSamplingFunction",
@@ -1164,9 +1223,6 @@ PYBIND11_MODULE(_monte_sampling, m) {
           description : str
               Description of the function.
 
-          component_index : int
-              Index into the unrolled vector of a sampled quantity.
-
           function : function
               A function with 0 arguments that samples the current state and returns a Python object that is convertible to JSON. Typically this is a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
 
@@ -1195,8 +1251,395 @@ PYBIND11_MODULE(_monte_sampling, m) {
           R"pbdoc(
           Evaluates the JSON state sampling function
 
-          Equivalent to calling :py::attr:`~libcasm.monte.jsonStateSamplingFunction.function`.
+          Equivalent to calling :py::attr:`~libcasm.monte.sampling.jsonStateSamplingFunction.function`.
           )pbdoc");
+
+  py::class_<monte::HistogramFunction<Eigen::VectorXi>>(
+      m, "VectorIntHistogramFunction",
+      R"pbdoc(
+      A function that returns a integer vector value to add to a histogram
+
+      Notes
+      -----
+      - Typically this holds a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the calculator's event data.
+      - VectorIntHistogramFunction can be used to return quantities of any dimension (scalar, vector, matrix, etc.) by unrolling values. The standard approach is to use column-major order.
+      - For sampling scalars, a size=1 vector is expected. This can be done with the function :func:`~libcasm.monte.scalar_as_vector`.
+      - For sampling matrices, column-major order unrolling can be done with the function :func:`~libcasm.monte.matrix_as_vector`.
+      - Data returned by a VectorIntHistogramFunction can be stored in a :class:`~libcasm.monte.sampling.DiscreteVectorIntHistogram`.
+      - A call operator exists (:func:`~libcasm.monte.VectorIntHistogramFunction.__call__`) to call the function held by :class:`~libcasm.monte.sampling.VectorIntHistogramFunction`.
+      )pbdoc")
+      .def(py::init<>(&make_vector_int_histogram_function),
+           R"pbdoc(
+
+          .. rubric:: Constructor
+
+          Parameters
+          ----------
+          name : str
+              Name of the sampled quantity.
+
+          description : str
+              Description of the function.
+
+          shape : List[int]
+              Shape of quantity, with column-major unrolling
+
+              Scalar: [], Vector: [n], Matrix: [m, n], etc.
+
+          function : function
+              A function with 0 arguments that returns an array of the proper size sampling the current state. Typically this is a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
+
+          component_names : Optional[List[str]] = None
+              A name for each component of the resulting vector.
+
+              Can be strings representing an indices (i.e "0", "1", "2", etc.) or can be a descriptive string (i.e. "Mg", "Va", "O", etc.). If None, indices for column-major ordering are used (i.e. "0,0", "1,0", ..., "m-1,n-1")
+
+          max_size : int = 10000
+              Maximum number of bins to create. If adding an additional data
+              point would cause the number of bins to exceed `max_size`, the
+              count / weight is instead added to the `out_of_range_count` of the
+              :class:`~libcasm.monte.sampling.DiscreteVectorIntHistogram`.
+
+          )pbdoc",
+           py::arg("name"), py::arg("description"), py::arg("shape"),
+           py::arg("function"), py::arg("component_names") = std::nullopt,
+           py::arg("max_size") = 10000)
+      .def_readwrite("name", &monte::HistogramFunction<Eigen::VectorXi>::name,
+                     R"pbdoc(
+          str : Name of the quantity.
+          )pbdoc")
+      .def_readwrite("description",
+                     &monte::HistogramFunction<Eigen::VectorXi>::description,
+                     R"pbdoc(
+          str : Description of the function.
+          )pbdoc")
+      .def_readwrite("shape", &monte::HistogramFunction<Eigen::VectorXi>::shape,
+                     R"pbdoc(
+          List[int] : Shape of quantity, with column-major unrolling.
+
+          Scalar: [], Vector: [n], Matrix: [m, n], etc.
+          )pbdoc")
+      .def_readwrite(
+          "component_names",
+          &monte::HistogramFunction<Eigen::VectorXi>::component_names,
+          R"pbdoc(
+          List[str] : A name for each component of the resulting vector.
+
+          Can be strings representing an indices (i.e "0", "1", "2", etc.) or can be a descriptive string (i.e. "Mg", "Va", "O", etc.). If the sampled quantity is an unrolled matrix, indices for column-major ordering are typical (i.e. "0,0", "1,0", ..., "m-1,n-1").
+          )pbdoc")
+      .def_readwrite("function",
+                     &monte::HistogramFunction<Eigen::VectorXi>::function,
+                     R"pbdoc(
+          function : The function to be evaluated.
+
+          A function with 0 arguments that returns an array of the proper size sampling the current state. Typically this is a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
+          )pbdoc")
+      .def_readwrite("max_size",
+                     &monte::HistogramFunction<Eigen::VectorXi>::max_size,
+                     R"pbdoc(
+          int: Maximum number of bins in the histogram.
+          )pbdoc")
+      .def(
+          "__call__",
+          [](monte::HistogramFunction<Eigen::VectorXi> const &f)
+              -> Eigen::VectorXi { return f(); },
+          R"pbdoc(
+          Evaluates the function
+
+          Equivalent to calling :py::attr:`~libcasm.monte.sampling.VectorIntHistogramFunction.function`.
+          )pbdoc");
+
+  py::bind_map<
+      std::map<std::string, monte::HistogramFunction<Eigen::VectorXi>>>(
+      m, "VectorIntHistogramFunctionMap",
+      R"pbdoc(
+      VectorIntHistogramFunctionMap stores :class:`~libcasm.monte.sampling.VectorIntHistogramFunction` by name of the sampled quantity
+
+      Notes
+      -----
+      VectorIntHistogramFunctionMap is a Dict[str, :class:`~libcasm.monte.sampling.VectorIntHistogramFunction`]-like object.
+      )pbdoc",
+      py::module_local(false));
+
+  py::class_<monte::HistogramFunction<Eigen::VectorXd>>(
+      m, "VectorFloatHistogramFunction",
+      R"pbdoc(
+      A function that returns a floating-point vector value to add to a histogram
+
+      Notes
+      -----
+      - Typically this holds a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the calculator's event data.
+      - VectorFloatHistogramFunction can be used to return quantities of any dimension (scalar, vector, matrix, etc.) by unrolling values. The standard approach is to use column-major order.
+      - For sampling scalars, a size=1 vector is expected. This can be done with the function :func:`~libcasm.monte.scalar_as_vector`.
+      - For sampling matrices, column-major order unrolling can be done with the function :func:`~libcasm.monte.matrix_as_vector`.
+      - Data returned by a VectorFloatHistogramFunction can be stored in a :class:`~libcasm.monte.sampling.DiscreteVectorIntHistogram`.
+      - A call operator exists (:func:`~libcasm.monte.VectorFloatHistogramFunction.__call__`) to call the function held by :class:`~libcasm.monte.sampling.VectorFloatHistogramFunction`.
+      )pbdoc")
+      .def(py::init<>(&make_vector_float_histogram_function),
+           R"pbdoc(
+
+          .. rubric:: Constructor
+
+          Parameters
+          ----------
+          name : str
+              Name of the sampled quantity.
+
+          description : str
+              Description of the function.
+
+          shape : List[int]
+              Shape of quantity, with column-major unrolling
+
+              Scalar: [], Vector: [n], Matrix: [m, n], etc.
+
+          function : function
+              A function with 0 arguments that returns an array of the proper size sampling the current state. Typically this is a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
+
+          component_names : Optional[List[str]] = None
+              A name for each component of the resulting vector.
+
+              Can be strings representing an indices (i.e "0", "1", "2", etc.) or can be a descriptive string (i.e. "Mg", "Va", "O", etc.). If None, indices for column-major ordering are used (i.e. "0,0", "1,0", ..., "m-1,n-1")
+
+          max_size : int = 10000
+              Maximum number of bins to create. If adding an additional data
+              point would cause the number of bins to exceed `max_size`, the
+              count / weight is instead added to the `out_of_range_count` of the
+              :class:`~libcasm.monte.sampling.DiscreteVectorFloatHistogram`.
+
+          tol : float = :data:`~libcasm.casmglobal.TOL`
+              Tolerance for floating point comparisons used when determining counts
+              for the histogram.
+          )pbdoc",
+           py::arg("name"), py::arg("description"), py::arg("shape"),
+           py::arg("function"), py::arg("component_names") = std::nullopt,
+           py::arg("max_size") = 10000, py::arg("tol") = CASM::TOL)
+      .def_readwrite("name", &monte::HistogramFunction<Eigen::VectorXd>::name,
+                     R"pbdoc(
+          str : Name of the quantity.
+          )pbdoc")
+      .def_readwrite("description",
+                     &monte::HistogramFunction<Eigen::VectorXd>::description,
+                     R"pbdoc(
+          str : Description of the function.
+          )pbdoc")
+      .def_readwrite("shape", &monte::HistogramFunction<Eigen::VectorXd>::shape,
+                     R"pbdoc(
+          List[int] : Shape of quantity, with column-major unrolling.
+
+          Scalar: [], Vector: [n], Matrix: [m, n], etc.
+          )pbdoc")
+      .def_readwrite(
+          "component_names",
+          &monte::HistogramFunction<Eigen::VectorXd>::component_names,
+          R"pbdoc(
+          List[str] : A name for each component of the resulting vector.
+
+          Can be strings representing an indices (i.e "0", "1", "2", etc.) or can be a descriptive string (i.e. "Mg", "Va", "O", etc.). If the sampled quantity is an unrolled matrix, indices for column-major ordering are typical (i.e. "0,0", "1,0", ..., "m-1,n-1").
+          )pbdoc")
+      .def_readwrite("function",
+                     &monte::HistogramFunction<Eigen::VectorXd>::function,
+                     R"pbdoc(
+          function : The function to be evaluated.
+
+          A function with 0 arguments that returns an array of the proper size
+          sampling the current state. Typically this is a lambda function that
+          has been given a reference or pointer to a Monte Carlo calculation
+          object so that it can access the current state of the simulation.
+          )pbdoc")
+      .def_readwrite("max_size",
+                     &monte::HistogramFunction<Eigen::VectorXd>::max_size,
+                     R"pbdoc(
+          int: Maximum number of bins in the histogram.
+          )pbdoc")
+      .def_readwrite("tol", &monte::HistogramFunction<Eigen::VectorXd>::tol,
+                     R"pbdoc(
+          float: Tolerance for floating point comparisons used when determining
+          counts for the histogram.
+          )pbdoc")
+      .def(
+          "__call__",
+          [](monte::HistogramFunction<Eigen::VectorXd> const &f)
+              -> Eigen::VectorXd { return f(); },
+          R"pbdoc(
+          Evaluates the function
+
+          Equivalent to calling :py::attr:`~libcasm.monte.sampling.VectorFloatHistogramFunction.function`.
+          )pbdoc");
+
+  py::bind_map<
+      std::map<std::string, monte::HistogramFunction<Eigen::VectorXd>>>(
+      m, "VectorFloatHistogramFunctionMap",
+      R"pbdoc(
+      VectorFloatHistogramFunctionMap stores :class:`~libcasm.monte.sampling.VectorFloatHistogramFunction` by name of the sampled quantity
+
+      Notes
+      -----
+      VectorFloatHistogramFunctionMap is a Dict[str, :class:`~libcasm.monte.sampling.VectorFloatHistogramFunction`]-like object.
+      )pbdoc",
+      py::module_local(false));
+
+  py::class_<monte::PartitionedHistogramFunction<double>>(
+      m, "PartitionedHistogramFunction",
+      R"pbdoc(
+      A function that returns a floating-point value to add to one of mutually
+      exclusive histograms
+
+      A common use case is to collect a histogram of event data, by the type
+      of event selected. This function outputs a scalar value and a partition
+      index, which is used to determine which histogram to add the value to.
+
+      Notes
+      -----
+      - Typically this holds a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the calculator's event data.
+      - PartitionedHistogramFunction can be used to return a scalar floating-point quantity (i.e. event rate) and a partition index (i.e. event type index).
+      - Data returned by a PartitionedHistogramFunction can be stored in a :class:`~libcasm.monte.sampling.PartitionedHistogram1D`.
+      - A call operator exists (:func:`~libcasm.monte.PartitionedHistogramFunction.__call__`) to evaluate the stored function.
+      - A :func:`~libcasm.monte.PartitionedHistogramFunction.partition` function returns the partition index of the individual histogram the value should be added to.
+      )pbdoc")
+      .def(py::init<>(&make_partitioned_histogram_function),
+           R"pbdoc(
+
+          .. rubric:: Constructor
+
+          Parameters
+          ----------
+          name : str
+              Name of the sampled quantity.
+          description : str
+              Description of the function.
+          function : function
+              A function with 0 arguments that returns a float. Typically this
+              is a lambda function that has been given a reference or pointer to
+              a Monte Carlo calculation object so that it can access the last
+              selected event state and the Monte Carlo state before the event
+              occurs.
+          partition_names : List[str]
+              A name for each partition.
+          get_partition_function : function
+              A function with 0 arguments that returns an int. Typically this
+              is a lambda function that has been given a reference or pointer
+              to a Monte Carlo calculation object so that it can access the
+              last selected event state and the Monte Carlo state before the
+              event occurs.
+          is_log : bool = False
+              True if bin coordinate spacing is log-scaled; False otherwise.
+          initial_begin : float = 0.0
+              Initial `begin` coordinate, specifying the beginning of the range
+              for the first bin. The bin number for a particular value is
+              calculated as `(value - begin) / bin_width`, so the range for
+              bin `i` is [begin, begin + i*bin_width). Coordinates are adjusted
+              to fit the data encountered by starting `begin` at
+              `initial_begin` and adjusting it as necessary by multiples of
+              `bin_width`.
+          bin_width : float = 1.0
+              Bin width.
+          max_size : int = 10000
+              Maximum number of bins to create. If adding an additional data
+              point would cause the number of bins to exceed `max_size`, the
+              count / weight is instead added to the `out_of_range_count` of the
+              :class:`~libcasm.monte.sampling.PartitionedHistogram1D`.
+          )pbdoc",
+           py::arg("name"), py::arg("description"), py::arg("function"),
+           py::arg("partition_names"), py::arg("get_partition_function"),
+           py::arg("is_log") = false, py::arg("initial_begin") = 0.0,
+           py::arg("bin_width") = 1.0, py::arg("max_size") = 10000)
+      .def_readwrite("name", &monte::PartitionedHistogramFunction<double>::name,
+                     R"pbdoc(
+          str : Name of the quantity.
+          )pbdoc")
+      .def_readwrite("description",
+                     &monte::PartitionedHistogramFunction<double>::description,
+                     R"pbdoc(
+          str : Description of the function.
+          )pbdoc")
+      .def_readwrite("function",
+                     &monte::PartitionedHistogramFunction<double>::function,
+                     R"pbdoc(
+          function : The function to be evaluated.
+
+          A function with 0 arguments that returns a float. Typically this is a
+          lambda function that has been given a reference or pointer to a Monte
+          Carlo calculation object so that it can access the last selected
+          event state and the Monte Carlo state before the event occurs.
+          )pbdoc")
+      .def_readwrite(
+          "get_partition_function",
+          &monte::PartitionedHistogramFunction<double>::get_partition,
+          R"pbdoc(
+          function : The function to be evaluated.
+
+          A function with 0 arguments that returns an int. Typically this is a
+          lambda function that has been given a reference or pointer to a Monte
+          Carlo calculation object so that it can access the last selected
+          event state and the Monte Carlo state before the event occurs.
+          )pbdoc")
+      .def_readwrite("is_log",
+                     &monte::PartitionedHistogramFunction<double>::is_log,
+                     R"pbdoc(
+          bool : True if bin coordinate spacing is log-scaled; False otherwise.
+          )pbdoc")
+      .def_readwrite(
+          "initial_begin",
+          &monte::PartitionedHistogramFunction<double>::initial_begin,
+          R"pbdoc(
+          float : Initial `begin` coordinate, specifying the beginning of the
+          range for the first bin.
+
+          The bin number for a particular value is calculated as
+          `(value - begin) / bin_width`, so the range for bin `i` is
+          [begin, begin + i*bin_width). Coordinates are adjusted to fit
+          the data encountered by starting `begin` at `initial_begin` and
+          adjusting it as necessary by multiples of `bin_width`.
+          )pbdoc")
+      .def_readwrite("bin_width",
+                     &monte::PartitionedHistogramFunction<double>::bin_width,
+                     R"pbdoc(
+          float : Bin width.
+          )pbdoc")
+      .def_readwrite("max_size",
+                     &monte::PartitionedHistogramFunction<double>::max_size,
+                     R"pbdoc(
+          int : Maximum number of bins to create.
+
+          If adding an additional data point would cause the number of bins to
+          exceed `max_size`, the count / weight is instead added to the
+          `out_of_range_count` of the :class:`PartitionedHistogram1D`.
+          )pbdoc")
+      .def(
+          "__call__",
+          [](monte::PartitionedHistogramFunction<double> const &f) -> double {
+            return f();
+          },
+          R"pbdoc(
+          Evaluates the function
+
+          Equivalent to calling
+          :py::attr:`~libcasm.monte.sampling.PartitionedHistogramFunction.function`.
+          )pbdoc")
+      .def(
+          "partition",
+          [](monte::PartitionedHistogramFunction<double> const &f) -> int {
+            return f.get_partition();
+          },
+          R"pbdoc(
+          Evaluates `get_partition_function`
+
+          Equivalent to calling
+          :py::attr:`~libcasm.monte.sampling.PartitionedHistogramFunction.get_partition_function`.
+          )pbdoc");
+
+  py::bind_map<
+      std::map<std::string, monte::PartitionedHistogramFunction<double>>>(
+      m, "PartitionedHistogramFunctionMap",
+      R"pbdoc(
+      PartitionedHistogramFunctionMap stores :class:`~libcasm.monte.sampling.PartitionedHistogramFunction` by name of the sampled quantity
+
+      Notes
+      -----
+      PartitionedHistogramFunction is a Dict[str, :class:`~libcasm.monte.sampling.PartitionedHistogramFunction`]-like object.
+      )pbdoc",
+      py::module_local(false));
 
   py::class_<monte::RequestedPrecision>(m, "RequestedPrecision",
                                         R"pbdoc(
@@ -2486,6 +2929,296 @@ PYBIND11_MODULE(_monte_sampling, m) {
               True if complete, False otherwise
           )pbdoc",
           py::arg("samplers"), py::arg("sample_weight"), py::arg("method_log"));
+
+  // -- SelectedEventData and related -----
+
+  py::class_<monte::CorrelationsDataParams>(m, "CorrelationsDataParams",
+                                            R"pbdoc(
+      Parameters for collecting hop correlations data (not basis function
+      correlations)
+      )pbdoc")
+      .def(py::init<Index, Index, bool, bool>(),
+           R"pbdoc(
+          .. rubric:: Constructor
+
+          Parameters
+          ----------
+          jumps_per_position_sample: int = 1
+              Every `jumps_per_position_sample` steps of an individual atom, store
+              its position.
+          max_n_position_samples: int = 100
+              The maximum number of positions to store for each atom.
+          output_incomplete_samples: bool = False
+              If false, only output data when all atoms have jumped the necessary
+              number of times. If true, output matrices with 0.0 values for atoms that
+              have not jumped enough times to be sampled.
+          stop_run_when_complete: bool = False
+              If true, stop the run when the maximum number of positions have been
+              sampled for all atoms. If false, continue running until the standard
+              completion check is met, but do not collect any more position samples.
+          )pbdoc",
+           py::arg("jumps_per_position_sample") = 1,
+           py::arg("max_n_position_samples") = 100,
+           py::arg("output_incomplete_samples") = false,
+           py::arg("stop_run_when_complete") = false)
+      .def_readwrite("jumps_per_position_sample",
+                     &monte::CorrelationsDataParams::jumps_per_position_sample,
+                     R"pbdoc(
+           int: Every `jumps_per_position_sample` steps of an individual atom, store
+           its position in this object
+           )pbdoc")
+      .def_readwrite("max_n_position_samples",
+                     &monte::CorrelationsDataParams::max_n_position_samples,
+                     R"pbdoc(
+           int: The maximum number of positions to store for each atom.
+           )pbdoc")
+      .def_readwrite("output_incomplete_samples",
+                     &monte::CorrelationsDataParams::output_incomplete_samples,
+                     R"pbdoc(
+           bool: Controls whether to output incomplete samples
+
+           If False, only output data when all atoms have jumped the necessary
+           number of times. If True, output matrices with 0.0 values for atoms that
+           have not jumped enough times to be sampled.
+           )pbdoc")
+      .def_readwrite("stop_run_when_complete",
+                     &monte::CorrelationsDataParams::stop_run_when_complete,
+                     R"pbdoc(
+           bool: Controls whether to stop the run when the maximum number of positions
+           have been sampled for all atoms.
+
+           If True, stop the run when the maximum number of positions have been
+           sampled for all atoms. If False, continue running until the standard
+           completion check is met, but do not collect any more position samples.
+           )pbdoc");
+
+  py::class_<monte::CorrelationsData>(m, "CorrelationsData",
+                                      R"pbdoc(
+        Hop correlations data (not basis function correlations)
+
+        Atom positions are stored every `jumps_per_position_sample` jumps, along
+        with the (step, pass, sample, time) at which the atom jumped. The
+        Cartesian coordinates of the atoms are stored as if the atom was
+        jumping in a system without periodic boundaries. For displacements, the
+        positions at two different times must be subtracted. By storing the
+        number of samples taken when each atom jumped, the user can restrict
+        correlation factor calculations to use atom positions taken after the
+        system has equilibrated, as determined by the
+        :class:`libcasm.monte.sampling.EquilibrationCheckResults`.
+
+        )pbdoc")
+      .def(py::init<>(),
+           R"pbdoc(
+            .. rubric:: Constructor
+
+            Default constructor only.
+            )pbdoc")
+      .def_readonly("jumps_per_position_sample",
+                    &monte::CorrelationsData::jumps_per_position_sample,
+                    R"pbdoc(
+             int: Every `jumps_per_position_sample` steps of an individual
+             atom, store its position in this object )pbdoc")
+      .def_readonly("max_n_position_samples",
+                    &monte::CorrelationsData::max_n_position_samples,
+                    R"pbdoc(
+             int: The maximum number of positions to store for each atom.
+             )pbdoc")
+      .def_readonly("output_incomplete_samples",
+                    &monte::CorrelationsData::output_incomplete_samples,
+                    R"pbdoc(
+             bool: Controls whether to output incomplete samples
+
+             If False, only output data when all atoms have jumped the
+             necessary number of times. If True, output matrices with 0.0
+             values for atoms that have not jumped enough times to be sampled.
+             )pbdoc")
+      .def_readonly("stop_run_when_complete",
+                    &monte::CorrelationsData::stop_run_when_complete,
+                    R"pbdoc(
+             bool: Controls whether to stop the run when the maximum number of
+             positions have been sampled for all atoms.
+
+             If True, stop the run when the maximum number of positions have
+             been sampled for all atoms. If False, continue running until the
+             standard completion check is met, but do not collect any more
+             position samples. )pbdoc")
+      .def_readonly("n_position_samples",
+                    &monte::CorrelationsData::n_position_samples,
+                    R"pbdoc(
+          list[int]: For each atom, the number of positions stored in this object.
+          )pbdoc")
+      .def_readonly("n_complete_samples",
+                    &monte::CorrelationsData::n_complete_samples,
+                    R"pbdoc(
+          int: Number of position samples completed for all atoms.
+          )pbdoc")
+      .def_readonly("step", &monte::CorrelationsData::step,
+                    R"pbdoc(
+          numpy.ndarray[numpy.int[max_n_position_samples,n_atoms]]: The
+          value `step[i_sample, i_atom]` is the number of steps completed
+          (resets to 0 every pass) when the `i_atom`-th atom jumped the
+          `i_sample * jumps_per_position_sample`-th time.
+          )pbdoc")
+      .def_readonly("pass", &monte::CorrelationsData::pass,
+                    R"pbdoc(
+          numpy.ndarray[numpy.int[max_n_position_samples,n_atoms]]: The
+          value `pass[i_sample, i_atom]` is the number of passes completed when
+          the `i_atom`-th atom jumped the
+          `i_sample * jumps_per_position_sample`-th time.
+          )pbdoc")
+      .def_readonly("sample", &monte::CorrelationsData::sample,
+                    R"pbdoc(
+          numpy.ndarray[numpy.int[max_n_position_samples,n_atoms]]: The
+          value `sample[i_sample, i_atom]` is the number of samples taken when
+          the `i_atom`-th atom jumped the
+          `i_sample * jumps_per_position_sample`-th time.
+          )pbdoc")
+      .def_readonly("time", &monte::CorrelationsData::time,
+                    R"pbdoc(
+          numpy.ndarray[numpy.float[max_n_position_samples,n_atoms]]: The
+          value `time[i_sample, i_atom]` is the simulated time when the
+          `i_atom`-th atom jumped the `i_sample * jumps_per_position_sample`-th
+          time.
+          )pbdoc")
+      .def_readonly("atom_positions_cart",
+                    &monte::CorrelationsData::atom_positions_cart,
+                    R"pbdoc(
+          list[numpy.ndarray[numpy.float[3,n_atoms]]]: The array
+          `atom_positions_cart[i_sample]` contains the Cartesian coordinates,
+          as columns, of each atom (as if periodic boundaries did not exist)
+          after the `i_sample * jumps_per_position_sample`-th jump.
+          )pbdoc")
+      .def(
+          "equilibrated_samples",
+          [](monte::CorrelationsData const &self,
+             Index N_samples_for_all_to_equilibrate) {
+            std::vector<int> result;
+            if (self.n_complete_samples >= self.sample.rows()) {
+              throw std::runtime_error(
+                  "Error in "
+                  "monte.sampling.CorrelationsData.equilibrated_samples: "
+                  "n_complete_samples >= sample.rows()");
+            }
+            for (Index j = 0; j < self.n_complete_samples; ++j) {
+              int max_sample = self.sample.row(j).maxCoeff();
+              if (max_sample >= N_samples_for_all_to_equilibrate) {
+                result.push_back(j);
+              }
+            }
+            return result;
+          },
+          R"pbdoc(
+          Return the indices of samples taken after the system has equilibrated
+
+          Parameter
+          ---------
+          N_samples_for_all_to_equilibrate: int
+              The long it took (how many samples) for the system to equilibrate.
+
+          Returns
+          -------
+          indices: list[int]
+              The indices, j, such that
+              `samples[j][i_atom] >= N_samples_for_all_to_equilibrate` for all
+              `i_atom`.
+          )pbdoc")
+      .def("initialize", &monte::CorrelationsData::initialize,
+           R"pbdoc(
+          Initialize for a new run
+
+          Parameters
+          ----------
+          n_atoms: int
+              The number of atoms in the simulation supercell.
+          jumps_per_position_sample: int
+              Every `jumps_per_position_sample` steps of an individual atom,
+              its position will be stored in Cartesian coordinates (as if
+              periodic boundaries did not exist).
+          max_n_position_samples: int
+              The maximum number of positions to store for each atom.
+          output_incomplete_samples: bool
+              If false, when representing this object as a Python dict, only
+              output data for the number of samples for which all atoms have
+              jumped the necessary number of times. If true, output matrices
+              with 0.0 values for atoms that have not jumped enough times to be
+              sampled.
+          )pbdoc")
+      .def("insert", &monte::CorrelationsData::insert, R"pbdoc(
+          Insert a new position sample for an atom, if the atom has jumped
+          the necessary number of times
+
+          Parameters
+          ----------
+          atom_id: int
+              Atom index (corresponds to columns of arrays).
+          n_jumps: int
+              Number of times the atom has jumped.
+          position_cart: numpy.ndarray[numpy.float[3]]
+              Cartesian coordinates of the atom after the jump.
+          step: int
+              Number of steps completed when the atom jumped.
+          pass: int
+              Number of passes completed when the atom jumped.
+          sample: int
+              Number of samples taken when the atom jumped.
+          time: float
+              Simulated time when the atom jumped.
+          )pbdoc");
+
+  py::class_<monte::DiscreteVectorIntHistogram>(m, "DiscreteVectorIntHistogram",
+                                                R"pbdoc(
+      Data structure for holding a histogram of discrete integer vector values
+      )pbdoc");
+
+  py::class_<monte::DiscreteVectorFloatHistogram>(
+      m, "DiscreteVectorFloatHistogram",
+      R"pbdoc(
+      Data structure for holding a histogram of discrete floating-point vector values
+      )pbdoc");
+
+  py::class_<monte::Histogram1D>(m, "Histogram1D",
+                                 R"pbdoc(
+      Data structure for holding a 1D histogram
+      )pbdoc");
+
+  py::class_<monte::PartitionedHistogram1D>(m, "PartitionedHistogram1D",
+                                            R"pbdoc(
+      Data structure for holding 1 or more 1D histograms of related data (i.e.
+      event rates by event type)
+      )pbdoc");
+
+  py::class_<monte::SelectedEventDataFunctions>(m, "SelectedEventDataFunctions",
+                                                R"pbdoc(
+        Holds functions that return selected event data
+        )pbdoc")
+      .def(py::init<>(),
+           R"pbdoc(
+            .. rubric:: Constructor
+
+            Default constructor only.
+            )pbdoc");
+
+  py::class_<monte::SelectedEventDataParams>(m, "SelectedEventDataParams",
+                                             R"pbdoc(
+        Parameters controlling selected events data collection
+        )pbdoc")
+      .def(py::init<>(),
+           R"pbdoc(
+            .. rubric:: Constructor
+
+            Default constructor only.
+            )pbdoc");
+
+  py::class_<monte::SelectedEventData>(m, "SelectedEventData",
+                                       R"pbdoc(
+        Holds data collected about selected events
+        )pbdoc")
+      .def(py::init<>(),
+           R"pbdoc(
+            .. rubric:: Constructor
+
+            Default constructor only.
+            )pbdoc");
 
 #ifdef VERSION_INFO
   m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);

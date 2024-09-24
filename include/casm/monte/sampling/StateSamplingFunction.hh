@@ -102,7 +102,7 @@ struct jsonStateSamplingFunction {
 namespace CASM {
 namespace monte {
 
-/// \brief Constructor - custom component names
+/// \brief Constructor - default component names
 inline StateSamplingFunction::StateSamplingFunction(
     std::string _name, std::string _description, std::vector<Index> _shape,
     std::function<Eigen::VectorXd()> _function)

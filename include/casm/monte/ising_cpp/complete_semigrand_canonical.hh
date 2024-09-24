@@ -251,10 +251,10 @@ struct SemiGrandCanonicalData {
   CountType n_steps_per_pass;
 
   /// \brief Number of accepted Monte Carlo steps
-  long long n_accept;
+  BigCountType n_accept;
 
   /// \brief Number of rejected Monte Carlo steps
-  long long n_reject;
+  BigCountType n_reject;
 
   /// \brief The Monte Carlo run completion checker
   CompletionCheck<statistics_type> completion_check;

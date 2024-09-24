@@ -146,6 +146,17 @@ struct RunManager {
     }
   }
 
+  // Collect event statistics - with configuration in the state before event,
+  // but after step and time have been updated in sampling fixtures
+  void set_selected_event_data(OccEvent const &selected_event,
+                               double time_increment, double event_time,
+                               state_type const &state) {
+    for (auto &fixture_ptr : sampling_fixtures) {
+      fixture_ptr->collect_event_stats(selected_event, time_increment,
+                                       event_time, state);
+    }
+  }
+
   template <typename PreSampleActionType = NullAction,
             typename PostSampleActionType = NullAction>
   void sample_data_by_count_if_due(

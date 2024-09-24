@@ -19,6 +19,7 @@ enum class SAMPLE_MODE { BY_STEP, BY_PASS, BY_TIME };
 enum class SAMPLE_METHOD { LINEAR, LOG, CUSTOM };
 
 typedef long CountType;
+typedef long long BigCountType;
 typedef double TimeType;
 
 struct SamplingParams;

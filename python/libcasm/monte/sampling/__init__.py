@@ -42,3 +42,22 @@ from ._requested_precision_constructor import (
     RequestedPrecisionConstructor,
     converge,
 )
+
+# keep seperate for now
+from ._monte_sampling import (
+    CorrelationsData,
+    CorrelationsDataParams,
+    DiscreteVectorIntHistogram,
+    DiscreteVectorFloatHistogram,
+    Histogram1D,
+    PartitionedHistogram1D,
+    PartitionedHistogramFunction,
+    PartitionedHistogramFunctionMap,
+    SelectedEventData,
+    SelectedEventDataFunctions,
+    SelectedEventDataParams,
+    VectorFloatHistogramFunction,
+    VectorFloatHistogramFunctionMap,
+    VectorIntHistogramFunction,
+    VectorIntHistogramFunctionMap,
+)
