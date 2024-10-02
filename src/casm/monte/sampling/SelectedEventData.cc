@@ -1,5 +1,8 @@
 #include "casm/monte/sampling/SelectedEventData.hh"
 
+// debug
+#include <iostream>
+
 namespace CASM::monte {
 
 void CorrelationsData::initialize(Index _n_atoms,
@@ -14,7 +17,6 @@ void CorrelationsData::initialize(Index _n_atoms,
 
   this->step = Eigen::MatrixXl::Zero(_max_n_position_samples, _n_atoms);
   this->pass = Eigen::MatrixXl::Zero(_max_n_position_samples, _n_atoms);
-  this->sample = Eigen::MatrixXl::Zero(_max_n_position_samples, _n_atoms);
   this->time = Eigen::MatrixXd::Zero(_max_n_position_samples, _n_atoms);
 
   this->atom_positions_cart = std::vector<Eigen::MatrixXd>(
@@ -25,8 +27,7 @@ void CorrelationsData::initialize(Index _n_atoms,
 ///     the necessary number of times
 void CorrelationsData::insert(Index atom_id, CountType n_jumps,
                               Eigen::VectorXd const &position_cart,
-                              CountType _step, CountType _pass,
-                              CountType _sample, double _time) {
+                              CountType _step, CountType _pass, double _time) {
   if (n_jumps % this->jumps_per_position_sample != 0) {
     return;
   }
@@ -39,7 +40,6 @@ void CorrelationsData::insert(Index atom_id, CountType n_jumps,
 
   this->step(n_samples, atom_id) = _step;
   this->pass(n_samples, atom_id) = _pass;
-  this->sample(n_samples, atom_id) = _sample;
   this->time(n_samples, atom_id) = _time;
   this->atom_positions_cart[n_samples].col(atom_id) = position_cart;
 
@@ -66,12 +66,16 @@ void CorrelationsData::_update_n_complete_samples(Index n_samples) {
 
 DiscreteVectorIntHistogram::DiscreteVectorIntHistogram(
     std::vector<std::string> const &_component_names, std::vector<Index> _shape,
-    Index _max_size)
+    Index _max_size,
+    std::optional<
+        std::map<Eigen::VectorXi, std::string, LexicographicalCompare>>
+        _value_labels)
     : m_shape(_shape),
       m_component_names(_component_names),
       m_max_size(_max_size),
       m_max_size_exceeded(false),
-      m_out_of_range_count(0.0) {}
+      m_out_of_range_count(0.0),
+      m_value_labels(_value_labels) {}
 
 /// \brief Insert a value into the histogram, with an optional weight
 void DiscreteVectorIntHistogram::insert(Eigen::VectorXi const &value,
@@ -130,13 +134,17 @@ std::vector<double> DiscreteVectorIntHistogram::fraction() const {
 
 DiscreteVectorFloatHistogram::DiscreteVectorFloatHistogram(
     std::vector<std::string> const &_component_names, std::vector<Index> _shape,
-    double _tol, Index _max_size)
+    double _tol, Index _max_size,
+    std::optional<
+        std::map<Eigen::VectorXd, std::string, FloatLexicographicalCompare>>
+        _value_labels)
     : m_shape(_shape),
       m_component_names(_component_names),
       m_max_size(_max_size),
       m_max_size_exceeded(false),
       m_count(FloatLexicographicalCompare(_tol)),
-      m_out_of_range_count(0.0) {}
+      m_out_of_range_count(0.0),
+      m_value_labels(_value_labels) {}
 
 /// \brief Insert a value into the histogram, with an optional weight
 void DiscreteVectorFloatHistogram::insert(Eigen::VectorXd const &value,
@@ -238,9 +246,9 @@ std::vector<double> Histogram1D::bin_coords() const {
   return _bin_coords;
 }
 
-/// \brief Return the sum of bin counts
+/// \brief Return the sum of bin counts + out-of-range counts
 double Histogram1D::sum() const {
-  double _sum = 0.0;
+  double _sum = m_out_of_range_count;
   for (double x : m_count) {
     _sum += x;
   }
@@ -345,6 +353,196 @@ Histogram1D combine(std::vector<Histogram1D> const &histograms) {
     combined.merge(histograms[i]);
   }
   return combined;
+}
+
+namespace {
+bool try_construct_vector_int_hist(
+    SelectedEventDataCollector &collector, std::string name,
+    monte::SelectedEventDataFunctions const &functions,
+    monte::SelectedEventDataParams const &params) {
+  if (!functions.discrete_vector_int_functions.count(name)) {
+    return false;
+  }
+
+  collector.discrete_vector_int_f.push_back(
+      functions.discrete_vector_int_functions.at(name));
+
+  // user override of default parameters:
+  auto &f = collector.discrete_vector_int_f.back();
+
+  collector.requires_event_state =
+      (collector.requires_event_state || f.requires_event_state);
+
+  if (params.max_size.count(name)) {
+    f.max_size = params.max_size.at(name);
+  }
+
+  // construct Histogram
+  collector.data->discrete_vector_int_histograms.emplace(
+      name, monte::DiscreteVectorIntHistogram(f.component_names, f.shape,
+                                              f.max_size, f.value_labels));
+  collector.discrete_vector_int_hist.push_back(
+      &collector.data->discrete_vector_int_histograms.at(name));
+  return true;
+}
+
+bool try_construct_vector_float_hist(
+    SelectedEventDataCollector &collector, std::string name,
+    monte::SelectedEventDataFunctions const &functions,
+    monte::SelectedEventDataParams const &params) {
+  if (!functions.discrete_vector_float_functions.count(name)) {
+    return false;
+  }
+  collector.discrete_vector_float_f.push_back(
+      functions.discrete_vector_float_functions.at(name));
+
+  // user override of default parameters:
+  auto &f = collector.discrete_vector_float_f.back();
+
+  collector.requires_event_state =
+      (collector.requires_event_state || f.requires_event_state);
+
+  if (params.tol.count(name)) {
+    f.tol = params.tol.at(name);
+  }
+  if (params.max_size.count(name)) {
+    f.max_size = params.max_size.at(name);
+  }
+
+  // construct Histogram
+  collector.data->discrete_vector_float_histograms.emplace(
+      name, monte::DiscreteVectorFloatHistogram(
+                f.component_names, f.shape, f.tol, f.max_size, f.value_labels));
+  collector.discrete_vector_float_hist.push_back(
+      &collector.data->discrete_vector_float_histograms.at(name));
+  return true;
+}
+
+bool try_construct_continuous_1d_hist(
+    SelectedEventDataCollector &collector, std::string name,
+    monte::SelectedEventDataFunctions const &functions,
+    monte::SelectedEventDataParams const &params) {
+  if (!functions.continuous_1d_functions.count(name)) {
+    return false;
+  }
+  collector.continuous_1d_f.push_back(
+      functions.continuous_1d_functions.at(name));
+
+  // user override of default parameters:
+  auto &f = collector.continuous_1d_f.back();
+
+  collector.requires_event_state =
+      (collector.requires_event_state || f.requires_event_state);
+
+  if (params.initial_begin.count(name)) {
+    f.initial_begin = params.initial_begin.at(name);
+  }
+  if (params.bin_width.count(name)) {
+    f.bin_width = params.bin_width.at(name);
+  }
+  if (params.is_log.count(name)) {
+    f.is_log = params.is_log.at(name);
+  }
+  if (params.max_size.count(name)) {
+    f.max_size = params.max_size.at(name);
+  }
+
+  // construct Histogram
+  collector.data->continuous_1d_histograms.emplace(
+      name, monte::PartitionedHistogram1D(f.partition_names, f.initial_begin,
+                                          f.bin_width, f.is_log, f.max_size));
+  collector.discrete_vector_float_hist.push_back(
+      &collector.data->discrete_vector_float_histograms.at(name));
+  return true;
+}
+
+}  // namespace
+
+/// \brief Constructor
+///
+/// \param selected_event_data Where data will be stored. Will be reset. Must
+///     not be null, else will throw a runtime_error.
+SelectedEventDataCollector::SelectedEventDataCollector(
+    monte::SelectedEventDataFunctions const &selected_event_data_functions,
+    monte::SelectedEventDataParams const &selected_event_data_params,
+    std::shared_ptr<monte::SelectedEventData> selected_event_data)
+    : data(selected_event_data), requires_event_state(false) {
+  auto const &functions = selected_event_data_functions;
+  auto const &params = selected_event_data_params;
+
+  if (!data) {
+    throw std::runtime_error(
+        "Error in SelectedEventDataCollector: null "
+        "selected_event_data");
+  }
+
+  data->reset();
+
+  for (std::string const &name : selected_event_data_params.function_names) {
+    if (try_construct_vector_int_hist(*this, name, functions, params)) {
+      continue;
+    } else if (try_construct_vector_float_hist(*this, name, functions,
+                                               params)) {
+      continue;
+    } else if (try_construct_continuous_1d_hist(*this, name, functions,
+                                                params)) {
+      continue;
+    } else {
+      throw std::runtime_error(
+          "Error in kinetic_monte_carlo_v2: unknown quantity in "
+          "selected_event_data_params: " +
+          name);
+    }
+  }
+}
+
+void SelectedEventDataCollector::collect_vector_int_data() {
+  double weight = 1.0;
+
+  auto hist_it = discrete_vector_int_hist.begin();
+  auto f_it = discrete_vector_int_f.begin();
+  auto f_end = discrete_vector_int_f.end();
+  while (f_it != f_end) {
+    if (f_it->has_value()) {
+      (*hist_it)->insert(f_it->function(), weight);
+    }
+    ++f_it;
+    ++hist_it;
+  }
+}
+
+void SelectedEventDataCollector::collect_vector_float_data() {
+  double weight = 1.0;
+
+  auto hist_it = discrete_vector_float_hist.begin();
+  auto f_it = discrete_vector_float_f.begin();
+  auto f_end = discrete_vector_float_f.end();
+  while (f_it != f_end) {
+    if (f_it->has_value()) {
+      (*hist_it)->insert(f_it->function(), weight);
+    }
+    ++f_it;
+    ++hist_it;
+  }
+}
+
+void SelectedEventDataCollector::collect_continuous_1d_data() {
+  double weight = 1.0;
+
+  auto hist_it = continuous_1d_hist.begin();
+  auto f_it = continuous_1d_f.begin();
+  auto f_end = continuous_1d_f.end();
+  while (f_it != f_end) {
+    (*hist_it)->insert(f_it->partition(), f_it->function(), weight);
+    ++f_it;
+    ++hist_it;
+  }
+}
+
+void SelectedEventDataCollector::collect(monte::MonteCounter const &counter) {
+  collect_vector_int_data();
+  collect_vector_float_data();
+  collect_continuous_1d_data();
 }
 
 }  // namespace CASM::monte

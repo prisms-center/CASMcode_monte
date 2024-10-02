@@ -190,8 +190,14 @@ void kinetic_monte_carlo(
     run_manager.write_status_if_due();
 
     // Select an event
-    total_rate = event_selector.total_rate();
+    // This function:
+    // - Updates rates of events impacted by the *last* selected event (if there
+    //   was a previous selection)
+    // - Updates the total rate
+    // - Chooses an event and time increment
+    // - Sets a list of impacted events by the chosen event
     std::tie(selected_event_id, time_increment) = event_selector.select_event();
+    total_rate = event_selector.total_rate();
     event_time = kmc_data.time + time_increment;
 
     // Sample data, if a sample is due by count

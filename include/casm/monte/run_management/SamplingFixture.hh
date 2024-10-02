@@ -38,8 +38,6 @@ struct SamplingFixtureParams {
       monte::SamplingParams _sampling_params,
       monte::CompletionCheckParams<StatisticsType> _completion_check_params,
       std::vector<std::string> _analysis_names,
-      std::optional<SelectedEventDataFunctions> _selected_event_data_functions,
-      std::optional<SelectedEventDataParams> _selected_event_data_params,
       std::unique_ptr<results_io_type> _results_io = nullptr,
       monte::MethodLog _method_log = monte::MethodLog())
       : label(_label),
@@ -49,8 +47,6 @@ struct SamplingFixtureParams {
         sampling_params(_sampling_params),
         completion_check_params(_completion_check_params),
         analysis_names(_analysis_names),
-        selected_event_data_functions(_selected_event_data_functions),
-        selected_event_data_params(_selected_event_data_params),
         results_io(std::move(_results_io)),
         method_log(_method_log) {
     for (auto const &name : sampling_params.sampler_names) {
@@ -93,12 +89,6 @@ struct SamplingFixtureParams {
 
   /// Analysis functions to evaluate
   std::vector<std::string> analysis_names;
-
-  /// Selected events data functions
-  std::optional<SelectedEventDataFunctions> selected_event_data_functions;
-
-  /// Selected events data params
-  std::optional<SelectedEventDataParams> selected_event_data_params;
 
   /// Results I/O implementation -- May be empty
   notstd::cloneable_ptr<results_io_type> results_io;

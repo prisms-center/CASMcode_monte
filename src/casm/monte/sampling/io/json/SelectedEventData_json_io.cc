@@ -65,13 +65,11 @@ jsonParser &to_json(CorrelationsData const &correlations_data,
   if (data.output_incomplete_samples) {
     json["step"] = data.step;
     json["pass"] = data.pass;
-    json["sample"] = data.sample;
     json["time"] = data.time;
     json["atom_positions_cart"] = data.atom_positions_cart;
   } else {
     json["step"] = data.step.topRows(data.n_complete_samples);
     json["pass"] = data.pass.topRows(data.n_complete_samples);
-    json["sample"] = data.sample.topRows(data.n_complete_samples);
     json["time"] = data.time.topRows(data.n_complete_samples);
     json["atom_positions_cart"] = jsonParser::array();
     for (Index i = 0; i < data.n_complete_samples; ++i) {
@@ -84,23 +82,45 @@ jsonParser &to_json(CorrelationsData const &correlations_data,
 /// \brief Convert DiscreteVectorIntHistogram to JSON
 jsonParser &to_json(DiscreteVectorIntHistogram const &histogram,
                     jsonParser &json) {
-  auto &data = histogram;
+  DiscreteVectorIntHistogram const &data = histogram;
   json.put_obj();
   json["shape"] = data.shape();
   json["max_size"] = data.max_size();
   json["max_size_exceeded"] = data.max_size_exceeded();
   json["size"] = data.size();
   json["sum"] = data.sum();
-  if (data.shape().empty()) {
+  if (!data.shape().empty()) {
+    json["component_names"] = data.component_names();
+  }
+
+  // labels
+  if (data.value_labels().has_value()) {
+    json["labels"] = jsonParser::array();
+    auto const &value_to_label = data.value_labels().value();
+    for (Eigen::VectorXi v : data.values()) {
+      if (value_to_label.count(v)) {
+        json["labels"].push_back(value_to_label.at(v));
+      } else {
+        if (data.shape().size() == 0) {
+          json["labels"].push_back(v(0));
+        } else {
+          json["labels"].push_back(v, jsonParser::as_array());
+        }
+      }
+    }
+  }
+
+  // values
+  if (data.shape().size() == 0) {
     // scalar
     json["values"] = jsonParser::array();
     for (auto const &v : data.values()) {
       json["values"].push_back(v(0));
     }
   } else {
-    json["component_names"] = data.component_names();
     to_json(data.values(), json["values"], jsonParser::as_array());
   }
+
   json["count"] = data.count();
   json["fraction"] = data.fraction();
   json["out_of_range_count"] = data.out_of_range_count();
@@ -126,7 +146,20 @@ jsonParser &to_json(DiscreteVectorFloatHistogram const &histogram,
     }
   } else {
     json["component_names"] = data.component_names();
-    to_json(data.values(), json["values"], jsonParser::as_array());
+    if (data.value_labels().has_value()) {
+      json["values"] = jsonParser::array();
+      auto const &value_to_label = data.value_labels().value();
+      for (Eigen::VectorXd v : data.values()) {
+        if (value_to_label.count(v)) {
+          json["values"].push_back(value_to_label.at(v));
+        } else {
+          json["values"].push_back(v, jsonParser::as_array());
+        }
+      }
+
+    } else {
+      to_json(data.values(), json["values"], jsonParser::as_array());
+    }
   }
   json["count"] = data.count();
   json["fraction"] = data.fraction();
@@ -186,23 +219,58 @@ jsonParser &to_json(PartitionedHistogram1D const &histogram, jsonParser &json) {
 ///
 /// Expected:
 ///
-///   correlations_data_params: CorrelationsDataParams (optional)
-///     Parameters for storing correlations data.
+///   "correlation_data_params": dict (default=None),
+///       Options controlling the collection of hop correlation data (not
+///       basis functions correlations). Options are:
 ///
-///   quantities: list[str] (optional)
-///     The names of functions to evaluate for each selected event (if
-///     applicable). Options are calculator specific.
+///       "jumps_per_position_sample": int (optional, default=1)
+///           Every `jumps_per_position_sample` jumps of an individual
+///           atom, its position in Cartesian coordinates (as if hopping
+///           without periodic boundaries) is saved.
+///       "max_n_position_samples: int (optional, default=100)
+///           The maximum number of positions to store for each atom.
+///       "output_incomplete_samples: bool (optional, default=false)
+///           If true, output all position data collected for every atom.
+///           If false, only output positions if all atoms jumped the
+///           required number of times.
+///       "stop_run_when_complete": bool (optional, default=false)
+///           If true, add an additional completion check to stop the run
+///           when the maximum number of position samples is reached. If
+///           false, continue running until the standard completion check
+///           is met.
 ///
-///   tol: object (optional)
-///     For discrete floating point functions, the tolerance for comparing
-///     values defaults to CASM::TOL (1e-5). To provide a different tolerance
-///     for a specific function, provide a key-value pair with the function
-///     name as the key and the tolerance as the value.
+///   "quantities": list[str] (default=[])
+///       Names of quantities to collect for each selected event and
+///       store in histograms.
+///   "tol": dict[str,float] (default={})
+///       Tolerance values (float) for comparing discrete floating point
+///        values, by quantity name. May be provided to override the
+///       default value for a particular quantity.
+///   "bin_width": dict[str,float] (default={})
+///       Histogram bin width values (float), by quantity name. May be
+///       provided to override the default value for a particular
+///       quantity.
+///   "initial_begin": dict[str,float] (default={})
+///       Initial bin coordinate value (float), by quantity name. The bin
+///       number for a particular value is calculated as
+///       `(value - begin) / bin_width`, so the range for bin `i` is
+///       [begin, begin + i*bin_width). Coordinates are adjusted to fit
+///       the data encountered by starting `begin` at `initial_begin` and
+///       adjusting it as necessary by multiples of `bin_width`. May be
+///       provided to override the default value for a particular
+///       quantity.
+///   "spacing": dict[str,str] (default={})
+///       Bin coordinate spacing (one of "log" or "linear"), by quantity
+///       name. May be provided to override the default value for a
+///       particular quantity.
+///   "max_size": dict[str,int] (default={})
+///       Maximum number of bins / discrete values to keep. If adding an
+///       additional data point would cause the number of bins / discrete
+///       values to exceed `max_size`, the count / weight is instead added
+///       to the `out_of_range_count`. May be provided to override the
+///       default value for a particular quantity.
 ///
-/// \param parser
-/// \param functions
-void parse(InputParser<SelectedEventDataParams> &parser,
-           SelectedEventDataFunctions const &functions) {
+void parse(InputParser<SelectedEventDataParams> &parser) {
   parser.value = std::make_unique<SelectedEventDataParams>();
 
   SelectedEventDataParams &params = *parser.value;
@@ -213,24 +281,9 @@ void parse(InputParser<SelectedEventDataParams> &parser,
     params.correlations_data_params = std::move(*subparser->value);
   }
 
-  std::vector<std::string> quantities;
-  parser.optional(quantities, "quantities");
+  parser.optional(params.function_names, "quantities");
 
-  for (const std::string &name : quantities) {
-    if (functions.discrete_vector_int_functions.count(name)) {
-      params.function_names.push_back(name);
-    } else if (functions.discrete_vector_float_functions.count(name)) {
-      params.function_names.push_back(name);
-    } else if (functions.continuous_1d_functions.count(name)) {
-      params.function_names.push_back(name);
-    } else {
-      std::stringstream msg;
-      msg << "Error: \"" << name
-          << "\" is not a selected event sampling option.";
-      parser.insert_error("quantities", msg.str());
-      continue;
-    }
-
+  for (const std::string &name : params.function_names) {
     // Check for user-specified "tol"
     std::unique_ptr<double> tol =
         parser.optional<double>(fs::path("tol") / name);
@@ -323,16 +376,24 @@ jsonParser &to_json(SelectedEventData const &selected_event_data,
     json["correlations_data"] = *data.correlations_data;
   }
 
-  json["histograms"].put_obj();
-  for (auto const &pair : data.discrete_vector_int_histograms) {
-    to_json(pair.second, json["histograms"][pair.first]);
+  int n_histograms = data.discrete_vector_int_histograms.size() +
+                     data.discrete_vector_float_histograms.size() +
+                     data.continuous_1d_histograms.size();
+
+  if (n_histograms > 0) {
+    json["histograms"] = jsonParser::object();
+
+    for (auto const &pair : data.discrete_vector_int_histograms) {
+      to_json(pair.second, json["histograms"][pair.first]);
+    }
+    for (auto const &pair : data.discrete_vector_float_histograms) {
+      to_json(pair.second, json["histograms"][pair.first]);
+    }
+    for (auto const &pair : data.continuous_1d_histograms) {
+      to_json(pair.second, json["histograms"][pair.first]);
+    }
   }
-  for (auto const &pair : data.discrete_vector_float_histograms) {
-    to_json(pair.second, json["histograms"][pair.first]);
-  }
-  for (auto const &pair : data.continuous_1d_histograms) {
-    to_json(pair.second, json["histograms"][pair.first]);
-  }
+
   return json;
 }
 

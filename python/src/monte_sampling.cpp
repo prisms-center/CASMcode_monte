@@ -1,5 +1,6 @@
 #include <pybind11/eigen.h>
 #include <pybind11/functional.h>
+#include <pybind11/iostream.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -31,6 +32,7 @@
 #include "casm/monte/sampling/StateSamplingFunction.hh"
 #include "casm/monte/sampling/io/json/Sampler_json_io.hh"
 #include "casm/monte/sampling/io/json/SamplingParams_json_io.hh"
+#include "casm/monte/sampling/io/json/SelectedEventData_json_io.hh"
 
 #define STRINGIFY(x) #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
@@ -146,44 +148,57 @@ monte::jsonStateSamplingFunction make_json_state_sampling_function(
       });
 }
 
-monte::HistogramFunction<Eigen::VectorXi> make_vector_int_histogram_function(
+monte::DiscreteVectorIntHistogramFunction make_vector_int_histogram_function(
     std::string name, std::string description, std::vector<Index> shape,
-    std::function<Eigen::VectorXi()> function,
+    bool requires_event_state, std::function<Eigen::VectorXi()> function,
+    std::function<bool()> has_value_function,
     std::optional<std::vector<std::string>> component_names, Index max_size) {
   if (function == nullptr) {
     throw std::runtime_error(
         "Error constructing VectorIntHistogramFunction: function == nullptr");
   }
+  if (has_value_function == nullptr) {
+    has_value_function = []() -> bool { return true; };
+  }
   if (!component_names.has_value()) {
-    return monte::HistogramFunction<Eigen::VectorXi>(name, description, shape,
-                                                     function, max_size);
+    return monte::DiscreteVectorIntHistogramFunction(
+        name, description, shape, requires_event_state, function,
+        has_value_function, max_size);
   } else {
-    return monte::HistogramFunction<Eigen::VectorXi>(
-        name, description, *component_names, shape, function, max_size);
+    return monte::DiscreteVectorIntHistogramFunction(
+        name, description, shape, *component_names, requires_event_state,
+        function, has_value_function, max_size);
   }
 }
 
-monte::HistogramFunction<Eigen::VectorXd> make_vector_float_histogram_function(
+monte::DiscreteVectorFloatHistogramFunction
+make_vector_float_histogram_function(
     std::string name, std::string description, std::vector<Index> shape,
-    std::function<Eigen::VectorXd()> function,
+    bool requires_event_state, std::function<Eigen::VectorXd()> function,
+    std::function<bool()> has_value_function,
     std::optional<std::vector<std::string>> component_names, Index max_size,
     double tol) {
   if (function == nullptr) {
     throw std::runtime_error(
         "Error constructing VectorFloatHistogramFunction: function == nullptr");
   }
+  if (has_value_function == nullptr) {
+    has_value_function = []() -> bool { return true; };
+  }
   if (!component_names.has_value()) {
-    return monte::HistogramFunction<Eigen::VectorXd>(name, description, shape,
-                                                     function, max_size, tol);
+    return monte::DiscreteVectorFloatHistogramFunction(
+        name, description, shape, requires_event_state, function,
+        has_value_function, max_size, tol);
   } else {
-    return monte::HistogramFunction<Eigen::VectorXd>(
-        name, description, *component_names, shape, function, max_size, tol);
+    return monte::DiscreteVectorFloatHistogramFunction(
+        name, description, shape, *component_names, requires_event_state,
+        function, has_value_function, max_size, tol);
   }
 }
 
 monte::PartitionedHistogramFunction<double> make_partitioned_histogram_function(
-    std::string name, std::string description, std::function<double()> function,
-    std::vector<std::string> partition_names,
+    std::string name, std::string description, bool requires_event_state,
+    std::function<double()> function, std::vector<std::string> partition_names,
     std::function<int()> get_partition, bool is_log, double initial_begin,
     double bin_width, Index max_size) {
   if (function == nullptr) {
@@ -196,8 +211,8 @@ monte::PartitionedHistogramFunction<double> make_partitioned_histogram_function(
         "get_partition_function == nullptr");
   }
   return monte::PartitionedHistogramFunction<double>(
-      name, description, function, partition_names, get_partition, is_log,
-      initial_begin, bin_width, max_size);
+      name, description, requires_event_state, function, partition_names,
+      get_partition, is_log, initial_begin, bin_width, max_size);
 }
 
 monte::CompletionCheckParams<statistics_type> make_completion_check_params(
@@ -293,11 +308,12 @@ PYBIND11_MAKE_OPAQUE(CASM::monte::jsonSamplerMap);
 PYBIND11_MAKE_OPAQUE(CASM::monte::StateSamplingFunctionMap);
 PYBIND11_MAKE_OPAQUE(CASM::monte::jsonStateSamplingFunctionMap);
 PYBIND11_MAKE_OPAQUE(
-    std::map<std::string, CASM::monte::HistogramFunction<Eigen::VectorXi>>);
+    std::map<std::string, CASM::monte::DiscreteVectorIntHistogramFunction>);
 PYBIND11_MAKE_OPAQUE(
-    std::map<std::string, CASM::monte::HistogramFunction<Eigen::VectorXd>>);
+    std::map<std::string, CASM::monte::DiscreteVectorFloatHistogramFunction>);
 PYBIND11_MAKE_OPAQUE(
     std::map<std::string, CASM::monte::PartitionedHistogramFunction<double>>);
+PYBIND11_MAKE_OPAQUE(std::vector<CASM::monte::Histogram1D>);
 PYBIND11_MAKE_OPAQUE(CASM::monte::RequestedPrecisionMap);
 PYBIND11_MAKE_OPAQUE(
     CASM::monte::ConvergenceResultMap<CASM::monte::BasicStatistics>);
@@ -448,7 +464,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           .. code-block:: Python
 
               from libcasm.monte.sampling import SAMPLE_METHOD
-              sample_method = libcasm.monte.SAMPLE_METHOD.LOG
+              sample_method = SAMPLE_METHOD.LOG
 
           )pbdoc")
       .value("CUSTOM", monte::SAMPLE_METHOD::CUSTOM,
@@ -458,7 +474,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           .. code-block:: Python
 
               from libcasm.monte.sampling import SAMPLE_METHOD
-              sample_method = libcasm.monte.SAMPLE_METHOD.CUSTOM
+              sample_method = SAMPLE_METHOD.CUSTOM
 
           )pbdoc")
       .export_values();
@@ -1063,7 +1079,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
                 return composition_calculator.
                     mean_num_each_component(get_occupation(calculation.state))
 
-            f = monte.StateSamplingFunction(
+            f = StateSamplingFunction(
                 name="mol_composition",
                 description="Mol composition per unit cell",
                 shape=[len(composition_calculator.components())],
@@ -1172,8 +1188,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
             from libcasm.clexmonte import SemiGrandCanonical
             from libcasm.monte import (
-                Sampler, SamplerMap, StateSamplingFunction,
-                StateSamplingFunctionMap, jsonStateSamplingFunctionMap
+                jsonSamplerMap, jsonStateSamplingFunction,
+                jsonStateSamplingFunctionMap
             )
 
             # ... in Monte Carlo simulation setup ...
@@ -1185,7 +1201,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
             def configuration_f():
                 return calculation.state.configuration.to_dict()
 
-            f = monte.jsonStateSamplingFunction(
+            f = jsonStateSamplingFunction(
                 name="configuration",
                 description="Configuration values",
                 function=configuration_json_f,
@@ -1208,7 +1224,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
         - Typically this holds a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
         - jsonStateSamplingFunction can be used to sample quantities not easily converted to scalar, vector, matrix, etc.
         - Data sampled by a jsonStateSamplingFunction can be stored in a :class:`~libcasm.monte.sampling.jsonSamplerMap`.
-        - A call operator exists (:func:`~libcasm.monte.jsonStateSamplingFunction.__call__`) to call the function held by :class:`~libcasm.monte.jsonStateSamplingFunction`.
+        - A call operator exists (:func:`~libcasm.monte.sampling.jsonStateSamplingFunction.__call__`) to call the function held by :class:`~libcasm.monte.sampling.jsonStateSamplingFunction`.
         )pbdoc")
       .def(py::init<>(&make_json_state_sampling_function),
            R"pbdoc(
@@ -1254,7 +1270,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           Equivalent to calling :py::attr:`~libcasm.monte.sampling.jsonStateSamplingFunction.function`.
           )pbdoc");
 
-  py::class_<monte::HistogramFunction<Eigen::VectorXi>>(
+  py::class_<monte::DiscreteVectorIntHistogramFunction>(
       m, "VectorIntHistogramFunction",
       R"pbdoc(
       A function that returns a integer vector value to add to a histogram
@@ -1266,7 +1282,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
       - For sampling scalars, a size=1 vector is expected. This can be done with the function :func:`~libcasm.monte.scalar_as_vector`.
       - For sampling matrices, column-major order unrolling can be done with the function :func:`~libcasm.monte.matrix_as_vector`.
       - Data returned by a VectorIntHistogramFunction can be stored in a :class:`~libcasm.monte.sampling.DiscreteVectorIntHistogram`.
-      - A call operator exists (:func:`~libcasm.monte.VectorIntHistogramFunction.__call__`) to call the function held by :class:`~libcasm.monte.sampling.VectorIntHistogramFunction`.
+      - A call operator exists (:func:`~libcasm.monte.sampling.VectorIntHistogramFunction.__call__`) to call the function held by :class:`~libcasm.monte.sampling.VectorIntHistogramFunction`.
       )pbdoc")
       .def(py::init<>(&make_vector_int_histogram_function),
            R"pbdoc(
@@ -1286,8 +1302,22 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
               Scalar: [], Vector: [n], Matrix: [m, n], etc.
 
+          requires_event_state : bool
+              If true, the function requires the event state of the selected
+              event to be calculated.
+
           function : function
-              A function with 0 arguments that returns an array of the proper size sampling the current state. Typically this is a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
+              A function with 0 arguments that returns an array of the proper
+              size sampling the current state. Typically this is a lambda
+              function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
+
+          has_value_function : Optional[function] = None
+              An optional function with 0 arguments that returns a bool
+              indicating that the value of `function` should be collected.
+              Default is to always return True. Typically this is a lambda
+              function that has been given a reference or pointer to a Monte
+              Carlo calculation object so that it can access the current
+              selected event and determine if a value should be collected.
 
           component_names : Optional[List[str]] = None
               A name for each component of the resulting vector.
@@ -1302,18 +1332,20 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           )pbdoc",
            py::arg("name"), py::arg("description"), py::arg("shape"),
-           py::arg("function"), py::arg("component_names") = std::nullopt,
+           py::arg("requires_event_state"), py::arg("function"),
+           py::arg("has_value_function") = nullptr,
+           py::arg("component_names") = std::nullopt,
            py::arg("max_size") = 10000)
-      .def_readwrite("name", &monte::HistogramFunction<Eigen::VectorXi>::name,
+      .def_readwrite("name", &monte::DiscreteVectorIntHistogramFunction::name,
                      R"pbdoc(
           str : Name of the quantity.
           )pbdoc")
       .def_readwrite("description",
-                     &monte::HistogramFunction<Eigen::VectorXi>::description,
+                     &monte::DiscreteVectorIntHistogramFunction::description,
                      R"pbdoc(
           str : Description of the function.
           )pbdoc")
-      .def_readwrite("shape", &monte::HistogramFunction<Eigen::VectorXi>::shape,
+      .def_readwrite("shape", &monte::DiscreteVectorIntHistogramFunction::shape,
                      R"pbdoc(
           List[int] : Shape of quantity, with column-major unrolling.
 
@@ -1321,36 +1353,98 @@ PYBIND11_MODULE(_monte_sampling, m) {
           )pbdoc")
       .def_readwrite(
           "component_names",
-          &monte::HistogramFunction<Eigen::VectorXi>::component_names,
+          &monte::DiscreteVectorIntHistogramFunction::component_names,
           R"pbdoc(
           List[str] : A name for each component of the resulting vector.
 
           Can be strings representing an indices (i.e "0", "1", "2", etc.) or can be a descriptive string (i.e. "Mg", "Va", "O", etc.). If the sampled quantity is an unrolled matrix, indices for column-major ordering are typical (i.e. "0,0", "1,0", ..., "m-1,n-1").
           )pbdoc")
+      .def_readwrite(
+          "requires_event_state",
+          &monte::DiscreteVectorIntHistogramFunction::requires_event_state,
+          R"pbdoc(
+          bool : If True, the function requires the event state of the selected
+          event to be calculated.
+          )pbdoc")
       .def_readwrite("function",
-                     &monte::HistogramFunction<Eigen::VectorXi>::function,
+                     &monte::DiscreteVectorIntHistogramFunction::function,
                      R"pbdoc(
           function : The function to be evaluated.
 
           A function with 0 arguments that returns an array of the proper size sampling the current state. Typically this is a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
           )pbdoc")
+      .def_readwrite(
+          "has_value_function",
+          &monte::DiscreteVectorIntHistogramFunction::has_value_function,
+          R"pbdoc(
+          function : A function that returns a bool indicating that the value
+          of `function` should be collected.
+
+          Typically this is a lambda function that has been given a reference
+          or pointer to a Monte Carlo calculation object so that it can access
+          the current selected event and determine if a value should be
+          collected.
+          )pbdoc")
       .def_readwrite("max_size",
-                     &monte::HistogramFunction<Eigen::VectorXi>::max_size,
+                     &monte::DiscreteVectorIntHistogramFunction::max_size,
                      R"pbdoc(
           int: Maximum number of bins in the histogram.
           )pbdoc")
       .def(
           "__call__",
-          [](monte::HistogramFunction<Eigen::VectorXi> const &f)
+          [](monte::DiscreteVectorIntHistogramFunction const &f)
               -> Eigen::VectorXi { return f(); },
           R"pbdoc(
           Evaluates the function
 
           Equivalent to calling :py::attr:`~libcasm.monte.sampling.VectorIntHistogramFunction.function`.
-          )pbdoc");
+          )pbdoc")
+      .def(
+          "value_labels",
+          [](monte::DiscreteVectorIntHistogramFunction const &self) {
+            typedef std::pair<Eigen::VectorXi, std::string> pair_type;
+            typedef std::vector<pair_type> vector_type;
+            std::optional<vector_type> value_labels;
+            if (self.value_labels.has_value()) {
+              value_labels = vector_type();
+              for (auto const &pair : self.value_labels.value()) {
+                value_labels->push_back(pair);
+              }
+            }
+            return value_labels;
+          },
+          R"pbdoc(
+          Optional[list[tuple[np.ndarray, str]]] : A list of `(value, label)`
+          for values in the histogram.
+          )pbdoc")
+      .def(
+          "set_value_labels",
+          [](monte::DiscreteVectorIntHistogramFunction &self,
+             std::optional<std::vector<std::pair<Eigen::VectorXi, std::string>>>
+                 value_labels) {
+            if (!value_labels.has_value()) {
+              self.value_labels = std::nullopt;
+              return;
+            }
+            self.value_labels = std::map<Eigen::VectorXi, std::string,
+                                         monte::LexicographicalCompare>();
+            for (auto const &pair : value_labels.value()) {
+              self.value_labels->emplace(pair.first, pair.second);
+            }
+          },
+          R"pbdoc(
+          Add labels values of the function.
+
+          Parameters
+          ----------
+          value_labels: Optional[list[tuple[np.ndarray, str]]]
+              A list of `(value, label)`. If None, the value labels are cleared.
+
+          )pbdoc",
+          py::arg("value_labels"));
 
   py::bind_map<
-      std::map<std::string, monte::HistogramFunction<Eigen::VectorXi>>>(
+      std::map<std::string, monte::DiscreteVectorIntHistogramFunction>>(
       m, "VectorIntHistogramFunctionMap",
       R"pbdoc(
       VectorIntHistogramFunctionMap stores :class:`~libcasm.monte.sampling.VectorIntHistogramFunction` by name of the sampled quantity
@@ -1361,7 +1455,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
       )pbdoc",
       py::module_local(false));
 
-  py::class_<monte::HistogramFunction<Eigen::VectorXd>>(
+  py::class_<monte::DiscreteVectorFloatHistogramFunction>(
       m, "VectorFloatHistogramFunction",
       R"pbdoc(
       A function that returns a floating-point vector value to add to a histogram
@@ -1373,7 +1467,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
       - For sampling scalars, a size=1 vector is expected. This can be done with the function :func:`~libcasm.monte.scalar_as_vector`.
       - For sampling matrices, column-major order unrolling can be done with the function :func:`~libcasm.monte.matrix_as_vector`.
       - Data returned by a VectorFloatHistogramFunction can be stored in a :class:`~libcasm.monte.sampling.DiscreteVectorIntHistogram`.
-      - A call operator exists (:func:`~libcasm.monte.VectorFloatHistogramFunction.__call__`) to call the function held by :class:`~libcasm.monte.sampling.VectorFloatHistogramFunction`.
+      - A call operator exists (:func:`~libcasm.monte.sampling.VectorFloatHistogramFunction.__call__`) to call the function held by :class:`~libcasm.monte.sampling.VectorFloatHistogramFunction`.
       )pbdoc")
       .def(py::init<>(&make_vector_float_histogram_function),
            R"pbdoc(
@@ -1393,8 +1487,24 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
               Scalar: [], Vector: [n], Matrix: [m, n], etc.
 
+          requires_event_state : bool
+              If true, the function requires the event state of the selected
+              event to be calculated.
+
           function : function
-              A function with 0 arguments that returns an array of the proper size sampling the current state. Typically this is a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
+              A function with 0 arguments that returns an array of the proper
+              size sampling the current state. Typically this is a lambda
+              function that has been given a reference or pointer to a Monte
+              Carlo calculation object so that it can access the current state
+              of the simulation.
+
+          has_value_function : Optional[function] = None
+              An optional function with 0 arguments that returns a bool
+              indicating that the value of `function` should be collected.
+              Default is to always return True. Typically this is a lambda
+              function that has been given a reference or pointer to a Monte
+              Carlo calculation object so that it can access the current
+              selected event and determine if a value should be collected.
 
           component_names : Optional[List[str]] = None
               A name for each component of the resulting vector.
@@ -1412,18 +1522,21 @@ PYBIND11_MODULE(_monte_sampling, m) {
               for the histogram.
           )pbdoc",
            py::arg("name"), py::arg("description"), py::arg("shape"),
-           py::arg("function"), py::arg("component_names") = std::nullopt,
+           py::arg("requires_event_state"), py::arg("function"),
+           py::arg("has_value_function") = nullptr,
+           py::arg("component_names") = std::nullopt,
            py::arg("max_size") = 10000, py::arg("tol") = CASM::TOL)
-      .def_readwrite("name", &monte::HistogramFunction<Eigen::VectorXd>::name,
+      .def_readwrite("name", &monte::DiscreteVectorFloatHistogramFunction::name,
                      R"pbdoc(
           str : Name of the quantity.
           )pbdoc")
       .def_readwrite("description",
-                     &monte::HistogramFunction<Eigen::VectorXd>::description,
+                     &monte::DiscreteVectorFloatHistogramFunction::description,
                      R"pbdoc(
           str : Description of the function.
           )pbdoc")
-      .def_readwrite("shape", &monte::HistogramFunction<Eigen::VectorXd>::shape,
+      .def_readwrite("shape",
+                     &monte::DiscreteVectorFloatHistogramFunction::shape,
                      R"pbdoc(
           List[int] : Shape of quantity, with column-major unrolling.
 
@@ -1431,14 +1544,21 @@ PYBIND11_MODULE(_monte_sampling, m) {
           )pbdoc")
       .def_readwrite(
           "component_names",
-          &monte::HistogramFunction<Eigen::VectorXd>::component_names,
+          &monte::DiscreteVectorFloatHistogramFunction::component_names,
           R"pbdoc(
           List[str] : A name for each component of the resulting vector.
 
           Can be strings representing an indices (i.e "0", "1", "2", etc.) or can be a descriptive string (i.e. "Mg", "Va", "O", etc.). If the sampled quantity is an unrolled matrix, indices for column-major ordering are typical (i.e. "0,0", "1,0", ..., "m-1,n-1").
           )pbdoc")
+      .def_readwrite(
+          "requires_event_state",
+          &monte::DiscreteVectorFloatHistogramFunction::requires_event_state,
+          R"pbdoc(
+          bool : If True, the function requires the event state of the selected
+          event to be calculated.
+          )pbdoc")
       .def_readwrite("function",
-                     &monte::HistogramFunction<Eigen::VectorXd>::function,
+                     &monte::DiscreteVectorFloatHistogramFunction::function,
                      R"pbdoc(
           function : The function to be evaluated.
 
@@ -1447,28 +1567,84 @@ PYBIND11_MODULE(_monte_sampling, m) {
           has been given a reference or pointer to a Monte Carlo calculation
           object so that it can access the current state of the simulation.
           )pbdoc")
+      .def_readwrite(
+          "has_value_function",
+          &monte::DiscreteVectorFloatHistogramFunction::has_value_function,
+          R"pbdoc(
+          function : A function that returns a bool indicating that the value
+          of `function` should be collected.
+
+          Typically this is a lambda function that has been given a reference
+          or pointer to a Monte Carlo calculation object so that it can access
+          the current selected event and determine if a value should be
+          collected.
+          )pbdoc")
       .def_readwrite("max_size",
-                     &monte::HistogramFunction<Eigen::VectorXd>::max_size,
+                     &monte::DiscreteVectorFloatHistogramFunction::max_size,
                      R"pbdoc(
           int: Maximum number of bins in the histogram.
           )pbdoc")
-      .def_readwrite("tol", &monte::HistogramFunction<Eigen::VectorXd>::tol,
+      .def_readwrite("tol", &monte::DiscreteVectorFloatHistogramFunction::tol,
                      R"pbdoc(
           float: Tolerance for floating point comparisons used when determining
           counts for the histogram.
           )pbdoc")
       .def(
           "__call__",
-          [](monte::HistogramFunction<Eigen::VectorXd> const &f)
+          [](monte::DiscreteVectorFloatHistogramFunction const &f)
               -> Eigen::VectorXd { return f(); },
           R"pbdoc(
           Evaluates the function
 
           Equivalent to calling :py::attr:`~libcasm.monte.sampling.VectorFloatHistogramFunction.function`.
-          )pbdoc");
+          )pbdoc")
+      .def(
+          "value_labels",
+          [](monte::DiscreteVectorFloatHistogramFunction const &self) {
+            typedef std::pair<Eigen::VectorXd, std::string> pair_type;
+            typedef std::vector<pair_type> vector_type;
+            std::optional<vector_type> value_labels;
+            if (self.value_labels.has_value()) {
+              value_labels = vector_type();
+              for (auto const &pair : self.value_labels.value()) {
+                value_labels->push_back(pair);
+              }
+            }
+            return value_labels;
+          },
+          R"pbdoc(
+          Optional[list[tuple[np.ndarray, str]]] : A list of `(value, label)`
+          for values in the histogram.
+          )pbdoc")
+      .def(
+          "set_value_labels",
+          [](monte::DiscreteVectorFloatHistogramFunction &self,
+             std::optional<std::vector<std::pair<Eigen::VectorXd, std::string>>>
+                 value_labels) {
+            if (!value_labels.has_value()) {
+              self.value_labels = std::nullopt;
+              return;
+            }
+            self.value_labels = std::map<Eigen::VectorXd, std::string,
+                                         monte::FloatLexicographicalCompare>(
+                monte::FloatLexicographicalCompare(self.tol));
+            for (auto const &pair : value_labels.value()) {
+              self.value_labels->emplace(pair.first, pair.second);
+            }
+          },
+          R"pbdoc(
+          Add labels values of the function.
+
+          Parameters
+          ----------
+          value_labels: Optional[list[tuple[np.ndarray, str]]]
+              A list of `(value, label)`. If None, the value labels are cleared.
+
+          )pbdoc",
+          py::arg("value_labels"));
 
   py::bind_map<
-      std::map<std::string, monte::HistogramFunction<Eigen::VectorXd>>>(
+      std::map<std::string, monte::DiscreteVectorFloatHistogramFunction>>(
       m, "VectorFloatHistogramFunctionMap",
       R"pbdoc(
       VectorFloatHistogramFunctionMap stores :class:`~libcasm.monte.sampling.VectorFloatHistogramFunction` by name of the sampled quantity
@@ -1494,8 +1670,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
       - Typically this holds a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the calculator's event data.
       - PartitionedHistogramFunction can be used to return a scalar floating-point quantity (i.e. event rate) and a partition index (i.e. event type index).
       - Data returned by a PartitionedHistogramFunction can be stored in a :class:`~libcasm.monte.sampling.PartitionedHistogram1D`.
-      - A call operator exists (:func:`~libcasm.monte.PartitionedHistogramFunction.__call__`) to evaluate the stored function.
-      - A :func:`~libcasm.monte.PartitionedHistogramFunction.partition` function returns the partition index of the individual histogram the value should be added to.
+      - A call operator exists (:func:`~libcasm.monte.sampling.PartitionedHistogramFunction.__call__`) to evaluate the stored function.
+      - A :func:`~libcasm.monte.sampling.PartitionedHistogramFunction.partition` function returns the partition index of the individual histogram the value should be added to.
       )pbdoc")
       .def(py::init<>(&make_partitioned_histogram_function),
            R"pbdoc(
@@ -1508,6 +1684,9 @@ PYBIND11_MODULE(_monte_sampling, m) {
               Name of the sampled quantity.
           description : str
               Description of the function.
+          requires_event_state : bool
+              If true, the function requires the event state of the selected
+              event to be calculated.
           function : function
               A function with 0 arguments that returns a float. Typically this
               is a lambda function that has been given a reference or pointer to
@@ -1540,7 +1719,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
               count / weight is instead added to the `out_of_range_count` of the
               :class:`~libcasm.monte.sampling.PartitionedHistogram1D`.
           )pbdoc",
-           py::arg("name"), py::arg("description"), py::arg("function"),
+           py::arg("name"), py::arg("description"),
+           py::arg("requires_event_state"), py::arg("function"),
            py::arg("partition_names"), py::arg("get_partition_function"),
            py::arg("is_log") = false, py::arg("initial_begin") = 0.0,
            py::arg("bin_width") = 1.0, py::arg("max_size") = 10000)
@@ -1552,6 +1732,13 @@ PYBIND11_MODULE(_monte_sampling, m) {
                      &monte::PartitionedHistogramFunction<double>::description,
                      R"pbdoc(
           str : Description of the function.
+          )pbdoc")
+      .def_readwrite(
+          "requires_event_state",
+          &monte::PartitionedHistogramFunction<double>::requires_event_state,
+          R"pbdoc(
+          bool : If True, the function requires the event state of the selected
+          event to be calculated.
           )pbdoc")
       .def_readwrite("function",
                      &monte::PartitionedHistogramFunction<double>::function,
@@ -1707,6 +1894,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
       .def_static(
           "from_dict",
           [](const nlohmann::json &data) {
+            // print errors and warnings to sys.stdout
+            py::scoped_ostream_redirect redirect;
             jsonParser json{data};
             monte::RequestedPrecision x;
             from_json(x, json);
@@ -1717,7 +1906,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
   py::class_<monte::IndividualEquilibrationCheckResult>(
       m, "IndividualEquilibrationResult",
       R"pbdoc(
-      Equilibration check results for a single :class:`~libcasm.monte.SamplerComponent`
+      Equilibration check results for a single :class:`~libcasm.monte.sampling.SamplerComponent`
       )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
@@ -1904,12 +2093,12 @@ PYBIND11_MODULE(_monte_sampling, m) {
                                                R"pbdoc(
       Basic statistics calculator
 
-      This is a callable class, which calculates :class:`~libcasm.monte.BasicStatistics`
+      This is a callable class, which calculates :class:`~libcasm.monte.sampling.BasicStatistics`
       from a series of observations, and optionally sample weights.
 
       .. rubric:: Special Methods
 
-      The call operator is equivalent to :func:`~libcasm.monte.BasicStatisticsCalculator.calculate`.
+      The call operator is equivalent to :func:`~libcasm.monte.sampling.BasicStatisticsCalculator.calculate`.
 
 
       )pbdoc")
@@ -1968,7 +2157,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           The method used to estimate precision in the sample mean when observations are
           weighted (i.e. N-fold way method) depends on the parameter
-          :py:attr:`~libcasm.monte.weighted_observations_method`.
+          :py:attr:`~libcasm.monte.sampling.weighted_observations_method`.
 
           .. rubric:: Case 1: No sample weights
 
@@ -2010,7 +2199,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           R"pbdoc(
           Calculate statistics for a range of weighted observations
 
-          The method used to estimate precision in the sample mean when observations are weighted (i.e. N-fold way method) depends on the parameter :py:attr:`~libcasm.monte.weighted_observations_method`.
+          The method used to estimate precision in the sample mean when observations are weighted (i.e. N-fold way method) depends on the parameter :py:attr:`~libcasm.monte.sampling.weighted_observations_method`.
 
           Parameters
           ----------
@@ -2038,6 +2227,9 @@ PYBIND11_MODULE(_monte_sampling, m) {
       .def_static(
           "from_dict",
           [](const nlohmann::json &data) {
+            // print errors and warnings to sys.stdout
+            py::scoped_ostream_redirect redirect;
+
             jsonParser json{data};
 
             double confidence = 0.95;
@@ -2313,10 +2505,12 @@ PYBIND11_MODULE(_monte_sampling, m) {
       .def_static(
           "from_dict",
           [](const nlohmann::json &data) {
+            // print errors and warnings to sys.stdout
+            py::scoped_ostream_redirect redirect;
             jsonParser json{data};
             InputParser<monte::CutoffCheckParams> parser(json);
             std::runtime_error error_if_invalid{
-                "Error in libcasm.monte.CutoffCheckParams.from_dict"};
+                "Error in libcasm.monte.sampling.CutoffCheckParams.from_dict"};
             report_and_throw_if_invalid(parser, CASM::log(), error_if_invalid);
             return std::move(*parser.value);
           },
@@ -2412,7 +2606,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
                   def calc_statistics_f(
                       observations: np.ndarray,
                       sample_weight: np.ndarray,
-                  ) -> libcasm.monte.BasicStatistics:
+                  ) -> libcasm.monte.sampling.BasicStatistics:
                       ...
 
               If None, the default is :class:`~libcasm.monte.sampling.BasicStatisticsCalculator`.
@@ -2424,8 +2618,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
                   def equilibration_check_f(
                       observations: np.ndarray,
                       sample_weight: np.ndarray,
-                      requested_precision: libcasm.monte.RequestedPrecision,
-                  ) -> libcasm.monte.IndividualEquilibrationResult:
+                      requested_precision: libcasm.monte.sampling.RequestedPrecision,
+                  ) -> libcasm.monte.sampling.IndividualEquilibrationResult:
                       ...
 
               If None, the default is :class:`~libcasm.monte.sampling.default_equilibration_check`.
@@ -2580,11 +2774,14 @@ PYBIND11_MODULE(_monte_sampling, m) {
           "from_dict",
           [](const nlohmann::json &data,
              monte::StateSamplingFunctionMap const &sampling_functions) {
+            // print errors and warnings to sys.stdout
+            py::scoped_ostream_redirect redirect;
             jsonParser json{data};
             InputParser<monte::CompletionCheckParams<statistics_type>> parser(
                 json, sampling_functions);
             std::runtime_error error_if_invalid{
-                "Error in libcasm.monte.CompletionCheckParams.from_dict"};
+                "Error in "
+                "libcasm.monte.sampling.CompletionCheckParams.from_dict"};
             report_and_throw_if_invalid(parser, CASM::log(), error_if_invalid);
             return std::move(*parser.value);
           },
@@ -2990,7 +3187,53 @@ PYBIND11_MODULE(_monte_sampling, m) {
            If True, stop the run when the maximum number of positions have been
            sampled for all atoms. If False, continue running until the standard
            completion check is met, but do not collect any more position samples.
-           )pbdoc");
+           )pbdoc")
+      .def(
+          "copy",
+          [](monte::CorrelationsDataParams const &self) {
+            return monte::CorrelationsDataParams(self);
+          },
+          R"pbdoc(
+          Returns a copy of the CorrelationsDataParams.
+          )pbdoc")
+      .def("__copy__",
+           [](monte::CorrelationsDataParams const &self) {
+             return monte::CorrelationsDataParams(self);
+           })
+      .def("__deepcopy__",
+           [](monte::CorrelationsDataParams const &self, py::dict) {
+             return monte::CorrelationsDataParams(self);
+           })
+      .def("__repr__",
+           [](monte::CorrelationsDataParams const &self) {
+             jsonParser json;
+             to_json(self, json);
+             std::stringstream ss;
+             ss << json;
+             return ss.str();
+           })
+      .def(
+          "to_dict",
+          [](monte::CorrelationsDataParams const &self) {
+            jsonParser json;
+            to_json(self, json);
+            return static_cast<nlohmann::json>(json);
+          },
+          "Represent the CorrelationsDataParams as a Python dict.")
+      .def_static(
+          "from_dict",
+          [](const nlohmann::json &data) {
+            // print errors and warnings to sys.stdout
+            py::scoped_ostream_redirect redirect;
+            jsonParser json{data};
+            InputParser<monte::CorrelationsDataParams> parser(json);
+            std::runtime_error error_if_invalid{
+                "Error in "
+                "libcasm.monte.sampling.CorrelationsDataParams.from_dict"};
+            report_and_throw_if_invalid(parser, CASM::log(), error_if_invalid);
+            return std::move(*parser.value);
+          },
+          "Construct CorrelationsDataParams from a Python dict.");
 
   py::class_<monte::CorrelationsData>(m, "CorrelationsData",
                                       R"pbdoc(
@@ -3066,13 +3309,6 @@ PYBIND11_MODULE(_monte_sampling, m) {
           the `i_atom`-th atom jumped the
           `i_sample * jumps_per_position_sample`-th time.
           )pbdoc")
-      .def_readonly("sample", &monte::CorrelationsData::sample,
-                    R"pbdoc(
-          numpy.ndarray[numpy.int[max_n_position_samples,n_atoms]]: The
-          value `sample[i_sample, i_atom]` is the number of samples taken when
-          the `i_atom`-th atom jumped the
-          `i_sample * jumps_per_position_sample`-th time.
-          )pbdoc")
       .def_readonly("time", &monte::CorrelationsData::time,
                     R"pbdoc(
           numpy.ndarray[numpy.float[max_n_position_samples,n_atoms]]: The
@@ -3089,39 +3325,71 @@ PYBIND11_MODULE(_monte_sampling, m) {
           after the `i_sample * jumps_per_position_sample`-th jump.
           )pbdoc")
       .def(
-          "equilibrated_samples",
-          [](monte::CorrelationsData const &self,
-             Index N_samples_for_all_to_equilibrate) {
+          "indices_after_pass",
+          [](monte::CorrelationsData const &self, Index pass) {
             std::vector<int> result;
-            if (self.n_complete_samples >= self.sample.rows()) {
+            if (self.n_complete_samples >= self.pass.rows()) {
               throw std::runtime_error(
                   "Error in "
-                  "monte.sampling.CorrelationsData.equilibrated_samples: "
-                  "n_complete_samples >= sample.rows()");
+                  "monte.sampling.CorrelationsData.indices_after_pass: "
+                  "n_complete_samples >= pass.rows()");
             }
             for (Index j = 0; j < self.n_complete_samples; ++j) {
-              int max_sample = self.sample.row(j).maxCoeff();
-              if (max_sample >= N_samples_for_all_to_equilibrate) {
+              int max_pass = self.pass.row(j).maxCoeff();
+              if (max_pass >= pass) {
                 result.push_back(j);
               }
             }
             return result;
           },
           R"pbdoc(
-          Return the indices of samples taken after the system has equilibrated
+          Return the indices for position samples taken after a certain number of
+          passes had occurred
 
-          Parameter
-          ---------
-          N_samples_for_all_to_equilibrate: int
-              The long it took (how many samples) for the system to equilibrate.
+          Parameters
+          ----------
+          pass: int
+              A number of passes
 
           Returns
           -------
           indices: list[int]
-              The indices, j, such that
-              `samples[j][i_atom] >= N_samples_for_all_to_equilibrate` for all
-              `i_atom`.
-          )pbdoc")
+              The indices, j, such that `self.pass[j][i_atom] >= pass` for all `i_atom`.
+          )pbdoc",
+          py::arg("pass"))
+      .def(
+          "indices_after_time",
+          [](monte::CorrelationsData const &self, Index time) {
+            std::vector<int> result;
+            if (self.n_complete_samples >= self.time.rows()) {
+              throw std::runtime_error(
+                  "Error in "
+                  "monte.sampling.CorrelationsData.indices_after_time: "
+                  "n_complete_samples >= time.rows()");
+            }
+            for (Index j = 0; j < self.n_complete_samples; ++j) {
+              int max_time = self.time.row(j).maxCoeff();
+              if (max_time >= time) {
+                result.push_back(j);
+              }
+            }
+            return result;
+          },
+          R"pbdoc(
+          Return the indices for position samples taken after a certain amount
+          of simulated time had occurred
+
+          Parameters
+          ----------
+          time: float
+              A simulated time
+
+          Returns
+          -------
+          indices: list[int]
+              The indices, j, such that `self.time[j][i_atom] >= time` for all `i_atom`.
+          )pbdoc",
+          py::arg("time"))
       .def("initialize", &monte::CorrelationsData::initialize,
            R"pbdoc(
           Initialize for a new run
@@ -3142,7 +3410,10 @@ PYBIND11_MODULE(_monte_sampling, m) {
               jumped the necessary number of times. If true, output matrices
               with 0.0 values for atoms that have not jumped enough times to be
               sampled.
-          )pbdoc")
+          )pbdoc",
+           py::arg("n_atoms"), py::arg("jumps_per_position_sample"),
+           py::arg("max_n_position_samples"),
+           py::arg("output_incomplete_samples"))
       .def("insert", &monte::CorrelationsData::insert, R"pbdoc(
           Insert a new position sample for an atom, if the atom has jumped
           the necessary number of times
@@ -3159,36 +3430,458 @@ PYBIND11_MODULE(_monte_sampling, m) {
               Number of steps completed when the atom jumped.
           pass: int
               Number of passes completed when the atom jumped.
-          sample: int
-              Number of samples taken when the atom jumped.
           time: float
               Simulated time when the atom jumped.
-          )pbdoc");
+          )pbdoc",
+           py::arg("atom_id"), py::arg("n_jumps"), py::arg("position_cart"),
+           py::arg("step"), py::arg("pass"), py::arg("time"))
+      .def("__repr__",
+           [](monte::CorrelationsData const &self) {
+             jsonParser json;
+             json["n_complete_samples"] = self.n_complete_samples;
+             json["jumps_per_position_sample"] = self.jumps_per_position_sample;
+             json["max_n_complete_samples"] = self.max_n_position_samples;
+             json["n_atoms"] = self.step.cols();
+             std::stringstream ss;
+             ss << json;
+             return ss.str();
+           })
+      .def(
+          "to_dict",
+          [](monte::CorrelationsData const &self) {
+            jsonParser json;
+            to_json(self, json);
+            return static_cast<nlohmann::json>(json);
+          },
+          "Represent the CorrelationsData as a Python dict.");
 
   py::class_<monte::DiscreteVectorIntHistogram>(m, "DiscreteVectorIntHistogram",
                                                 R"pbdoc(
       Data structure for holding a histogram of discrete integer vector values
-      )pbdoc");
+      )pbdoc")
+      .def(py::init<std::vector<std::string>, std::vector<Index>, Index>(),
+           R"pbdoc(
+           .. rubric:: Constructor
+
+           Parameters
+           ----------
+           component_names: list[str]
+               Names of the components of the vector.
+           shape : List[int]
+               Shape of quantity, with column-major unrolling
+
+               Scalar: [], Vector: [n], Matrix: [m, n], etc.
+
+           max_size : int
+               Maximum number of unique values that can be stored
+           )pbdoc",
+           py::arg("component_names"), py::arg("shape"), py::arg("max_size"))
+      .def("shape", &monte::DiscreteVectorIntHistogram::shape, R"pbdoc(
+          Shape of quantity, with column-major unrolling (scalar: [], vector: [n], matrix: [m, n], etc.)
+          )pbdoc")
+      .def("component_names",
+           &monte::DiscreteVectorIntHistogram::component_names,
+           R"pbdoc(
+           The component names of the quantity
+           )pbdoc")
+      .def("size", &monte::DiscreteVectorIntHistogram::size,
+           R"pbdoc(
+           The number of unique values in the histogram
+           )pbdoc")
+      .def("max_size", &monte::DiscreteVectorIntHistogram::max_size,
+           R"pbdoc(
+           The maximum number of unique values that can be stored
+           )pbdoc")
+      .def("max_size_exceeded",
+           &monte::DiscreteVectorIntHistogram::max_size_exceeded,
+           R"pbdoc(
+           Return True if the maximum number of unique values has been
+           reached; False otherwise
+           )pbdoc")
+      .def("insert", &monte::DiscreteVectorIntHistogram::insert, R"pbdoc(
+           Insert a value into the histogram, with an optional weight
+
+           Parameters
+           ----------
+           value: numpy.ndarray[numpy.float]
+               The value to insert
+           weight: float = 1.0
+               The weight of the value
+           )pbdoc",
+           py::arg("value"), py::arg("weight") = 1.0)
+      .def("sum", &monte::DiscreteVectorIntHistogram::sum, R"pbdoc(
+           The sum of bin counts + out-of-range counts
+           )pbdoc")
+      .def("values", &monte::DiscreteVectorIntHistogram::values, R"pbdoc(
+           Return the values as a list
+           )pbdoc")
+      .def("count", &monte::DiscreteVectorIntHistogram::count, R"pbdoc(
+           Return the count (total weight) as a list of float
+           )pbdoc")
+      .def("out_of_range_count",
+           &monte::DiscreteVectorIntHistogram::out_of_range_count, R"pbdoc(
+           The number of values (total weight) that was not binned because the
+           max_size was exceeded
+           )pbdoc")
+      .def("fraction", &monte::DiscreteVectorIntHistogram::fraction, R"pbdoc(
+           Return the count as a list of fractions of the sum
+           )pbdoc")
+      .def("__repr__",
+           [](monte::DiscreteVectorIntHistogram const &self) {
+             jsonParser json;
+             json["size"] = self.size();
+             json["sum"] = self.sum();
+             std::stringstream ss;
+             ss << json;
+             return ss.str();
+           })
+      .def(
+          "to_dict",
+          [](monte::DiscreteVectorIntHistogram const &self) {
+            jsonParser json;
+            to_json(self, json);
+            return static_cast<nlohmann::json>(json);
+          },
+          "Represent the DiscreteVectorIntHistogram as a Python dict.");
+
+  py::bind_map<std::map<std::string, monte::DiscreteVectorIntHistogram>>(
+      m, "DiscreteVectorIntHistogramMap",
+      R"pbdoc(
+      DiscreteVectorIntHistogramMap stores :class:`~libcasm.monte.sampling.DiscreteVectorIntHistogram` by name of the quantity
+
+      Notes
+      -----
+      DiscreteVectorIntHistogramMap is a Dict[str, :class:`~libcasm.monte.sampling.DiscreteVectorIntHistogram`]-like object.
+      )pbdoc",
+      py::module_local(false));
 
   py::class_<monte::DiscreteVectorFloatHistogram>(
       m, "DiscreteVectorFloatHistogram",
       R"pbdoc(
       Data structure for holding a histogram of discrete floating-point vector values
-      )pbdoc");
+      )pbdoc")
+      .def(py::init<std::vector<std::string>, std::vector<Index>, double,
+                    Index>(),
+           R"pbdoc(
+           .. rubric:: Constructor
+
+           Parameters
+           ----------
+           component_names: list[str]
+               Names of the components of the vector.
+           shape : List[int]
+               Shape of quantity, with column-major unrolling
+
+               scalar: [], vector: [n], matrix: [m, n], etc.
+
+           tol : float = :data:`~libcasm.casmglobal.TOL`
+               Tolerance for floating-point comparisons
+
+           max_size : int
+               Maximum number of unique values that can be stored
+           )pbdoc",
+           py::arg("component_names"), py::arg("shape"),
+           py::arg("tol") = CASM::TOL, py::arg("max_size") = 10000)
+      .def("shape", &monte::DiscreteVectorFloatHistogram::shape, R"pbdoc(
+          Shape of quantity, with column-major unrolling (scalar: [],
+          vector: [n], matrix: [m, n], etc.)
+          )pbdoc")
+      .def("component_names",
+           &monte::DiscreteVectorFloatHistogram::component_names,
+           R"pbdoc(
+           The component names of the quantity
+           )pbdoc")
+      .def("size", &monte::DiscreteVectorFloatHistogram::size,
+           R"pbdoc(
+           The number of unique values in the histogram
+           )pbdoc")
+      .def("max_size", &monte::DiscreteVectorFloatHistogram::max_size,
+           R"pbdoc(
+           The maximum number of unique values that can be stored
+           )pbdoc")
+      .def("max_size_exceeded",
+           &monte::DiscreteVectorFloatHistogram::max_size_exceeded,
+           R"pbdoc(
+           Return True if the maximum number of unique values has been
+           reached; False otherwise
+           )pbdoc")
+      .def("tol", &monte::DiscreteVectorFloatHistogram::tol,
+           R"pbdoc(
+           Return the tolerance for comparing floating point values
+           )pbdoc")
+      .def("insert", &monte::DiscreteVectorFloatHistogram::insert, R"pbdoc(
+           Insert a value into the histogram, with an optional weight
+
+           Parameters
+           ----------
+           value: numpy.ndarray[numpy.float]
+               The value to insert
+           weight: float = 1.0
+               The weight of the value
+           )pbdoc",
+           py::arg("value"), py::arg("weight") = 1.0)
+      .def("sum", &monte::DiscreteVectorFloatHistogram::sum, R"pbdoc(
+           The sum of bin counts + out-of-range counts
+           )pbdoc")
+      .def("values", &monte::DiscreteVectorFloatHistogram::values, R"pbdoc(
+           Return the values as a list
+           )pbdoc")
+      .def("count", &monte::DiscreteVectorFloatHistogram::count, R"pbdoc(
+           Return the count (total weight) as a list of float
+           )pbdoc")
+      .def("out_of_range_count",
+           &monte::DiscreteVectorFloatHistogram::out_of_range_count, R"pbdoc(
+           The number of values (total weight) that was not binned because the
+           max_size was exceeded
+           )pbdoc")
+      .def("fraction", &monte::DiscreteVectorFloatHistogram::fraction, R"pbdoc(
+           Return the count as a list of fractions of the sum
+           )pbdoc")
+      .def("__repr__",
+           [](monte::DiscreteVectorFloatHistogram const &self) {
+             jsonParser json;
+             json["size"] = self.size();
+             json["sum"] = self.sum();
+             std::stringstream ss;
+             ss << json;
+             return ss.str();
+           })
+      .def(
+          "to_dict",
+          [](monte::DiscreteVectorFloatHistogram const &self) {
+            jsonParser json;
+            to_json(self, json);
+            return static_cast<nlohmann::json>(json);
+          },
+          "Represent the DiscreteVectorFloatHistogram as a Python dict.");
+
+  py::bind_map<std::map<std::string, monte::DiscreteVectorFloatHistogram>>(
+      m, "DiscreteVectorFloatHistogramMap",
+      R"pbdoc(
+      DiscreteVectorFloatHistogramMap stores :class:`~libcasm.monte.sampling.DiscreteVectorFloatHistogram` by name of the quantity
+
+      Notes
+      -----
+      DiscreteVectorFloatHistogramMap is a Dict[str, :class:`~libcasm.monte.sampling.DiscreteVectorFloatHistogram`]-like object.
+      )pbdoc",
+      py::module_local(false));
 
   py::class_<monte::Histogram1D>(m, "Histogram1D",
                                  R"pbdoc(
       Data structure for holding a 1D histogram
-      )pbdoc");
+      )pbdoc")
+      .def(py::init<double, double, bool, Index>(),
+           R"pbdoc(
+          .. rubric:: Constructor
+
+          Parameters
+          ----------
+          initial_begin : float = 0.0
+              Initial `begin` coordinate, specifying the beginning of the range
+              for the first bin. The bin number for a particular value is
+              calculated as `(value - begin) / bin_width`, so the range for
+              bin `i` is [begin, begin + i*bin_width). Coordinates are adjusted
+              to fit the data encountered by starting `begin` at
+              `initial_begin` and adjusting it as necessary by multiples of
+              `bin_width`.
+          bin_width : float = 1.0
+              Bin width.
+          is_log : bool = False
+              True if bin coordinate spacing is log-scaled; False otherwise.
+          max_size : int = 10000
+              Maximum number of bins to create. If adding an additional data
+              point would cause the number of bins to exceed `max_size`, the
+              count / weight is instead added to the `out_of_range_count` of the
+              :class:`~libcasm.monte.sampling.PartitionedHistogram1D`.
+          )pbdoc",
+           py::arg("initial_begin") = 0.0, py::arg("bin_width") = 1.0,
+           py::arg("is_log") = false, py::arg("max_size") = 10000)
+      .def("bin_width", &monte::Histogram1D::size, R"pbdoc(
+          The width of each bin in the histogram
+          )pbdoc")
+      .def("is_log", &monte::Histogram1D::is_log, R"pbdoc(
+          If true, the histogram (including bin width and `begin` value) is in
+          log coordinates (using base 10)
+          )pbdoc")
+      .def("size", &monte::Histogram1D::size, R"pbdoc(
+          The number of bins in the histogram
+          )pbdoc")
+      .def("max_size", &monte::Histogram1D::max_size, R"pbdoc(
+          The maximum number of bins that can be stored
+          )pbdoc")
+      .def("max_size_exceeded", &monte::Histogram1D::max_size_exceeded, R"pbdoc(
+          Return True if the maximum number of bins has been
+          reached; False otherwise
+          )pbdoc")
+      .def("begin", &monte::Histogram1D::begin, R"pbdoc(
+          The first bin is for the range `[begin, begin + bin_width)`
+          )pbdoc")
+      .def("count", &monte::Histogram1D::count, R"pbdoc(
+          The number of values (total weight) in each bin
+          )pbdoc")
+      .def("out_of_range_count", &monte::Histogram1D::out_of_range_count,
+           R"pbdoc(
+          The number of values (total weight) that was not binned because the
+          max_size was exceeded
+          )pbdoc")
+      .def("insert", &monte::Histogram1D::insert, R"pbdoc(
+          Insert a value into the histogram, with an optional weight
+
+          Parameters
+          ----------
+          value: numpy.ndarray[numpy.float]
+              The value to insert
+          weight: float = 1.0
+              The weight of the value
+          )pbdoc",
+           py::arg("value"), py::arg("weight") = 1.0)
+      .def("bin_coords", &monte::Histogram1D::bin_coords, R"pbdoc(
+          Return the coordinates of the beginning of each bin range
+          )pbdoc")
+      .def("sum", &monte::Histogram1D::sum, R"pbdoc(
+          Return the sum of bin counts + out-of-range counts
+          )pbdoc")
+      .def("density", &monte::Histogram1D::density, R"pbdoc(
+          Return the count as a probability density, such that the area
+          under the histogram integrates to 1 (if no out-of-range count)
+          )pbdoc")
+      .def("merge", &monte::Histogram1D::merge, R"pbdoc(
+          Merge another histogram into this one
+
+          Parameters
+          ----------
+          other: libcasm.monte.sampling.Histogram1D
+              The other histogram to merge into this one
+          )pbdoc")
+      .def("__repr__",
+           [](monte::Histogram1D const &self) {
+             jsonParser json;
+             json["size"] = self.size();
+             json["sum"] = self.sum();
+             std::stringstream ss;
+             ss << json;
+             return ss.str();
+           })
+      .def(
+          "to_dict",
+          [](monte::Histogram1D const &self) {
+            jsonParser json;
+            to_json(self, json);
+            return static_cast<nlohmann::json>(json);
+          },
+          "Represent the Histogram1D as a Python dict.");
+
+  py::bind_vector<std::vector<monte::Histogram1D>>(m, "Histogram1DVector");
 
   py::class_<monte::PartitionedHistogram1D>(m, "PartitionedHistogram1D",
                                             R"pbdoc(
       Data structure for holding 1 or more 1D histograms of related data (i.e.
       event rates by event type)
-      )pbdoc");
+      )pbdoc")
+      .def(py::init<std::vector<std::string>, double, double, bool, Index>(),
+           R"pbdoc(
+          .. rubric:: Constructor
 
-  py::class_<monte::SelectedEventDataFunctions>(m, "SelectedEventDataFunctions",
-                                                R"pbdoc(
+          Parameters
+          ----------
+          partiion_names : list[str]
+              Names of the partitions. A separate histogram is created for each
+              partition (i.e. activation energies for A-Va hops in one partition
+              and activation energies for B-Va hops in another partition).
+          initial_begin : float = 0.0
+              Initial `begin` coordinate, specifying the beginning of the range
+              for the first bin. The bin number for a particular value is
+              calculated as `(value - begin) / bin_width`, so the range for
+              bin `i` is [begin, begin + i*bin_width). Coordinates are adjusted
+              to fit the data encountered by starting `begin` at
+              `initial_begin` and adjusting it as necessary by multiples of
+              `bin_width`.
+          bin_width : float = 1.0
+              Bin width.
+          is_log : bool = False
+              True if bin coordinate spacing is log-scaled; False otherwise.
+          max_size : int = 10000
+              Maximum number of bins to create. If adding an additional data
+              point would cause the number of bins to exceed `max_size`, the
+              count / weight is instead added to the `out_of_range_count` of the
+              :class:`~libcasm.monte.sampling.PartitionedHistogram1D`.
+          )pbdoc",
+           py::arg("partition_names"), py::arg("initial_begin") = 0.0,
+           py::arg("bin_width") = 1.0, py::arg("is_log") = false,
+           py::arg("max_size") = 10000)
+      .def("partition_names", &monte::PartitionedHistogram1D::partition_names,
+           R"pbdoc(
+          list[str] : The names of the partitions
+          )pbdoc")
+      .def("insert", &monte::PartitionedHistogram1D::insert, R"pbdoc(
+          Insert a value into the histogram for a partition, with an optional
+          weight
+
+          Parameters
+          ----------
+          partition: int
+              The index of the partition to insert the value into
+          value: float
+              The value to insert
+          weight: float = 1.0
+              The weight of the value
+          )pbdoc",
+           py::arg("partition_name"), py::arg("value"), py::arg("weight") = 1.0)
+      .def("histograms", &monte::PartitionedHistogram1D::histograms,
+           R"pbdoc(
+          Histogram1DVector : A list-like container of :class:`Histogram1D`,
+          containing one for each partition
+
+          When this is called, if a value has been inserted since the last
+          access, the combined histogram is re-constructed and an attempt is
+          made (respecting the limitation on the maximum number of bins) to set
+          the initial / final bins in each individual histogram to be equal.
+          )pbdoc")
+      .def("combined_histogram",
+           &monte::PartitionedHistogram1D::combined_histogram,
+           R"pbdoc(
+          Histogram1D : The histogram constructed by merging the
+          individual histograms for each partition
+
+          When this is called, if a value has been inserted since the last
+          access, the combined histogram is re-constructed and an attempt is
+          made (respecting the limitation on the maximum number of bins) to
+          set the initial / final bins in each individual histogram to be equal.
+          )pbdoc")
+      .def("__repr__",
+           [](monte::PartitionedHistogram1D const &self) {
+             jsonParser json;
+             json["size"] = self.combined_histogram().size();
+             json["sum"] = self.combined_histogram().sum();
+             json["n_partitions"] = self.histograms().size();
+             std::stringstream ss;
+             ss << json;
+             return ss.str();
+           })
+      .def(
+          "to_dict",
+          [](monte::PartitionedHistogram1D const &self) {
+            jsonParser json;
+            to_json(self, json);
+            return static_cast<nlohmann::json>(json);
+          },
+          "Represent the monte::PartitionedHistogram1D as a Python dict.");
+
+  py::bind_map<std::map<std::string, monte::PartitionedHistogram1D>>(
+      m, "PartitionedHistogram1DMap",
+      R"pbdoc(
+      PartitionedHistogram1DMap stores :class:`~libcasm.monte.sampling.PartitionedHistogram1D` by name of the quantity
+
+      Notes
+      -----
+      PartitionedHistogram1DMap is a Dict[str, :class:`~libcasm.monte.sampling.PartitionedHistogram1D`]-like object.
+      )pbdoc",
+      py::module_local(false));
+
+  py::class_<monte::SelectedEventDataFunctions,
+             std::shared_ptr<monte::SelectedEventDataFunctions>>(
+      m, "SelectedEventDataFunctions",
+      R"pbdoc(
         Holds functions that return selected event data
         )pbdoc")
       .def(py::init<>(),
@@ -3196,21 +3889,253 @@ PYBIND11_MODULE(_monte_sampling, m) {
             .. rubric:: Constructor
 
             Default constructor only.
-            )pbdoc");
+            )pbdoc")
+      .def_readwrite(
+          "discrete_vector_int_functions",
+          &monte::SelectedEventDataFunctions::discrete_vector_int_functions,
+          R"pbdoc(
+          VectorIntHistogramFunctionMap: Dict-like container of functions
+          (:class:`VectorInHistogramFunction`) for collecting discrete
+          vector integer data from selected events.
+          )pbdoc")
+      .def_readwrite(
+          "discrete_vector_float_functions",
+          &monte::SelectedEventDataFunctions::discrete_vector_float_functions,
+          R"pbdoc(
+          VectorFloatHistogramFunctionMap: Dict-like container of functions
+          (:class:`VectorFloatHistogramFunction`) for collecting discrete
+          vector floating-point data from selected events.
+          )pbdoc")
+      .def_readwrite(
+          "continuous_1d_functions",
+          &monte::SelectedEventDataFunctions::continuous_1d_functions,
+          R"pbdoc(
+          PartitionedHistogramFunctionMap: Dict-like container of functions
+          (:class:`PartitionedHistogramFunction`) for collecting continuous
+          1d floating-point data from selected events.
+          )pbdoc");
 
-  py::class_<monte::SelectedEventDataParams>(m, "SelectedEventDataParams",
-                                             R"pbdoc(
-        Parameters controlling selected events data collection
+  py::class_<monte::SelectedEventDataParams,
+             std::shared_ptr<monte::SelectedEventDataParams>>(
+      m, "SelectedEventDataParams",
+      R"pbdoc(
+        Parameters controlling selected event data collection
         )pbdoc")
       .def(py::init<>(),
            R"pbdoc(
             .. rubric:: Constructor
 
             Default constructor only.
-            )pbdoc");
+            )pbdoc")
+      .def_readonly("correlations_data_params",
+                    &monte::SelectedEventDataParams::correlations_data_params,
+                    R"pbdoc(
+          Optional[CorrelationsDataParams]: Parameters for hop correlations data,
+          which may be None if hop correlations data is not to be collected.
 
-  py::class_<monte::SelectedEventData>(m, "SelectedEventData",
-                                       R"pbdoc(
+          This parameter is read-only. Set hop correlations data parameters
+          using :func:`collect_hop_correlations` or update to not collect with
+          :func:`do_not_collect_hop_correlations`.
+          )pbdoc")
+      .def_readonly("function_names",
+                    &monte::SelectedEventDataParams::function_names,
+                    R"pbdoc(
+          list[str]: The names of the selected event data functions which
+          should be evaluated to collect data during a simulation.
+
+          This parameter is read-only. Set the quantities to be collected
+          using :func:`collect` or update to not collect with
+          :func:`do_not_collect`.
+          )pbdoc")
+      .def(
+          "collect_hop_correlations",
+          [](monte::SelectedEventDataParams &self,
+             Index jumps_per_position_sample, Index max_n_position_samples,
+             bool output_incomplete_samples, bool stop_run_when_complete) {
+            self.correlations_data_params = monte::CorrelationsDataParams(
+                {jumps_per_position_sample, max_n_position_samples,
+                 output_incomplete_samples, stop_run_when_complete});
+            return self;
+          },
+          R"pbdoc(
+          Update to collect hop correlations data
+
+          Parameters
+          ----------
+          jumps_per_position_sample : int = 1
+              Every `jumps_per_position_sample` steps of an individual atom,
+              its position will be stored in Cartesian coordinates (as if
+              periodic boundaries did not exist).
+          max_n_position_samples : int = 100
+              The maximum number of positions to store for each atom.
+          output_incomplete_samples : bool = False
+              If false, when representing this object as a Python dict, only
+              output data for the number of samples for which all atoms have
+              jumped the necessary number of times. If true, output matrices
+              with 0.0 values for atoms that have not jumped enough times to be
+              sampled.
+          stop_run_when_complete : bool = False
+              If true, stop the run when all atoms have jumped the necessary number
+              of times to be sampled.
+
+          Returns
+          -------
+          self: libcasm.clexmonte.SelectedEventDataParams
+              To allow chaining multiple calls, `self` is returned
+          )pbdoc",
+          py::arg("jumps_per_position_sample") = 1,
+          py::arg("max_n_position_samples") = 100,
+          py::arg("output_incomplete_samples") = false,
+          py::arg("stop_run_when_complete") = false)
+      .def(
+          "do_not_collect_hop_correlations",
+          [](monte::SelectedEventDataParams &self) {
+            self.correlations_data_params = std::nullopt;
+            return self;
+          },
+          R"pbdoc(
+          Update to not collect hop correlations data
+
+          Returns
+          -------
+          self: libcasm.clexmonte.SelectedEventDataParams
+              To allow chaining multiple calls, `self` is returned
+          )pbdoc")
+      .def("collect", &monte::SelectedEventDataParams::collect,
+           R"pbdoc(
+          Add the name of a quantity to be collected for each selected event,
+          along with optional custom settings.
+
+          Parameters
+          ----------
+          name : str
+              The name of a selected event data function to be added to
+              `self.selected_event_data_params.function_names`. These should
+              be keys in one of the dictionaries in a
+              :class:`SelectedEventDataFunctions` object.
+          tol : Optional[float] = None
+              The tolerance for comparing values, applicable to
+              discrete floating point valued functions. If None, the
+              function's default tolerance value is used.
+          bin_width : Optional[float] = None
+              The tolerance for comparing values, applicable to
+              continuous valued functions. If None, the function's default bin
+              width is used.
+          initial_begin : Optional[float] = None
+              The initial value for the first bin, applicable to continuous
+              valued functions. If None, the function's default initial begin
+              value is used.
+          spacing : Optional[str] = None
+              The spacing of the bins, applicable to continuous valued
+              functions. If None, the function's default spacing is used.
+              Options are "log" or "linear".
+          max_size : Optional[int] = None
+              The maximum number of bins to store, applicable to all functions.
+              If None, the function's default maximum number of bins is used.
+
+          Returns
+          -------
+          self: libcasm.clexmonte.SelectedEventDataParams
+              To allow chaining multiple calls, `self` is returned
+          )pbdoc",
+           py::arg("name"), py::arg("tol") = std::nullopt,
+           py::arg("bin_width") = std::nullopt,
+           py::arg("initial_begin") = std::nullopt,
+           py::arg("spacing") = std::nullopt,
+           py::arg("max_size") = std::nullopt)
+      .def("do_not_collect", &monte::SelectedEventDataParams::do_not_collect,
+           R"pbdoc(
+          Remove the name of a quantity to be collected, and remove all custom
+          settings for that quantity.
+          )pbdoc")
+      .def(
+          "get_parameters",
+          [](monte::SelectedEventDataParams const &self, std::string name) {
+            jsonParser json;
+            if (self.tol.count(name)) {
+              json["tol"] = self.tol.at(name);
+            }
+            if (self.bin_width.count(name)) {
+              json["bin_width"] = self.bin_width.at(name);
+            }
+            if (self.initial_begin.count(name)) {
+              json["initial_begin"] = self.initial_begin.at(name);
+            }
+            if (self.is_log.count(name)) {
+              json["spacing"] = self.is_log.at(name) ? "log" : "linear";
+            }
+            if (self.max_size.count(name)) {
+              json["max_size"] = self.max_size.at(name);
+            }
+            return static_cast<nlohmann::json>(json);
+          },
+          R"pbdoc(
+          Get the custom settings for a quantity to be collected
+
+          Parameters
+          ----------
+          name : str
+              The name of the selected event data function
+
+          Returns
+          -------
+          dict
+              A dictionary of the custom settings for the quantity
+          )pbdoc",
+          py::arg("name"))
+      .def("reset", &monte::SelectedEventDataParams::reset, R"pbdoc(
+          Clear all quantities to be collected and any custom settings
+          )pbdoc")
+      .def(
+          "copy",
+          [](monte::SelectedEventDataParams const &self) {
+            return std::make_shared<monte::SelectedEventDataParams>(self);
+          },
+          R"pbdoc(
+          Returns a copy of the SelectedEventDataParams.
+          )pbdoc")
+      .def("__copy__",
+           [](monte::SelectedEventDataParams const &self) {
+             return std::make_shared<monte::SelectedEventDataParams>(self);
+           })
+      .def("__deepcopy__",
+           [](monte::SelectedEventDataParams const &self, py::dict) {
+             return std::make_shared<monte::SelectedEventDataParams>(self);
+           })
+      .def("__repr__",
+           [](monte::SelectedEventDataParams const &self) {
+             jsonParser json;
+             to_json(self, json);
+             std::stringstream ss;
+             ss << json;
+             return ss.str();
+           })
+      .def(
+          "to_dict",
+          [](monte::SelectedEventDataParams const &self) {
+            jsonParser json;
+            to_json(self, json);
+            return static_cast<nlohmann::json>(json);
+          },
+          "Represent the SelectedEventDataParams as a Python dict.")
+      .def_static(
+          "from_dict",
+          [](const nlohmann::json &data) {
+            // print errors and warnings to sys.stdout
+            py::scoped_ostream_redirect redirect;
+            jsonParser json{data};
+            InputParser<monte::SelectedEventDataParams> parser(json);
+            std::runtime_error error_if_invalid{
+                "Error in "
+                "libcasm.monte.sampling.SelectedEventDataParams.from_dict"};
+            report_and_throw_if_invalid(parser, CASM::log(), error_if_invalid);
+            return std::move(*parser.value);
+          },
+          "Construct SelectedEventDataParams from a Python dict.");
+
+  py::class_<monte::SelectedEventData,
+             std::shared_ptr<monte::SelectedEventData>>(m, "SelectedEventData",
+                                                        R"pbdoc(
         Holds data collected about selected events
         )pbdoc")
       .def(py::init<>(),
@@ -3218,7 +4143,59 @@ PYBIND11_MODULE(_monte_sampling, m) {
             .. rubric:: Constructor
 
             Default constructor only.
-            )pbdoc");
+            )pbdoc")
+      .def_readwrite("correlations_data",
+                     &monte::SelectedEventData::correlations_data,
+                     R"pbdoc(
+          CorrelationsData: Data structure for holding hop correlations data
+          )pbdoc")
+      .def_readwrite("discrete_vector_int_histograms",
+                     &monte::SelectedEventData::discrete_vector_int_histograms,
+                     R"pbdoc(
+          DiscreteVectorIntHistogramMap: Dict-like container of histograms
+          (:class:`~libcasm.monter.sampling.DiscreteVectorIntHistogram`)
+          for collecting discrete vector integer data from selected events.
+          )pbdoc")
+      .def_readwrite(
+          "discrete_vector_float_histograms",
+          &monte::SelectedEventData::discrete_vector_float_histograms,
+          R"pbdoc(
+          DiscreteVectorFloatHistogramMap: Dict-like container of histograms
+          (:class:`~libcasm.monter.sampling.DiscreteVectorFloatHistogram`)
+          for collecting discrete vector floating-point data from selected
+          events.
+          )pbdoc")
+      .def_readwrite("continuous_1d_histograms",
+                     &monte::SelectedEventData::continuous_1d_histograms,
+                     R"pbdoc(
+          PartitionedHistogram1DMap: Dict-like container of histograms
+          (:class:`~libcasm.monter.sampling.PartitionedHistogram1D`)
+          for collecting continuous 1d floating-point data from selected
+          events.
+          )pbdoc")
+      .def("reset", &monte::SelectedEventData::reset, R"pbdoc(
+          Reset all member data structures.
+          )pbdoc")
+      .def("__repr__",
+           [](monte::SelectedEventData const &self) {
+             jsonParser json;
+             json["has_correlations_data"] = self.correlations_data.has_value();
+             json["n_histograms"] =
+                 self.discrete_vector_int_histograms.size() +
+                 self.discrete_vector_float_histograms.size() +
+                 self.continuous_1d_histograms.size();
+             std::stringstream ss;
+             ss << json;
+             return ss.str();
+           })
+      .def(
+          "to_dict",
+          [](monte::SelectedEventData const &self) {
+            jsonParser json;
+            to_json(self, json);
+            return static_cast<nlohmann::json>(json);
+          },
+          "Represent the SelectedEventDataParams as a Python dict.");
 
 #ifdef VERSION_INFO
   m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);

@@ -63,7 +63,6 @@ struct CorrelationsData {
 
   Eigen::MatrixXl step;
   Eigen::MatrixXl pass;
-  Eigen::MatrixXl sample;
   Eigen::MatrixXd time;
 
   /// Store atom positions
@@ -76,7 +75,7 @@ struct CorrelationsData {
 
   void insert(Index atom_id, Index n_jumps,
               Eigen::VectorXd const &position_cart, CountType _step,
-              CountType _pass, CountType _sample, double _time);
+              CountType _pass, double _time);
 
  private:
   /// \brief Update the number of complete samples
@@ -95,9 +94,12 @@ struct CorrelationsData {
 ///   values are stored in the `out_of_range_count`.
 class DiscreteVectorIntHistogram {
  public:
-  DiscreteVectorIntHistogram(std::vector<std::string> const &_component_names,
-                             std::vector<Index> _shape,
-                             Index _max_size = 10000);
+  DiscreteVectorIntHistogram(
+      std::vector<std::string> const &_component_names,
+      std::vector<Index> _shape, Index _max_size = 10000,
+      std::optional<
+          std::map<Eigen::VectorXi, std::string, LexicographicalCompare>>
+          _value_labels = std::nullopt);
 
   /// \brief Return the shape of the quantity
   std::vector<Index> const &shape() const { return this->m_shape; }
@@ -135,6 +137,13 @@ class DiscreteVectorIntHistogram {
   /// \brief Return the count as a vector containing fractions of the sum
   std::vector<double> fraction() const;
 
+  /// Optional labels for each value in the histogram
+  std::optional<
+      std::map<Eigen::VectorXi, std::string, LexicographicalCompare>> const &
+  value_labels() const {
+    return this->m_value_labels;
+  }
+
  private:
   /// \brief Shape of quantity, with column-major unrolling
   ///
@@ -160,13 +169,20 @@ class DiscreteVectorIntHistogram {
   /// The number of values (total weight) that was not binned because the
   /// max_size was exceeded
   double m_out_of_range_count;
+
+  /// Optional labels for each value in the histogram
+  std::optional<std::map<Eigen::VectorXi, std::string, LexicographicalCompare>>
+      m_value_labels;
 };
 
 class DiscreteVectorFloatHistogram {
  public:
-  DiscreteVectorFloatHistogram(std::vector<std::string> const &_component_names,
-                               std::vector<Index> _shape, double _tol,
-                               Index _max_size = 10000);
+  DiscreteVectorFloatHistogram(
+      std::vector<std::string> const &_component_names,
+      std::vector<Index> _shape, double _tol, Index _max_size = 10000,
+      std::optional<
+          std::map<Eigen::VectorXd, std::string, FloatLexicographicalCompare>>
+          _value_labels = std::nullopt);
 
   /// \brief Return the shape of the quantity
   std::vector<Index> const &shape() const { return this->m_shape; }
@@ -184,6 +200,9 @@ class DiscreteVectorFloatHistogram {
 
   /// \brief Return true if the maximum number of unique values has been reached
   bool max_size_exceeded() const { return this->m_max_size_exceeded; }
+
+  /// \brief Return the tolerance for comparing floating point values
+  double tol() const { return this->m_count.key_comp().tol; }
 
   /// \brief Insert a value into the histogram, with an optional weight
   void insert(Eigen::VectorXd const &value, double weight = 1.0);
@@ -203,6 +222,13 @@ class DiscreteVectorFloatHistogram {
 
   /// \brief Return the count as a vector containing fractions of the sum
   std::vector<double> fraction() const;
+
+  /// Optional labels for each value in the histogram
+  std::optional<std::map<Eigen::VectorXd, std::string,
+                         FloatLexicographicalCompare>> const &
+  value_labels() const {
+    return this->m_value_labels;
+  }
 
  private:
   /// \brief Shape of quantity, with column-major unrolling
@@ -228,6 +254,11 @@ class DiscreteVectorFloatHistogram {
   /// The number of values (total weight) that was not binned because the
   /// max_size was exceeded
   double m_out_of_range_count;
+
+  /// Optional labels for each value in the histogram
+  std::optional<
+      std::map<Eigen::VectorXd, std::string, FloatLexicographicalCompare>>
+      m_value_labels;
 };
 
 /// \brief Histogram of a single continuous variable with fixed bin width
@@ -251,6 +282,9 @@ class Histogram1D {
   /// is in log space (using base 10)
   bool is_log() const { return this->m_is_log; }
 
+  /// \brief Return the number of bins in the histogram
+  Index size() const { return this->m_count.size(); }
+
   /// The maximum number of bins to store
   Index max_size() const { return this->m_max_size; }
 
@@ -273,7 +307,7 @@ class Histogram1D {
   /// \brief Return the coordinates of the beginning of each bin range
   std::vector<double> bin_coords() const;
 
-  /// \brief Return the sum of bin counts
+  /// \brief Return the sum of bin counts + out-of-range counts
   double sum() const;
 
   /// \brief Return the count as a probability density, such that the area
@@ -352,6 +386,9 @@ class PartitionedHistogram1D {
 
   /// \brief Access the individual histograms
   std::vector<Histogram1D> const &histograms() const {
+    if (m_histograms.size() == 1) {
+      return this->m_histograms;
+    }
     if (!m_up_to_date) {
       _make_combined_histogram();
     }
@@ -369,7 +406,12 @@ class PartitionedHistogram1D {
   }
 
   /// \brief Access the combined histogram
+  ///
+  /// If there is only a single partition, that histogram is returned directly.
   Histogram1D const &combined_histogram() const {
+    if (m_histograms.size() == 1) {
+      return m_histograms.front();
+    }
     if (!m_up_to_date) {
       _make_combined_histogram();
     }
@@ -405,12 +447,30 @@ class PartitionedHistogram1D {
 };
 
 struct SelectedEventDataFunctions {
-  std::map<std::string, HistogramFunction<Eigen::VectorXi>>
+  std::map<std::string, DiscreteVectorIntHistogramFunction>
       discrete_vector_int_functions;
-  std::map<std::string, HistogramFunction<Eigen::VectorXd>>
+  std::map<std::string, DiscreteVectorFloatHistogramFunction>
       discrete_vector_float_functions;
   std::map<std::string, PartitionedHistogramFunction<double>>
       continuous_1d_functions;
+
+  void insert(DiscreteVectorIntHistogramFunction f) {
+    this->discrete_vector_int_functions.emplace(f.name, f);
+  }
+
+  void insert(DiscreteVectorFloatHistogramFunction f) {
+    this->discrete_vector_float_functions.emplace(f.name, f);
+  }
+
+  void insert(PartitionedHistogramFunction<double> f) {
+    this->continuous_1d_functions.emplace(f.name, f);
+  }
+
+  void reset() {
+    discrete_vector_int_functions.clear();
+    discrete_vector_float_functions.clear();
+    continuous_1d_functions.clear();
+  }
 };
 
 struct SelectedEventDataParams {
@@ -444,6 +504,61 @@ struct SelectedEventDataParams {
 
   /// Maximum number of bins / discrete values, by function name
   std::map<std::string, Index> max_size;
+
+  SelectedEventDataParams &collect(std::string name, std::optional<double> tol,
+                                   std::optional<double> bin_width,
+                                   std::optional<double> initial_begin,
+                                   std::optional<std::string> spacing,
+                                   std::optional<Index> max_size) {
+    this->function_names.push_back(name);
+    if (tol.has_value()) {
+      this->tol[name] = tol.value();
+    }
+    if (bin_width.has_value()) {
+      this->bin_width[name] = bin_width.value();
+    }
+    if (initial_begin.has_value()) {
+      this->initial_begin[name] = initial_begin.value();
+    }
+    if (spacing.has_value()) {
+      std::string _spacing = spacing.value();
+      if (_spacing == "log") {
+        this->is_log[name] = true;
+      } else if (_spacing == "linear") {
+        this->is_log[name] = false;
+      } else {
+        throw std::runtime_error(
+            "Error in SelectedEventDataParams::set: spacing must be "
+            "'log' or 'linear'");
+      }
+    }
+    if (max_size.has_value()) {
+      this->max_size[name] = max_size.value();
+    }
+    return *this;
+  }
+
+  SelectedEventDataParams &do_not_collect(std::string name) {
+    this->function_names.erase(std::remove(this->function_names.begin(),
+                                           this->function_names.end(), name),
+                               this->function_names.end());
+    this->tol.erase(name);
+    this->bin_width.erase(name);
+    this->initial_begin.erase(name);
+    this->is_log.erase(name);
+    this->max_size.erase(name);
+    return *this;
+  }
+
+  void reset() {
+    correlations_data_params.reset();
+    function_names.clear();
+    tol.clear();
+    bin_width.clear();
+    initial_begin.clear();
+    is_log.clear();
+    max_size.clear();
+  }
 };
 
 /// \brief Statistics for events that have been selected
@@ -469,6 +584,54 @@ struct SelectedEventData {
   ///   by event orientation.
   ///
   std::map<std::string, PartitionedHistogram1D> continuous_1d_histograms;
+
+  void reset() {
+    correlations_data.reset();
+    discrete_vector_int_histograms.clear();
+    discrete_vector_float_histograms.clear();
+    continuous_1d_histograms.clear();
+  }
+};
+
+struct MonteCounter;
+
+struct SelectedEventDataCollector {
+  /// \brief Constructor
+  SelectedEventDataCollector(
+      monte::SelectedEventDataFunctions const &selected_event_data_functions,
+      monte::SelectedEventDataParams const &selected_event_data_params,
+      std::shared_ptr<monte::SelectedEventData> selected_event_data);
+
+  // -- Must not be null, else constructor will throw --
+  std::shared_ptr<monte::SelectedEventData> data;
+
+  /// \brief If True, the event state must be calculated for at least one of
+  ///     the requested functions
+  bool requires_event_state;
+
+  // -- Discrete vector int histograms --
+
+  std::vector<DiscreteVectorIntHistogramFunction> discrete_vector_int_f;
+  std::vector<DiscreteVectorIntHistogram *> discrete_vector_int_hist;
+
+  void collect_vector_int_data();
+
+  // -- Discrete vector float histograms --
+
+  std::vector<DiscreteVectorFloatHistogramFunction> discrete_vector_float_f;
+  std::vector<DiscreteVectorFloatHistogram *> discrete_vector_float_hist;
+
+  void collect_vector_float_data();
+
+  // -- Continuous 1d histograms --
+
+  std::vector<PartitionedHistogramFunction<double>> continuous_1d_f;
+  std::vector<PartitionedHistogram1D *> continuous_1d_hist;
+
+  void collect_continuous_1d_data();
+
+  // -- Collect selected event data --
+  void collect(monte::MonteCounter const &counter);
 };
 
 }  // namespace monte
