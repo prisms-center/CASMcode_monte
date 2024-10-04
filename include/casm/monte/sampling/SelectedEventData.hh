@@ -144,6 +144,12 @@ class DiscreteVectorIntHistogram {
     return this->m_value_labels;
   }
 
+  /// The number of values (total weight) in each bin
+  std::map<Eigen::VectorXi, double, LexicographicalCompare> const &
+  value_counts() const {
+    return this->m_count;
+  }
+
  private:
   /// \brief Shape of quantity, with column-major unrolling
   ///
@@ -228,6 +234,12 @@ class DiscreteVectorFloatHistogram {
                          FloatLexicographicalCompare>> const &
   value_labels() const {
     return this->m_value_labels;
+  }
+
+  /// The number of values (total weight) in each bin
+  std::map<Eigen::VectorXd, double, FloatLexicographicalCompare> const &
+  value_counts() const {
+    return this->m_count;
   }
 
  private:

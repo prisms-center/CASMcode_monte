@@ -233,6 +233,7 @@ class SamplingFixture {
       }
     }
 
+    this->sampling_functions.clear();
     for (auto const &name : m_params.sampling_params.sampler_names) {
       if (!m_params.sampling_functions.count(name)) {
         std::stringstream ss;
@@ -240,6 +241,20 @@ class SamplingFixture {
            << "'";
         throw std::runtime_error(ss.str());
       }
+      this->sampling_functions.emplace(name,
+                                       m_params.sampling_functions.at(name));
+    }
+
+    this->json_sampling_functions.clear();
+    for (auto const &name : m_params.sampling_params.json_sampler_names) {
+      if (!m_params.json_sampling_functions.count(name)) {
+        std::stringstream ss;
+        ss << "Sampling parameters error: No json sampling function for '"
+           << name << "'";
+        throw std::runtime_error(ss.str());
+      }
+      this->json_sampling_functions.emplace(
+          name, m_params.json_sampling_functions.at(name));
     }
 
     Log &log = m_params.method_log.log;
@@ -339,27 +354,27 @@ class SamplingFixture {
 
     // - Evaluate functions and record data
     for (auto const &name : m_params.sampling_params.sampler_names) {
-      if (m_params.sampling_functions.find(name) ==
-          m_params.sampling_functions.end()) {
+      if (this->sampling_functions.find(name) ==
+          this->sampling_functions.end()) {
         std::stringstream ss;
         ss << "Error in SamplingFixture::sample_data: did not find sampling "
               "function '"
            << name << "'";
         throw std::runtime_error(ss.str());
       }
-      auto const &function = m_params.sampling_functions.at(name);
+      auto const &function = this->sampling_functions.at(name);
       m_results.samplers.at(name)->push_back(function());
     }
     for (auto const &name : m_params.sampling_params.json_sampler_names) {
-      if (m_params.json_sampling_functions.find(name) ==
-          m_params.json_sampling_functions.end()) {
+      if (this->json_sampling_functions.find(name) ==
+          this->json_sampling_functions.end()) {
         std::stringstream ss;
         ss << "Error in SamplingFixture::sample_data: did not find json "
               "sampling function'"
            << name << "'";
         throw std::runtime_error(ss.str());
       }
-      auto const &function = m_params.json_sampling_functions.at(name);
+      auto const &function = this->json_sampling_functions.at(name);
       m_results.json_samplers.at(name)->values.push_back(function());
     }
 
@@ -434,6 +449,12 @@ class SamplingFixture {
  private:
   /// \brief Parameters controlling what is sampled and when
   SamplingFixtureParams<config_type, stats_type> m_params;
+
+  /// State sampling functions (copied made during `initialize`)
+  StateSamplingFunctionMap sampling_functions;
+
+  /// JSON State sampling functions (copied made during `initialize`)
+  jsonStateSamplingFunctionMap json_sampling_functions;
 
   /// \brief Random number generator
   monte::RandomNumberGenerator<engine_type> m_random_number_generator;

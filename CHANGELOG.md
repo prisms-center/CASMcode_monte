@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added `SamplingParams.json_sampler_names`, `SamplingParams.append_to_sampler_names`, `SamplingParams.remove_from_sampler_names`, `SamplingParams.extend_sampler_names`, `SamplingParams.append_to_json_sampler_names`, `SamplingParams.remove_from_json_sampler_names`, and `SamplingParams.extend_json_sampler_names`.
 - Added `jsonSampler` and `jsonSamplerMap` to `libcasm.monte.sampling`.
+- Added selected event data sampling methods to `libcasm.monte.sampling`.
+
+### Changed
+
+- Changed `SamplingFixture::initialize` to copy sampling functions from the SamplingFixtureParams object so functions that sample changes do not need to check if a new run has begun.
 
 ### Fixed
 
