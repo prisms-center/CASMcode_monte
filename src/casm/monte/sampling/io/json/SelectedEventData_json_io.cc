@@ -79,10 +79,12 @@ jsonParser &to_json(CorrelationsData const &correlations_data,
   return json;
 }
 
-/// \brief Convert DiscreteVectorIntHistogram to JSON
-jsonParser &to_json(DiscreteVectorIntHistogram const &histogram,
-                    jsonParser &json) {
-  DiscreteVectorIntHistogram const &data = histogram;
+namespace {
+
+template <typename DiscreteHistogramType>
+jsonParser &_discrete_histogram_to_json(DiscreteHistogramType const &histogram,
+                                        jsonParser &json) {
+  DiscreteHistogramType const &data = histogram;
   json.put_obj();
   json["shape"] = data.shape();
   json["max_size"] = data.max_size();
@@ -97,7 +99,7 @@ jsonParser &to_json(DiscreteVectorIntHistogram const &histogram,
   if (data.value_labels().has_value()) {
     json["labels"] = jsonParser::array();
     auto const &value_to_label = data.value_labels().value();
-    for (Eigen::VectorXi v : data.values()) {
+    for (auto v : data.values()) {
       if (value_to_label.count(v)) {
         json["labels"].push_back(value_to_label.at(v));
       } else {
@@ -127,50 +129,26 @@ jsonParser &to_json(DiscreteVectorIntHistogram const &histogram,
   return json;
 }
 
+}  // namespace
+
+/// \brief Convert DiscreteVectorIntHistogram to JSON
+jsonParser &to_json(DiscreteVectorIntHistogram const &histogram,
+                    jsonParser &json) {
+  return _discrete_histogram_to_json(histogram, json);
+}
+
 /// \brief Convert DiscreteVectorFloatHistogram to JSON
 jsonParser &to_json(DiscreteVectorFloatHistogram const &histogram,
                     jsonParser &json) {
-  auto &data = histogram;
-  json.put_obj();
-  json["shape"] = data.shape();
-  json["component_names"] = data.component_names();
-  json["max_size"] = data.max_size();
-  json["max_size_exceeded"] = data.max_size_exceeded();
-  json["size"] = data.size();
-  json["sum"] = data.sum();
-  if (data.shape().empty()) {
-    // scalar
-    json["values"] = jsonParser::array();
-    for (auto const &v : data.values()) {
-      json["values"].push_back(v(0));
-    }
-  } else {
-    json["component_names"] = data.component_names();
-    if (data.value_labels().has_value()) {
-      json["values"] = jsonParser::array();
-      auto const &value_to_label = data.value_labels().value();
-      for (Eigen::VectorXd v : data.values()) {
-        if (value_to_label.count(v)) {
-          json["values"].push_back(value_to_label.at(v));
-        } else {
-          json["values"].push_back(v, jsonParser::as_array());
-        }
-      }
-
-    } else {
-      to_json(data.values(), json["values"], jsonParser::as_array());
-    }
-  }
-  json["count"] = data.count();
-  json["fraction"] = data.fraction();
-  json["out_of_range_count"] = data.out_of_range_count();
-  return json;
+  return _discrete_histogram_to_json(histogram, json);
 }
 
 /// \brief Convert Histogram1D to JSON
 jsonParser &to_json(Histogram1D const &histogram, jsonParser &json) {
   auto &data = histogram;
   json.put_obj();
+  json["max_size"] = data.max_size();
+  json["max_size_exceeded"] = data.max_size_exceeded();
   json["is_log"] = data.is_log();
   json["begin"] = data.begin();
   json["bin_width"] = data.bin_width();
@@ -191,7 +169,7 @@ jsonParser &to_json(PartitionedHistogram1D const &histogram, jsonParser &json) {
     to_json(data.histograms()[0], json);
   } else {
     // If >1 partition, output combined histogram and partitioned histograms
-    to_json(data.combined_histogram(), json);
+    to_json(data.combined_histogram(), json["combined"]);
     json["partition_names"] = data.partition_names();
     json["partitions"] = jsonParser::array();
 

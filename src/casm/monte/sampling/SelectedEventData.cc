@@ -1,8 +1,5 @@
 #include "casm/monte/sampling/SelectedEventData.hh"
 
-// debug
-#include <iostream>
-
 namespace CASM::monte {
 
 void CorrelationsData::initialize(Index _n_atoms,
@@ -208,7 +205,9 @@ Histogram1D::Histogram1D(double _initial_begin, double _bin_width, bool _is_log,
       m_bin_width(_bin_width),
       m_is_log(_is_log),
       m_max_size(_max_size),
-      m_begin(_initial_begin) {}
+      m_max_size_exceeded(false),
+      m_begin(_initial_begin),
+      m_out_of_range_count(0.0) {}
 
 /// \brief Insert a value into the histogram, with an optional weight
 void Histogram1D::insert(double value, double weight) {
@@ -223,7 +222,8 @@ void Histogram1D::insert(double value, double weight) {
     return;
   }
 
-  int bin = (value - m_begin) / m_bin_width;
+  double _tol = 1e-10;
+  int bin = std::floor((value - m_begin) / m_bin_width + _tol);
 
   while (bin >= m_count.size()) {
     if (m_count.size() == m_max_size) {
@@ -295,6 +295,7 @@ void Histogram1D::merge(Histogram1D const &other) {
   for (Index i = 0; i < other.m_count.size(); ++i) {
     this->insert(other_bin_coords[i], other.m_count[i]);
   }
+  this->m_out_of_range_count += other.m_out_of_range_count;
 }
 
 /// \brief Reset histogram bins if this is the first value being added,
@@ -393,6 +394,7 @@ bool try_construct_vector_float_hist(
   if (!functions.discrete_vector_float_functions.count(name)) {
     return false;
   }
+
   collector.discrete_vector_float_f.push_back(
       functions.discrete_vector_float_functions.at(name));
 
@@ -425,6 +427,7 @@ bool try_construct_continuous_1d_hist(
   if (!functions.continuous_1d_functions.count(name)) {
     return false;
   }
+
   collector.continuous_1d_f.push_back(
       functions.continuous_1d_functions.at(name));
 
@@ -451,8 +454,8 @@ bool try_construct_continuous_1d_hist(
   collector.data->continuous_1d_histograms.emplace(
       name, monte::PartitionedHistogram1D(f.partition_names, f.initial_begin,
                                           f.bin_width, f.is_log, f.max_size));
-  collector.discrete_vector_float_hist.push_back(
-      &collector.data->discrete_vector_float_histograms.at(name));
+  collector.continuous_1d_hist.push_back(
+      &collector.data->continuous_1d_histograms.at(name));
   return true;
 }
 

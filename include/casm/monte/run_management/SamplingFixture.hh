@@ -6,6 +6,7 @@
 #include "casm/monte/checks/CutoffCheck.hh"
 #include "casm/monte/checks/EquilibrationCheck.hh"
 #include "casm/monte/definitions.hh"
+#include "casm/monte/misc/memory_used.hh"
 #include "casm/monte/run_management/Results.hh"
 #include "casm/monte/run_management/ResultsAnalysisFunction.hh"
 #include "casm/monte/run_management/io/ResultsIO.hh"
@@ -213,6 +214,7 @@ class SamplingFixture {
     m_counter.reset(m_params.sampling_params.sample_mode, steps_per_pass);
     m_completion_check.reset();
     m_results.reset();
+    m_results.initial_memory_used_MiB = memory_used_MiB(true);
 
     if (m_params.sampling_params.sample_mode == SAMPLE_MODE::BY_TIME) {
       m_next_sample_count = 0;
@@ -432,6 +434,7 @@ class SamplingFixture {
   /// \brief Write results and final status
   void finalize(state_type const &state, Index run_index) {
     Log &log = m_params.method_log.log;
+    m_results.final_memory_used_MiB = memory_used_MiB(true);
     m_results.elapsed_clocktime = log.time_s();
     m_results.completion_check_results = m_completion_check.results();
     m_results.analysis = make_analysis(m_results, m_params.analysis_functions,

@@ -48,6 +48,12 @@ struct Results {
   /// Results analysis functions
   ResultsAnalysisFunctionMap<ConfigType, StatisticsType> analysis_functions;
 
+  /// Memory used at initialization
+  std::optional<double> initial_memory_used_MiB;
+
+  /// Memory used at initialization
+  std::optional<double> final_memory_used_MiB;
+
   /// Elapsed clocktime
   std::optional<TimeType> elapsed_clocktime;
 
@@ -95,6 +101,8 @@ struct Results {
   BigCountType n_reject;
 
   void reset() {
+    initial_memory_used_MiB.reset();
+    final_memory_used_MiB.reset();
     elapsed_clocktime.reset();
     samplers.clear();
     json_samplers.clear();

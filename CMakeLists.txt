@@ -111,6 +111,7 @@ set(
   ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/BasicStructureTools.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/LexicographicalCompare.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/math.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/memory_used.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/misc/polymorphic_method_json_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/Results.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/run_management/ResultsAnalysisFunction.hh
@@ -145,6 +146,7 @@ set(
   ${PROJECT_SOURCE_DIR}/src/casm/monte/events/io/OccCandidate_stream_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/io/json/ValueMap_json_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/misc/BasicStructureTools.cc
+  ${PROJECT_SOURCE_DIR}/src/casm/monte/misc/memory_used.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/SelectedEventData.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/Sampler_json_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/SamplingParams_json_io.cc

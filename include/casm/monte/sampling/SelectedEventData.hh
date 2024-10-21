@@ -389,7 +389,8 @@ class PartitionedHistogram1D {
       : m_partition_names(_partion_names),
         m_histograms(
             _partion_names.size(),
-            Histogram1D(_initial_begin, _bin_width, _is_log, _max_size)) {}
+            Histogram1D(_initial_begin, _bin_width, _is_log, _max_size)),
+        m_up_to_date(false) {}
 
   /// \brief Return the names of the partitions
   std::vector<std::string> const &partition_names() const {
@@ -410,7 +411,7 @@ class PartitionedHistogram1D {
   /// \brief Insert a value into an individual histogram, with an optional
   /// weight
   void insert(int partition, double value, double weight = 1.0) {
-    bool m_up_to_date = false;
+    m_up_to_date = false;
     if (partition < 0 || partition >= m_histograms.size()) {
       throw std::runtime_error("Partition index out of range");
     }
@@ -442,6 +443,7 @@ class PartitionedHistogram1D {
         hist[i].insert(bin_coords.back(), 0.0);
       }
     }
+
     m_up_to_date = true;
   }
 

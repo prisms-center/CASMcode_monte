@@ -200,6 +200,8 @@ jsonParser &append_statistics_to_json(
 ///
 /// \code
 /// {
+///   "initial_memory_used_MiB": [...], <-- appends to
+///   "final_memory_used_MiB": [...], <-- appends to
 ///   "elapsed_clocktime": [...], <-- appends to
 ///   "all_equilibrated": [...], <-- appends to
 ///   "N_samples_for_all_to_equilibrate": [...], <-- appends to
@@ -232,6 +234,7 @@ jsonParser &append_completion_check_results_to_json(
 
   ensure_initialized_arrays(
       json, {"N_samples", "N_samples_for_statistics", "acceptance_rate",
+             "initial_memory_used_MiB", "final_memory_used_MiB",
              "elapsed_clocktime", "count"});
 
   json["N_samples"].push_back(N_samples(results));
@@ -239,6 +242,10 @@ jsonParser &append_completion_check_results_to_json(
   json["N_samples_for_statistics"].push_back(N_samples_for_statistics(results));
 
   json["acceptance_rate"].push_back(acceptance_rate(results));
+
+  json["initial_memory_used_MiB"].push_back(results.initial_memory_used_MiB);
+
+  json["final_memory_used_MiB"].push_back(results.final_memory_used_MiB);
 
   json["elapsed_clocktime"].push_back(elapsed_clocktime(results));
 
