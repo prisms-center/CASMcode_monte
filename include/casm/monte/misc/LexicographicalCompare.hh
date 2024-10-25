@@ -14,6 +14,11 @@ struct LexicographicalCompare {
     return std::lexicographical_compare(A.data(), A.data() + A.size(), B.data(),
                                         B.data() + B.size());
   }
+
+  bool operator()(Eigen::VectorXl const &A, Eigen::VectorXl const &B) const {
+    return std::lexicographical_compare(A.data(), A.data() + A.size(), B.data(),
+                                        B.data() + B.size());
+  }
 };
 
 /// \brief Lexicographically compare Eigen::VectorXd

@@ -7,7 +7,7 @@
 #include "casm/casm_io/json/optional.hh"
 #include "casm/monte/run_management/Results.hh"
 #include "casm/monte/run_management/io/json/jsonResultsIO.hh"
-#include "casm/monte/sampling/io/json/SelectedEventData_json_io.hh"
+#include "casm/monte/sampling/io/json/SelectedEventFunctions_json_io.hh"
 
 namespace CASM {
 namespace monte {

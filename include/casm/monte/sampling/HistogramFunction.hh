@@ -10,7 +10,7 @@ namespace monte {
 
 /// \brief A function to be evaluated during a Monte Carlo calculation
 ///
-/// - Each SamplingFunction returns a ValueType (e.g. Eigen::VectorXi,
+/// - Each SamplingFunction returns a ValueType (e.g. Eigen::VectorXl,
 ///   Eigen::VectorXd)
 /// - A StateSamplingFunction has additional information (name, description,
 ///   component_names) to enable specifying convergence criteria, allow input
@@ -21,17 +21,10 @@ namespace monte {
 template <typename ValueType, typename CompareType>
 class HistogramFunctionT {
  public:
-  /// \brief Constructor - default component names
-  HistogramFunctionT(std::string _name, std::string _description,
-                     std::vector<Index> _shape, bool _requires_event_state,
-                     std::function<ValueType()> _function,
-                     std::function<bool()> _has_value_function, Index _max_size,
-                     double _tol = CASM::TOL);
-
-  /// \brief Constructor - custom component names
+  /// \brief Constructor
   HistogramFunctionT(std::string _name, std::string _description,
                      std::vector<Index> _shape,
-                     std::vector<std::string> const &_component_names,
+                     std::optional<std::vector<std::string>> _component_names,
                      bool _requires_event_state,
                      std::function<ValueType()> _function,
                      std::function<bool()> _has_value_function, Index _max_size,
@@ -79,7 +72,7 @@ class HistogramFunctionT {
   bool has_value() const { return has_value_function(); }
 };
 
-typedef HistogramFunctionT<Eigen::VectorXi, LexicographicalCompare>
+typedef HistogramFunctionT<Eigen::VectorXl, LexicographicalCompare>
     DiscreteVectorIntHistogramFunction;
 
 typedef HistogramFunctionT<Eigen::VectorXd, FloatLexicographicalCompare>
@@ -142,40 +135,19 @@ class PartitionedHistogramFunction {
 namespace CASM {
 namespace monte {
 
-/// \brief Constructor - default component names
+/// \brief Constructor
 template <typename ValueType, typename CompareType>
 HistogramFunctionT<ValueType, CompareType>::HistogramFunctionT(
     std::string _name, std::string _description, std::vector<Index> _shape,
+    std::optional<std::vector<std::string>> _component_names,
     bool _requires_event_state, std::function<ValueType()> _function,
     std::function<bool()> _has_value_function, Index _max_size, double _tol)
     : name(_name),
       description(_description),
       shape(_shape),
-      component_names(default_component_names(shape)),
-      requires_event_state(_requires_event_state),
-      function(_function),
-      has_value_function(_has_value_function),
-      max_size(_max_size),
-      tol(_tol) {
-  if (!function) {
-    throw std::runtime_error("HistogramFunction: function is empty");
-  }
-  if (!has_value_function) {
-    throw std::runtime_error("HistogramFunction: has_value_function is empty");
-  }
-}
-
-/// \brief Constructor - custom component names
-template <typename ValueType, typename CompareType>
-HistogramFunctionT<ValueType, CompareType>::HistogramFunctionT(
-    std::string _name, std::string _description, std::vector<Index> _shape,
-    std::vector<std::string> const &_component_names,
-    bool _requires_event_state, std::function<ValueType()> _function,
-    std::function<bool()> _has_value_function, Index _max_size, double _tol)
-    : name(_name),
-      description(_description),
-      shape(_shape),
-      component_names(_component_names),
+      component_names(_component_names.has_value()
+                          ? _component_names.value()
+                          : default_component_names(shape)),
       requires_event_state(_requires_event_state),
       function(_function),
       has_value_function(_has_value_function),

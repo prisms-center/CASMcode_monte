@@ -14,7 +14,7 @@ class DiscreteVectorIntHistogram;
 class DiscreteVectorFloatHistogram;
 class Histogram1D;
 class PartitionedHistogram1D;
-struct SelectedEventDataParams;
+struct SelectedEventFunctionParams;
 struct SelectedEventData;
 
 /// \brief Construct CorrelationsDataParams from JSON
@@ -42,12 +42,13 @@ jsonParser &to_json(Histogram1D const &histogram, jsonParser &json);
 /// \brief Convert PartitionedHistogram1D to JSON
 jsonParser &to_json(PartitionedHistogram1D const &histogram, jsonParser &json);
 
-/// \brief Construct SelectedEventDataParams from JSON
-void parse(InputParser<SelectedEventDataParams> &parser);
+/// \brief Construct SelectedEventFunctionParams from JSON
+void parse(InputParser<SelectedEventFunctionParams> &parser);
 
-/// \brief Convert SelectedEventDataParams to JSON
-jsonParser &to_json(SelectedEventDataParams const &selected_event_data_params,
-                    jsonParser &json);
+/// \brief Convert SelectedEventFunctionParams to JSON
+jsonParser &to_json(
+    SelectedEventFunctionParams const &selected_event_data_params,
+    jsonParser &json);
 
 /// \brief Convert SelectedEventData to JSON
 jsonParser &to_json(SelectedEventData const &selected_event_data,

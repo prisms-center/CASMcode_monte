@@ -6,7 +6,7 @@
 #include "casm/monte/checks/CompletionCheck.hh"
 #include "casm/monte/run_management/ResultsAnalysisFunction.hh"
 #include "casm/monte/run_management/State.hh"
-#include "casm/monte/sampling/SelectedEventData.hh"
+#include "casm/monte/sampling/SelectedEventFunctions.hh"
 #include "casm/monte/sampling/StateSamplingFunction.hh"
 
 namespace CASM {

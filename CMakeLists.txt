@@ -127,11 +127,11 @@ set(
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/RequestedPrecisionConstructor.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/Sampler.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/SamplingParams.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/SelectedEventData.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/SelectedEventFunctions.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/StateSamplingFunction.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/io/json/Sampler_json_io.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/io/json/SamplingParams_json_io.hh
-  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/io/json/SelectedEventData_json_io.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/sampling/io/json/SelectedEventFunctions_json_io.hh
 )
 set(
   libcasm_monte_SOURCES
@@ -147,10 +147,10 @@ set(
   ${PROJECT_SOURCE_DIR}/src/casm/monte/io/json/ValueMap_json_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/misc/BasicStructureTools.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/misc/memory_used.cc
-  ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/SelectedEventData.cc
+  ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/SelectedEventFunctions.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/Sampler_json_io.cc
   ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/SamplingParams_json_io.cc
-  ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/SelectedEventData_json_io.cc
+  ${PROJECT_SOURCE_DIR}/src/casm/monte/sampling/io/json/SelectedEventFunctions_json_io.cc
 )
 add_library(casm_monte SHARED ${libcasm_monte_SOURCES})
 target_include_directories(casm_monte

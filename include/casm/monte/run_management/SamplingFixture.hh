@@ -12,7 +12,7 @@
 #include "casm/monte/run_management/io/ResultsIO.hh"
 #include "casm/monte/sampling/Sampler.hh"
 #include "casm/monte/sampling/SamplingParams.hh"
-#include "casm/monte/sampling/SelectedEventData.hh"
+#include "casm/monte/sampling/SelectedEventFunctions.hh"
 #include "casm/monte/sampling/StateSamplingFunction.hh"
 
 // logging

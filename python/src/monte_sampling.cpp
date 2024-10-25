@@ -28,11 +28,11 @@
 #include "casm/monte/sampling/HistogramFunction.hh"
 #include "casm/monte/sampling/Sampler.hh"
 #include "casm/monte/sampling/SamplingParams.hh"
-#include "casm/monte/sampling/SelectedEventData.hh"
+#include "casm/monte/sampling/SelectedEventFunctions.hh"
 #include "casm/monte/sampling/StateSamplingFunction.hh"
 #include "casm/monte/sampling/io/json/Sampler_json_io.hh"
 #include "casm/monte/sampling/io/json/SamplingParams_json_io.hh"
-#include "casm/monte/sampling/io/json/SelectedEventData_json_io.hh"
+#include "casm/monte/sampling/io/json/SelectedEventFunctions_json_io.hh"
 
 #define STRINGIFY(x) #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
@@ -150,7 +150,7 @@ monte::jsonStateSamplingFunction make_json_state_sampling_function(
 
 monte::DiscreteVectorIntHistogramFunction make_vector_int_histogram_function(
     std::string name, std::string description, std::vector<Index> shape,
-    bool requires_event_state, std::function<Eigen::VectorXi()> function,
+    bool requires_event_state, std::function<Eigen::VectorXl()> function,
     std::function<bool()> has_value_function,
     std::optional<std::vector<std::string>> component_names, Index max_size) {
   if (function == nullptr) {
@@ -160,15 +160,9 @@ monte::DiscreteVectorIntHistogramFunction make_vector_int_histogram_function(
   if (has_value_function == nullptr) {
     has_value_function = []() -> bool { return true; };
   }
-  if (!component_names.has_value()) {
-    return monte::DiscreteVectorIntHistogramFunction(
-        name, description, shape, requires_event_state, function,
-        has_value_function, max_size);
-  } else {
-    return monte::DiscreteVectorIntHistogramFunction(
-        name, description, shape, *component_names, requires_event_state,
-        function, has_value_function, max_size);
-  }
+  return monte::DiscreteVectorIntHistogramFunction(
+      name, description, shape, component_names, requires_event_state, function,
+      has_value_function, max_size);
 }
 
 monte::DiscreteVectorFloatHistogramFunction
@@ -185,15 +179,9 @@ make_vector_float_histogram_function(
   if (has_value_function == nullptr) {
     has_value_function = []() -> bool { return true; };
   }
-  if (!component_names.has_value()) {
-    return monte::DiscreteVectorFloatHistogramFunction(
-        name, description, shape, requires_event_state, function,
-        has_value_function, max_size, tol);
-  } else {
-    return monte::DiscreteVectorFloatHistogramFunction(
-        name, description, shape, *component_names, requires_event_state,
-        function, has_value_function, max_size, tol);
-  }
+  return monte::DiscreteVectorFloatHistogramFunction(
+      name, description, shape, component_names, requires_event_state, function,
+      has_value_function, max_size, tol);
 }
 
 monte::PartitionedHistogramFunction<double> make_partitioned_histogram_function(
@@ -213,6 +201,22 @@ monte::PartitionedHistogramFunction<double> make_partitioned_histogram_function(
   return monte::PartitionedHistogramFunction<double>(
       name, description, requires_event_state, function, partition_names,
       get_partition, is_log, initial_begin, bin_width, max_size);
+}
+
+monte::GenericSelectedEventFunction make_generic_selected_event_function(
+    std::string name, std::string description, bool requires_event_state,
+    std::function<void()> function, std::function<bool()> has_value_function,
+    Index order) {
+  if (function == nullptr) {
+    throw std::runtime_error(
+        "Error constructing GenericSelectedEventFunction: function == nullptr");
+  }
+  if (has_value_function == nullptr) {
+    has_value_function = []() -> bool { return true; };
+  }
+  return monte::GenericSelectedEventFunction(name, description,
+                                             requires_event_state, function,
+                                             has_value_function, order);
 }
 
 monte::CompletionCheckParams<statistics_type> make_completion_check_params(
@@ -313,6 +317,8 @@ PYBIND11_MAKE_OPAQUE(
     std::map<std::string, CASM::monte::DiscreteVectorFloatHistogramFunction>);
 PYBIND11_MAKE_OPAQUE(
     std::map<std::string, CASM::monte::PartitionedHistogramFunction<double>>);
+PYBIND11_MAKE_OPAQUE(
+    std::map<std::string, CASM::monte::GenericSelectedEventFunction>);
 PYBIND11_MAKE_OPAQUE(std::vector<CASM::monte::Histogram1D>);
 PYBIND11_MAKE_OPAQUE(CASM::monte::RequestedPrecisionMap);
 PYBIND11_MAKE_OPAQUE(
@@ -633,7 +639,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           )pbdoc")
       .def_readwrite("sampler_names", &monte::SamplingParams::sampler_names,
                      R"pbdoc(
-          List[str]: Get or set (as a copy) the names of quantities to sample
+          list[str]: Get or set (as a copy) the names of quantities to sample
           (i.e. sampling function names).
 
           Note that this is a property that either (i) gets a copy of the
@@ -677,7 +683,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
       .def_readwrite("json_sampler_names",
                      &monte::SamplingParams::json_sampler_names,
                      R"pbdoc(
-          List[str]: Get or set (as a copy) the names of JSON quantities to sample
+          list[str]: Get or set (as a copy) the names of JSON quantities to sample
           (i.e. json sampling function names).
 
           Note that this is a property that either (i) gets a copy of the
@@ -758,12 +764,12 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
       Parameters
       ----------
-      shape : List[int]
+      shape : list[int]
           The shape of quantity to be sampled
 
       Returns
       -------
-      component_names : List[str]
+      component_names : list[str]
           The default component names are:
 
           - shape = [] (scalar) -> {"0"}
@@ -786,7 +792,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
       Returns
       -------
-      component_names : List[str]
+      component_names : list[str]
           A vector of (row,col) names ["0,0", "1,0", ..., "n_rows-1,n_cols-1"]
       )pbdoc",
         py::arg("n_rows"), py::arg("n_cols"));
@@ -810,10 +816,10 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           Parameters
           ----------
-          shape : List[int]
+          shape : list[int]
               The shape of quantity to be sampled. Use ``[]`` for scalar, ``[n]``
               for a length ``n`` vector, ``[m, n]`` for a shape ``(m,n)`` matrix, etc.
-          component_names : Optional[List[str]] = None
+          component_names : Optional[list[str]] = None
               Names to give to each sampled vector element. If None, components
               are given default names according column-major unrolling:
 
@@ -1124,7 +1130,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           description : str
               Description of the function.
 
-          shape : List[int]
+          shape : list[int]
               Shape of quantity, with column-major unrolling
 
               Scalar: [], Vector: [n], Matrix: [m, n], etc.
@@ -1132,7 +1138,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           function : function
               A function with 0 arguments that returns an array of the proper size sampling the current state. Typically this is a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
 
-          component_names : Optional[List[str]] = None
+          component_names : Optional[list[str]] = None
               A name for each component of the resulting vector.
 
               Can be strings representing an indices (i.e "0", "1", "2", etc.) or can be a descriptive string (i.e. "Mg", "Va", "O", etc.). If None, indices for column-major ordering are used (i.e. "0,0", "1,0", ..., "m-1,n-1")
@@ -1150,14 +1156,14 @@ PYBIND11_MODULE(_monte_sampling, m) {
           )pbdoc")
       .def_readwrite("shape", &monte::StateSamplingFunction::shape,
                      R"pbdoc(
-          List[int] : Shape of quantity, with column-major unrolling.
+          list[int] : Shape of quantity, with column-major unrolling.
 
           Scalar: [], Vector: [n], Matrix: [m, n], etc.
           )pbdoc")
       .def_readwrite("component_names",
                      &monte::StateSamplingFunction::component_names,
                      R"pbdoc(
-          List[str] : A name for each component of the resulting vector.
+          list[str] : A name for each component of the resulting vector.
 
           Can be strings representing an indices (i.e "0", "1", "2", etc.) or can be a descriptive string (i.e. "Mg", "Va", "O", etc.). If the sampled quantity is an unrolled matrix, indices for column-major ordering are typical (i.e. "0,0", "1,0", ..., "m-1,n-1").
           )pbdoc")
@@ -1297,7 +1303,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           description : str
               Description of the function.
 
-          shape : List[int]
+          shape : list[int]
               Shape of quantity, with column-major unrolling
 
               Scalar: [], Vector: [n], Matrix: [m, n], etc.
@@ -1307,9 +1313,11 @@ PYBIND11_MODULE(_monte_sampling, m) {
               event to be calculated.
 
           function : function
-              A function with 0 arguments that returns an array of the proper
-              size sampling the current state. Typically this is a lambda
-              function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
+              A function with 0 arguments that returns a integer-valued array.
+              Typically this is a lambda function that has been given a
+              reference or pointer to a Monte Carlo calculation object so that
+              it can access the last selected event state and the Monte Carlo
+              state before the event occurs.
 
           has_value_function : Optional[function] = None
               An optional function with 0 arguments that returns a bool
@@ -1319,7 +1327,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
               Carlo calculation object so that it can access the current
               selected event and determine if a value should be collected.
 
-          component_names : Optional[List[str]] = None
+          component_names : Optional[list[str]] = None
               A name for each component of the resulting vector.
 
               Can be strings representing an indices (i.e "0", "1", "2", etc.) or can be a descriptive string (i.e. "Mg", "Va", "O", etc.). If None, indices for column-major ordering are used (i.e. "0,0", "1,0", ..., "m-1,n-1")
@@ -1347,7 +1355,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           )pbdoc")
       .def_readwrite("shape", &monte::DiscreteVectorIntHistogramFunction::shape,
                      R"pbdoc(
-          List[int] : Shape of quantity, with column-major unrolling.
+          list[int] : Shape of quantity, with column-major unrolling.
 
           Scalar: [], Vector: [n], Matrix: [m, n], etc.
           )pbdoc")
@@ -1355,7 +1363,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           "component_names",
           &monte::DiscreteVectorIntHistogramFunction::component_names,
           R"pbdoc(
-          List[str] : A name for each component of the resulting vector.
+          list[str] : A name for each component of the resulting vector.
 
           Can be strings representing an indices (i.e "0", "1", "2", etc.) or can be a descriptive string (i.e. "Mg", "Va", "O", etc.). If the sampled quantity is an unrolled matrix, indices for column-major ordering are typical (i.e. "0,0", "1,0", ..., "m-1,n-1").
           )pbdoc")
@@ -1371,7 +1379,11 @@ PYBIND11_MODULE(_monte_sampling, m) {
                      R"pbdoc(
           function : The function to be evaluated.
 
-          A function with 0 arguments that returns an array of the proper size sampling the current state. Typically this is a lambda function that has been given a reference or pointer to a Monte Carlo calculation object so that it can access the current state of the simulation.
+          A function with 0 arguments that returns a integer-valued array.
+          Typically this is a lambda function that has been given a
+          reference or pointer to a Monte Carlo calculation object so that
+          it can access the last selected event state and the Monte Carlo
+          state before the event occurs.
           )pbdoc")
       .def_readwrite(
           "has_value_function",
@@ -1393,7 +1405,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
       .def(
           "__call__",
           [](monte::DiscreteVectorIntHistogramFunction const &f)
-              -> Eigen::VectorXi { return f(); },
+              -> Eigen::VectorXl { return f(); },
           R"pbdoc(
           Evaluates the function
 
@@ -1402,7 +1414,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
       .def(
           "value_labels",
           [](monte::DiscreteVectorIntHistogramFunction const &self) {
-            typedef std::pair<Eigen::VectorXi, std::string> pair_type;
+            typedef std::pair<Eigen::VectorXl, std::string> pair_type;
             typedef std::vector<pair_type> vector_type;
             std::optional<vector_type> value_labels;
             if (self.value_labels.has_value()) {
@@ -1420,13 +1432,13 @@ PYBIND11_MODULE(_monte_sampling, m) {
       .def(
           "set_value_labels",
           [](monte::DiscreteVectorIntHistogramFunction &self,
-             std::optional<std::vector<std::pair<Eigen::VectorXi, std::string>>>
+             std::optional<std::vector<std::pair<Eigen::VectorXl, std::string>>>
                  value_labels) {
             if (!value_labels.has_value()) {
               self.value_labels = std::nullopt;
               return;
             }
-            self.value_labels = std::map<Eigen::VectorXi, std::string,
+            self.value_labels = std::map<Eigen::VectorXl, std::string,
                                          monte::LexicographicalCompare>();
             for (auto const &pair : value_labels.value()) {
               self.value_labels->emplace(pair.first, pair.second);
@@ -1482,7 +1494,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           description : str
               Description of the function.
 
-          shape : List[int]
+          shape : list[int]
               Shape of quantity, with column-major unrolling
 
               Scalar: [], Vector: [n], Matrix: [m, n], etc.
@@ -1492,11 +1504,11 @@ PYBIND11_MODULE(_monte_sampling, m) {
               event to be calculated.
 
           function : function
-              A function with 0 arguments that returns an array of the proper
-              size sampling the current state. Typically this is a lambda
-              function that has been given a reference or pointer to a Monte
-              Carlo calculation object so that it can access the current state
-              of the simulation.
+              A function with 0 arguments that returns a float-valued array.
+              Typically this is a lambda function that has been given a
+              reference or pointer to a Monte Carlo calculation object so that
+              it can access the last selected event state and the Monte Carlo
+              state before the event occurs.
 
           has_value_function : Optional[function] = None
               An optional function with 0 arguments that returns a bool
@@ -1506,7 +1518,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
               Carlo calculation object so that it can access the current
               selected event and determine if a value should be collected.
 
-          component_names : Optional[List[str]] = None
+          component_names : Optional[list[str]] = None
               A name for each component of the resulting vector.
 
               Can be strings representing an indices (i.e "0", "1", "2", etc.) or can be a descriptive string (i.e. "Mg", "Va", "O", etc.). If None, indices for column-major ordering are used (i.e. "0,0", "1,0", ..., "m-1,n-1")
@@ -1538,7 +1550,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
       .def_readwrite("shape",
                      &monte::DiscreteVectorFloatHistogramFunction::shape,
                      R"pbdoc(
-          List[int] : Shape of quantity, with column-major unrolling.
+          list[int] : Shape of quantity, with column-major unrolling.
 
           Scalar: [], Vector: [n], Matrix: [m, n], etc.
           )pbdoc")
@@ -1546,7 +1558,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           "component_names",
           &monte::DiscreteVectorFloatHistogramFunction::component_names,
           R"pbdoc(
-          List[str] : A name for each component of the resulting vector.
+          list[str] : A name for each component of the resulting vector.
 
           Can be strings representing an indices (i.e "0", "1", "2", etc.) or can be a descriptive string (i.e. "Mg", "Va", "O", etc.). If the sampled quantity is an unrolled matrix, indices for column-major ordering are typical (i.e. "0,0", "1,0", ..., "m-1,n-1").
           )pbdoc")
@@ -1562,10 +1574,11 @@ PYBIND11_MODULE(_monte_sampling, m) {
                      R"pbdoc(
           function : The function to be evaluated.
 
-          A function with 0 arguments that returns an array of the proper size
-          sampling the current state. Typically this is a lambda function that
-          has been given a reference or pointer to a Monte Carlo calculation
-          object so that it can access the current state of the simulation.
+          A function with 0 arguments that returns a float-valued array.
+          Typically this is a lambda function that has been given a
+          reference or pointer to a Monte Carlo calculation object so that
+          it can access the last selected event state and the Monte Carlo
+          state before the event occurs.
           )pbdoc")
       .def_readwrite(
           "has_value_function",
@@ -1693,7 +1706,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
               a Monte Carlo calculation object so that it can access the last
               selected event state and the Monte Carlo state before the event
               occurs.
-          partition_names : List[str]
+          partition_names : list[str]
               A name for each partition.
           get_partition_function : function
               A function with 0 arguments that returns an int. Typically this
@@ -1739,6 +1752,12 @@ PYBIND11_MODULE(_monte_sampling, m) {
           R"pbdoc(
           bool : If True, the function requires the event state of the selected
           event to be calculated.
+          )pbdoc")
+      .def_readwrite(
+          "partition_names",
+          &monte::PartitionedHistogramFunction<double>::partition_names,
+          R"pbdoc(
+          list[str]: A name for each partition.
           )pbdoc")
       .def_readwrite("function",
                      &monte::PartitionedHistogramFunction<double>::function,
@@ -1824,7 +1843,121 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
       Notes
       -----
-      PartitionedHistogramFunction is a Dict[str, :class:`~libcasm.monte.sampling.PartitionedHistogramFunction`]-like object.
+      PartitionedHistogramFunctionMap is a Dict[str, :class:`~libcasm.monte.sampling.PartitionedHistogramFunction`]-like object.
+      )pbdoc",
+      py::module_local(false));
+
+  py::class_<monte::GenericSelectedEventFunction>(
+      m, "GenericSelectedEventFunction",
+      R"pbdoc(
+      A generic function that will be evaluated after selecting an event and
+      before collecting data about the event.
+
+      Notes
+      -----
+
+      These functions can:
+
+      - request to have the event state of the selected event calculated,
+      - be customized to only evaluate after particular event types are
+        selected, and
+      - be evaluated before selected event data collection functions are
+        evaluated, in user-specified order.
+
+      )pbdoc")
+      .def(py::init<>(&make_generic_selected_event_function),
+           R"pbdoc(
+
+          .. rubric:: Constructor
+
+          Parameters
+          ----------
+          name : str
+              Name of the sampled quantity.
+          description : str
+              Description of the function.
+          requires_event_state : bool
+              If true, the function requires the event state of the selected
+              event to be calculated.
+          function : function
+              A function with 0 arguments that returns nothing. Typically this
+              is a lambda function that has been given a reference or pointer to
+              a Monte Carlo calculation object so that it can access the last
+              selected event state and the Monte Carlo state before the event
+              occurs. It may print information, perform calculations, modify
+              a data structure used by other functions, etc.
+          has_value_function : Optional[function] = None
+              An optional function with 0 arguments that returns a bool
+              indicating that the value of `function` should be collected.
+              Default is to always return True. Typically this is a lambda
+              function that has been given a reference or pointer to a Monte
+              Carlo calculation object so that it can access the current
+              selected event and determine if a value should be collected.
+          order : int = 0
+              Order in which the function is evaluated. Functions with lower
+              order are evaluated first. If two functions have the same order,
+              they are evaluated in lexicographical order by function name.
+           )pbdoc",
+           py::arg("name"), py::arg("description"),
+           py::arg("requires_event_state"), py::arg("function"),
+           py::arg("has_value_function") = nullptr, py::arg("order") = 0)
+      .def_readwrite("name", &monte::GenericSelectedEventFunction::name,
+                     R"pbdoc(
+          str : Name of the function.
+          )pbdoc")
+      .def_readwrite("description",
+                     &monte::GenericSelectedEventFunction::description,
+                     R"pbdoc(
+          str : Description of the function.
+          )pbdoc")
+      .def_readwrite("requires_event_state",
+                     &monte::GenericSelectedEventFunction::requires_event_state,
+                     R"pbdoc(
+          bool : If True, the function requires the event state of the selected
+          event to be calculated.
+          )pbdoc")
+      .def_readwrite("function", &monte::GenericSelectedEventFunction::function,
+                     R"pbdoc(
+          function : The function to be evaluated.
+
+          A function with 0 arguments that returns nothing. Typically this is a
+          lambda function that has been given a reference or pointer to a Monte
+          Carlo calculation object so that it can access the current state of
+          the simulation, event data, and the selected event.
+          )pbdoc")
+      .def_readwrite("has_value_function",
+                     &monte::GenericSelectedEventFunction::has_value_function,
+                     R"pbdoc(
+          function : A function that returns a bool indicating that the value
+          of `function` should be collected.
+
+          Typically this is a lambda function that has been given a reference
+          or pointer to a Monte Carlo calculation object so that it can access
+          the current selected event and determine the function should be
+          evaluated.
+          )pbdoc")
+      .def_readwrite("order", &monte::GenericSelectedEventFunction::order,
+                     R"pbdoc(
+          int: Order in which generic functions are evaluated, starting with the
+          lowest number, and breaking ties by comparing function names
+          lexicographically.
+          )pbdoc")
+      .def(
+          "__call__", [](monte::GenericSelectedEventFunction const &f) { f(); },
+          R"pbdoc(
+          Evaluates the function
+
+          Equivalent to calling :py::attr:`~libcasm.monte.sampling.GenericSelectedEventFunction.function`.
+          )pbdoc");
+
+  py::bind_map<std::map<std::string, monte::GenericSelectedEventFunction>>(
+      m, "GenericSelectedEventFunctionMap",
+      R"pbdoc(
+      GenericSelectedEventFunctionMap stores :class:`~libcasm.monte.sampling.GenericSelectedEventFunction` by name of the function
+
+      Notes
+      -----
+      GenericSelectedEventFunctionMap is a Dict[str, :class:`~libcasm.monte.sampling.PartitionedHistogramFunction`]-like object.
       )pbdoc",
       py::module_local(false));
 
@@ -3467,7 +3600,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
            ----------
            component_names: list[str]
                Names of the components of the vector.
-           shape : List[int]
+           shape : list[int]
                Shape of quantity, with column-major unrolling
 
                Scalar: [], Vector: [n], Matrix: [m, n], etc.
@@ -3569,7 +3702,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
            ----------
            component_names: list[str]
                Names of the components of the vector.
-           shape : List[int]
+           shape : list[int]
                Shape of quantity, with column-major unrolling
 
                scalar: [], vector: [n], matrix: [m, n], etc.
@@ -3878,9 +4011,9 @@ PYBIND11_MODULE(_monte_sampling, m) {
       )pbdoc",
       py::module_local(false));
 
-  py::class_<monte::SelectedEventDataFunctions,
-             std::shared_ptr<monte::SelectedEventDataFunctions>>(
-      m, "SelectedEventDataFunctions",
+  py::class_<monte::SelectedEventFunctions,
+             std::shared_ptr<monte::SelectedEventFunctions>>(
+      m, "SelectedEventFunctions",
       R"pbdoc(
         Holds functions that return selected event data
         )pbdoc")
@@ -3890,34 +4023,40 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
             Default constructor only.
             )pbdoc")
+      .def_readwrite("generic_functions",
+                     &monte::SelectedEventFunctions::generic_functions,
+                     R"pbdoc(
+          GenericSelectedEventFunctionMap: Dict-like container of functions
+          (:class:`GenericSelectedEventFunction`) to be evaluated when an event
+          is selected.
+          )pbdoc")
       .def_readwrite(
           "discrete_vector_int_functions",
-          &monte::SelectedEventDataFunctions::discrete_vector_int_functions,
+          &monte::SelectedEventFunctions::discrete_vector_int_functions,
           R"pbdoc(
           VectorIntHistogramFunctionMap: Dict-like container of functions
-          (:class:`VectorInHistogramFunction`) for collecting discrete
+          (:class:`VectorIntHistogramFunction`) for collecting discrete
           vector integer data from selected events.
           )pbdoc")
       .def_readwrite(
           "discrete_vector_float_functions",
-          &monte::SelectedEventDataFunctions::discrete_vector_float_functions,
+          &monte::SelectedEventFunctions::discrete_vector_float_functions,
           R"pbdoc(
           VectorFloatHistogramFunctionMap: Dict-like container of functions
           (:class:`VectorFloatHistogramFunction`) for collecting discrete
           vector floating-point data from selected events.
           )pbdoc")
-      .def_readwrite(
-          "continuous_1d_functions",
-          &monte::SelectedEventDataFunctions::continuous_1d_functions,
-          R"pbdoc(
+      .def_readwrite("continuous_1d_functions",
+                     &monte::SelectedEventFunctions::continuous_1d_functions,
+                     R"pbdoc(
           PartitionedHistogramFunctionMap: Dict-like container of functions
           (:class:`PartitionedHistogramFunction`) for collecting continuous
           1d floating-point data from selected events.
           )pbdoc");
 
-  py::class_<monte::SelectedEventDataParams,
-             std::shared_ptr<monte::SelectedEventDataParams>>(
-      m, "SelectedEventDataParams",
+  py::class_<monte::SelectedEventFunctionParams,
+             std::shared_ptr<monte::SelectedEventFunctionParams>>(
+      m, "SelectedEventFunctionParams",
       R"pbdoc(
         Parameters controlling selected event data collection
         )pbdoc")
@@ -3927,9 +4066,10 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
             Default constructor only.
             )pbdoc")
-      .def_readonly("correlations_data_params",
-                    &monte::SelectedEventDataParams::correlations_data_params,
-                    R"pbdoc(
+      .def_readonly(
+          "correlations_data_params",
+          &monte::SelectedEventFunctionParams::correlations_data_params,
+          R"pbdoc(
           Optional[CorrelationsDataParams]: Parameters for hop correlations data,
           which may be None if hop correlations data is not to be collected.
 
@@ -3938,7 +4078,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           :func:`do_not_collect_hop_correlations`.
           )pbdoc")
       .def_readonly("function_names",
-                    &monte::SelectedEventDataParams::function_names,
+                    &monte::SelectedEventFunctionParams::function_names,
                     R"pbdoc(
           list[str]: The names of the selected event data functions which
           should be evaluated to collect data during a simulation.
@@ -3949,7 +4089,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           )pbdoc")
       .def(
           "collect_hop_correlations",
-          [](monte::SelectedEventDataParams &self,
+          [](monte::SelectedEventFunctionParams &self,
              Index jumps_per_position_sample, Index max_n_position_samples,
              bool output_incomplete_samples, bool stop_run_when_complete) {
             self.correlations_data_params = monte::CorrelationsDataParams(
@@ -3980,7 +4120,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           Returns
           -------
-          self: libcasm.clexmonte.SelectedEventDataParams
+          self: libcasm.clexmonte.SelectedEventFunctionParams
               To allow chaining multiple calls, `self` is returned
           )pbdoc",
           py::arg("jumps_per_position_sample") = 1,
@@ -3989,7 +4129,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           py::arg("stop_run_when_complete") = false)
       .def(
           "do_not_collect_hop_correlations",
-          [](monte::SelectedEventDataParams &self) {
+          [](monte::SelectedEventFunctionParams &self) {
             self.correlations_data_params = std::nullopt;
             return self;
           },
@@ -3998,10 +4138,34 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           Returns
           -------
-          self: libcasm.clexmonte.SelectedEventDataParams
+          self: libcasm.clexmonte.SelectedEventFunctionParams
               To allow chaining multiple calls, `self` is returned
           )pbdoc")
-      .def("collect", &monte::SelectedEventDataParams::collect,
+      .def("evaluate", &monte::SelectedEventFunctionParams::evaluate,
+           R"pbdoc(
+          Add the name of a function to be evaluated for each selected event,
+          along with optional order of evaluation.
+
+          Parameters
+          ----------
+          name : str
+              The name of a selected event data function to be added to
+              `self.selected_event_data_params.function_names`. These should
+              be keys in one of the dictionaries in a
+              :class:`SelectedEventFunctions` object.
+          order : Optional[int] = None
+              The order in which generic selected event functions are evaluated.
+              Functions with lower order are evaluated first. If two functions
+              have the same order, they are evaluated in lexicographical order
+              by function name.
+
+          Returns
+          -------
+          self: libcasm.clexmonte.SelectedEventFunctionParams
+              To allow chaining multiple calls, `self` is returned
+          )pbdoc",
+           py::arg("name"), py::arg("order") = std::nullopt)
+      .def("collect", &monte::SelectedEventFunctionParams::collect,
            R"pbdoc(
           Add the name of a quantity to be collected for each selected event,
           along with optional custom settings.
@@ -4012,7 +4176,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
               The name of a selected event data function to be added to
               `self.selected_event_data_params.function_names`. These should
               be keys in one of the dictionaries in a
-              :class:`SelectedEventDataFunctions` object.
+              :class:`SelectedEventFunctions` object.
           tol : Optional[float] = None
               The tolerance for comparing values, applicable to
               discrete floating point valued functions. If None, the
@@ -4035,7 +4199,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           Returns
           -------
-          self: libcasm.clexmonte.SelectedEventDataParams
+          self: libcasm.clexmonte.SelectedEventFunctionParams
               To allow chaining multiple calls, `self` is returned
           )pbdoc",
            py::arg("name"), py::arg("tol") = std::nullopt,
@@ -4043,14 +4207,15 @@ PYBIND11_MODULE(_monte_sampling, m) {
            py::arg("initial_begin") = std::nullopt,
            py::arg("spacing") = std::nullopt,
            py::arg("max_size") = std::nullopt)
-      .def("do_not_collect", &monte::SelectedEventDataParams::do_not_collect,
+      .def("do_not_collect",
+           &monte::SelectedEventFunctionParams::do_not_collect,
            R"pbdoc(
           Remove the name of a quantity to be collected, and remove all custom
           settings for that quantity.
           )pbdoc")
       .def(
           "get_parameters",
-          [](monte::SelectedEventDataParams const &self, std::string name) {
+          [](monte::SelectedEventFunctionParams const &self, std::string name) {
             jsonParser json;
             if (self.tol.count(name)) {
               json["tol"] = self.tol.at(name);
@@ -4083,27 +4248,27 @@ PYBIND11_MODULE(_monte_sampling, m) {
               A dictionary of the custom settings for the quantity
           )pbdoc",
           py::arg("name"))
-      .def("reset", &monte::SelectedEventDataParams::reset, R"pbdoc(
+      .def("reset", &monte::SelectedEventFunctionParams::reset, R"pbdoc(
           Clear all quantities to be collected and any custom settings
           )pbdoc")
       .def(
           "copy",
-          [](monte::SelectedEventDataParams const &self) {
-            return std::make_shared<monte::SelectedEventDataParams>(self);
+          [](monte::SelectedEventFunctionParams const &self) {
+            return std::make_shared<monte::SelectedEventFunctionParams>(self);
           },
           R"pbdoc(
-          Returns a copy of the SelectedEventDataParams.
+          Returns a copy of the SelectedEventFunctionParams.
           )pbdoc")
       .def("__copy__",
-           [](monte::SelectedEventDataParams const &self) {
-             return std::make_shared<monte::SelectedEventDataParams>(self);
+           [](monte::SelectedEventFunctionParams const &self) {
+             return std::make_shared<monte::SelectedEventFunctionParams>(self);
            })
       .def("__deepcopy__",
-           [](monte::SelectedEventDataParams const &self, py::dict) {
-             return std::make_shared<monte::SelectedEventDataParams>(self);
+           [](monte::SelectedEventFunctionParams const &self, py::dict) {
+             return std::make_shared<monte::SelectedEventFunctionParams>(self);
            })
       .def("__repr__",
-           [](monte::SelectedEventDataParams const &self) {
+           [](monte::SelectedEventFunctionParams const &self) {
              jsonParser json;
              to_json(self, json);
              std::stringstream ss;
@@ -4112,26 +4277,26 @@ PYBIND11_MODULE(_monte_sampling, m) {
            })
       .def(
           "to_dict",
-          [](monte::SelectedEventDataParams const &self) {
+          [](monte::SelectedEventFunctionParams const &self) {
             jsonParser json;
             to_json(self, json);
             return static_cast<nlohmann::json>(json);
           },
-          "Represent the SelectedEventDataParams as a Python dict.")
+          "Represent the SelectedEventFunctionParams as a Python dict.")
       .def_static(
           "from_dict",
           [](const nlohmann::json &data) {
             // print errors and warnings to sys.stdout
             py::scoped_ostream_redirect redirect;
             jsonParser json{data};
-            InputParser<monte::SelectedEventDataParams> parser(json);
+            InputParser<monte::SelectedEventFunctionParams> parser(json);
             std::runtime_error error_if_invalid{
                 "Error in "
-                "libcasm.monte.sampling.SelectedEventDataParams.from_dict"};
+                "libcasm.monte.sampling.SelectedEventFunctionParams.from_dict"};
             report_and_throw_if_invalid(parser, CASM::log(), error_if_invalid);
             return std::move(*parser.value);
           },
-          "Construct SelectedEventDataParams from a Python dict.");
+          "Construct SelectedEventFunctionParams from a Python dict.");
 
   py::class_<monte::SelectedEventData,
              std::shared_ptr<monte::SelectedEventData>>(m, "SelectedEventData",
@@ -4195,7 +4360,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
             to_json(self, json);
             return static_cast<nlohmann::json>(json);
           },
-          "Represent the SelectedEventDataParams as a Python dict.");
+          "Represent the SelectedEventFunctionParams as a Python dict.");
 
 #ifdef VERSION_INFO
   m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);

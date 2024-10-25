@@ -1,9 +1,9 @@
-#include "casm/monte/sampling/io/json/SelectedEventData_json_io.hh"
+#include "casm/monte/sampling/io/json/SelectedEventFunctions_json_io.hh"
 
 #include "casm/casm_io/container/json_io.hh"
 #include "casm/casm_io/json/InputParser_impl.hh"
 #include "casm/casm_io/json/optional.hh"
-#include "casm/monte/sampling/SelectedEventData.hh"
+#include "casm/monte/sampling/SelectedEventFunctions.hh"
 
 namespace CASM {
 namespace monte {
@@ -193,7 +193,7 @@ jsonParser &to_json(PartitionedHistogram1D const &histogram, jsonParser &json) {
   return json;
 }
 
-/// \brief Construct SelectedEventDataParams from JSON
+/// \brief Construct SelectedEventFunctionParams from JSON
 ///
 /// Expected:
 ///
@@ -248,10 +248,10 @@ jsonParser &to_json(PartitionedHistogram1D const &histogram, jsonParser &json) {
 ///       to the `out_of_range_count`. May be provided to override the
 ///       default value for a particular quantity.
 ///
-void parse(InputParser<SelectedEventDataParams> &parser) {
-  parser.value = std::make_unique<SelectedEventDataParams>();
+void parse(InputParser<SelectedEventFunctionParams> &parser) {
+  parser.value = std::make_unique<SelectedEventFunctionParams>();
 
-  SelectedEventDataParams &params = *parser.value;
+  SelectedEventFunctionParams &params = *parser.value;
 
   auto subparser =
       parser.subparse<CorrelationsDataParams>("correlations_data_params");
@@ -312,9 +312,10 @@ void parse(InputParser<SelectedEventDataParams> &parser) {
   }
 }
 
-/// \brief Convert SelectedEventDataParams to JSON
-jsonParser &to_json(SelectedEventDataParams const &selected_event_data_params,
-                    jsonParser &json) {
+/// \brief Convert SelectedEventFunctionParams to JSON
+jsonParser &to_json(
+    SelectedEventFunctionParams const &selected_event_data_params,
+    jsonParser &json) {
   auto &params = selected_event_data_params;
   json.put_obj();
   if (params.correlations_data_params.has_value()) {

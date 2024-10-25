@@ -98,7 +98,7 @@ class DiscreteVectorIntHistogram {
       std::vector<std::string> const &_component_names,
       std::vector<Index> _shape, Index _max_size = 10000,
       std::optional<
-          std::map<Eigen::VectorXi, std::string, LexicographicalCompare>>
+          std::map<Eigen::VectorXl, std::string, LexicographicalCompare>>
           _value_labels = std::nullopt);
 
   /// \brief Return the shape of the quantity
@@ -119,13 +119,13 @@ class DiscreteVectorIntHistogram {
   bool max_size_exceeded() const { return this->m_max_size_exceeded; }
 
   /// \brief Insert a value into the histogram, with an optional weight
-  void insert(Eigen::VectorXi const &value, double weight = 1.0);
+  void insert(Eigen::VectorXl const &value, double weight = 1.0);
 
   /// \brief Return the sum of bin counts + out-of-range counts
   double sum() const;
 
   /// \brief Return the values as a vector
-  std::vector<Eigen::VectorXi> values() const;
+  std::vector<Eigen::VectorXl> values() const;
 
   /// \brief Return the count as a vector
   std::vector<double> count() const;
@@ -139,13 +139,13 @@ class DiscreteVectorIntHistogram {
 
   /// Optional labels for each value in the histogram
   std::optional<
-      std::map<Eigen::VectorXi, std::string, LexicographicalCompare>> const &
+      std::map<Eigen::VectorXl, std::string, LexicographicalCompare>> const &
   value_labels() const {
     return this->m_value_labels;
   }
 
   /// The number of values (total weight) in each bin
-  std::map<Eigen::VectorXi, double, LexicographicalCompare> const &
+  std::map<Eigen::VectorXl, double, LexicographicalCompare> const &
   value_counts() const {
     return this->m_count;
   }
@@ -170,14 +170,14 @@ class DiscreteVectorIntHistogram {
   bool m_max_size_exceeded;
 
   /// The number of values (total weight) in each bin
-  std::map<Eigen::VectorXi, double, LexicographicalCompare> m_count;
+  std::map<Eigen::VectorXl, double, LexicographicalCompare> m_count;
 
   /// The number of values (total weight) that was not binned because the
   /// max_size was exceeded
   double m_out_of_range_count;
 
   /// Optional labels for each value in the histogram
-  std::optional<std::map<Eigen::VectorXi, std::string, LexicographicalCompare>>
+  std::optional<std::map<Eigen::VectorXl, std::string, LexicographicalCompare>>
       m_value_labels;
 };
 
@@ -460,13 +460,63 @@ class PartitionedHistogram1D {
   mutable std::optional<Histogram1D> m_combined_histogram;
 };
 
-struct SelectedEventDataFunctions {
+/// \brief A function to be evaluated during a Monte Carlo calculation after
+/// every event selection
+///
+/// - Can request to have the event state of the selected event calculated
+/// - Can be customized to only evaluate after particular event types are
+///   selected.
+/// - Will be evaluated before selected event data collection functions are
+///   evaluated, in user-specified order (defaults to lexicographical by
+///   function name).
+///
+class GenericSelectedEventFunction {
+ public:
+  /// \brief Constructor - default component names
+  GenericSelectedEventFunction(std::string _name, std::string _description,
+                               bool _requires_event_state,
+                               std::function<void()> _function,
+                               std::function<bool()> _has_value_function,
+                               Index _order);
+
+  /// \brief Function name (and quantity to be sampled)
+  std::string name;
+
+  /// \brief Description of the function
+  std::string description;
+
+  /// \brief Does the function require the event state?
+  bool requires_event_state;
+
+  /// \brief The function to be evaluated
+  std::function<void()> function;
+
+  /// \brief Returns true if the function has a value
+  std::function<bool()> has_value_function;
+
+  /// \brief The order in which the function should be evaluated (ties are
+  /// broken by function name)
+  Index order;
+
+  /// \brief Evaluates `function`
+  void operator()() const { return function(); }
+
+  /// \brief Evaluates `has_value_function`
+  bool has_value() const { return has_value_function(); }
+};
+
+struct SelectedEventFunctions {
+  std::map<std::string, GenericSelectedEventFunction> generic_functions;
   std::map<std::string, DiscreteVectorIntHistogramFunction>
       discrete_vector_int_functions;
   std::map<std::string, DiscreteVectorFloatHistogramFunction>
       discrete_vector_float_functions;
   std::map<std::string, PartitionedHistogramFunction<double>>
       continuous_1d_functions;
+
+  void insert(GenericSelectedEventFunction f) {
+    this->generic_functions.emplace(f.name, f);
+  }
 
   void insert(DiscreteVectorIntHistogramFunction f) {
     this->discrete_vector_int_functions.emplace(f.name, f);
@@ -481,13 +531,14 @@ struct SelectedEventDataFunctions {
   }
 
   void reset() {
+    generic_functions.clear();
     discrete_vector_int_functions.clear();
     discrete_vector_float_functions.clear();
     continuous_1d_functions.clear();
   }
 };
 
-struct SelectedEventDataParams {
+struct SelectedEventFunctionParams {
   // -- Jump Correlations --------------------------------------------
 
   /// Optional parameters for collecting correlations data
@@ -495,10 +546,15 @@ struct SelectedEventDataParams {
 
   // -- Histograms ----------------------------------------------
 
-  // -- Which histograms to collect --
+  // -- Which histograms to collect / generic functions to evaluate --
 
-  /// The data to collect and construct histograms for
+  /// The data to collect and construct histograms for or generic functions to
+  /// evaluate
   std::vector<std::string> function_names;
+
+  // -- Allow overriding default values for the generic functions --
+
+  std::map<std::string, Index> order;
 
   // -- The following allow overriding default values for the histograms --
 
@@ -519,11 +575,21 @@ struct SelectedEventDataParams {
   /// Maximum number of bins / discrete values, by function name
   std::map<std::string, Index> max_size;
 
-  SelectedEventDataParams &collect(std::string name, std::optional<double> tol,
-                                   std::optional<double> bin_width,
-                                   std::optional<double> initial_begin,
-                                   std::optional<std::string> spacing,
-                                   std::optional<Index> max_size) {
+  SelectedEventFunctionParams &evaluate(std::string name,
+                                        std::optional<Index> order) {
+    this->function_names.push_back(name);
+    if (order.has_value()) {
+      this->order[name] = order.value();
+    }
+    return *this;
+  }
+
+  SelectedEventFunctionParams &collect(std::string name,
+                                       std::optional<double> tol,
+                                       std::optional<double> bin_width,
+                                       std::optional<double> initial_begin,
+                                       std::optional<std::string> spacing,
+                                       std::optional<Index> max_size) {
     this->function_names.push_back(name);
     if (tol.has_value()) {
       this->tol[name] = tol.value();
@@ -542,7 +608,7 @@ struct SelectedEventDataParams {
         this->is_log[name] = false;
       } else {
         throw std::runtime_error(
-            "Error in SelectedEventDataParams::set: spacing must be "
+            "Error in SelectedEventFunctionParams::set: spacing must be "
             "'log' or 'linear'");
       }
     }
@@ -552,10 +618,11 @@ struct SelectedEventDataParams {
     return *this;
   }
 
-  SelectedEventDataParams &do_not_collect(std::string name) {
+  SelectedEventFunctionParams &do_not_collect(std::string name) {
     this->function_names.erase(std::remove(this->function_names.begin(),
                                            this->function_names.end(), name),
                                this->function_names.end());
+    this->order.erase(name);
     this->tol.erase(name);
     this->bin_width.erase(name);
     this->initial_begin.erase(name);
@@ -567,6 +634,7 @@ struct SelectedEventDataParams {
   void reset() {
     correlations_data_params.reset();
     function_names.clear();
+    order.clear();
     tol.clear();
     bin_width.clear();
     initial_begin.clear();
@@ -612,8 +680,8 @@ struct MonteCounter;
 struct SelectedEventDataCollector {
   /// \brief Constructor
   SelectedEventDataCollector(
-      monte::SelectedEventDataFunctions const &selected_event_data_functions,
-      monte::SelectedEventDataParams const &selected_event_data_params,
+      monte::SelectedEventFunctions const &selected_event_data_functions,
+      monte::SelectedEventFunctionParams const &selected_event_data_params,
       std::shared_ptr<monte::SelectedEventData> selected_event_data);
 
   // -- Must not be null, else constructor will throw --
@@ -644,8 +712,13 @@ struct SelectedEventDataCollector {
 
   void collect_continuous_1d_data();
 
-  // -- Collect selected event data --
-  void collect(monte::MonteCounter const &counter);
+  // -- Generic functions --
+
+  std::vector<GenericSelectedEventFunction> generic_f;
+  void evaluate_generic_functions();
+
+  // -- Collect selected event data && evaluate generic functions --
+  void collect();
 };
 
 }  // namespace monte

@@ -1,4 +1,4 @@
-#include "casm/monte/sampling/SelectedEventData.hh"
+#include "casm/monte/sampling/SelectedEventFunctions.hh"
 
 namespace CASM::monte {
 
@@ -65,7 +65,7 @@ DiscreteVectorIntHistogram::DiscreteVectorIntHistogram(
     std::vector<std::string> const &_component_names, std::vector<Index> _shape,
     Index _max_size,
     std::optional<
-        std::map<Eigen::VectorXi, std::string, LexicographicalCompare>>
+        std::map<Eigen::VectorXl, std::string, LexicographicalCompare>>
         _value_labels)
     : m_shape(_shape),
       m_component_names(_component_names),
@@ -75,7 +75,7 @@ DiscreteVectorIntHistogram::DiscreteVectorIntHistogram(
       m_value_labels(_value_labels) {}
 
 /// \brief Insert a value into the histogram, with an optional weight
-void DiscreteVectorIntHistogram::insert(Eigen::VectorXi const &value,
+void DiscreteVectorIntHistogram::insert(Eigen::VectorXl const &value,
                                         double weight) {
   // If the value is not already in the histogram, insert it with a count of 0
   auto it = m_count.find(value);
@@ -100,8 +100,8 @@ double DiscreteVectorIntHistogram::sum() const {
 }
 
 /// \brief Return the values as a vector
-std::vector<Eigen::VectorXi> DiscreteVectorIntHistogram::values() const {
-  std::vector<Eigen::VectorXi> _keys;
+std::vector<Eigen::VectorXl> DiscreteVectorIntHistogram::values() const {
+  std::vector<Eigen::VectorXl> _keys;
   for (auto const &x : m_count) {
     _keys.push_back(x.first);
   }
@@ -356,11 +356,48 @@ Histogram1D combine(std::vector<Histogram1D> const &histograms) {
   return combined;
 }
 
+/// \brief Constructor - default component names
+GenericSelectedEventFunction::GenericSelectedEventFunction(
+    std::string _name, std::string _description, bool _requires_event_state,
+    std::function<void()> _function, std::function<bool()> _has_value_function,
+    Index _order)
+    : name(_name),
+      description(_description),
+      requires_event_state(_requires_event_state),
+      function(_function),
+      has_value_function(_has_value_function),
+      order(_order) {}
+
 namespace {
+
+bool try_construct_generic_f(
+    SelectedEventDataCollector &collector, std::string name,
+    monte::SelectedEventFunctions const &functions,
+    monte::SelectedEventFunctionParams const &params,
+    std::map<std::pair<Index, std::string>, GenericSelectedEventFunction>
+        &ordered_generic_f) {
+  if (!functions.generic_functions.count(name)) {
+    return false;
+  }
+
+  auto f = functions.generic_functions.at(name);
+
+  if (params.order.count(name)) {
+    f.order = params.order.at(name);
+  }
+
+  ordered_generic_f.emplace(std::make_pair(f.order, f.name), f);
+
+  collector.requires_event_state =
+      (collector.requires_event_state || f.requires_event_state);
+
+  return true;
+}
+
 bool try_construct_vector_int_hist(
     SelectedEventDataCollector &collector, std::string name,
-    monte::SelectedEventDataFunctions const &functions,
-    monte::SelectedEventDataParams const &params) {
+    monte::SelectedEventFunctions const &functions,
+    monte::SelectedEventFunctionParams const &params) {
   if (!functions.discrete_vector_int_functions.count(name)) {
     return false;
   }
@@ -389,8 +426,8 @@ bool try_construct_vector_int_hist(
 
 bool try_construct_vector_float_hist(
     SelectedEventDataCollector &collector, std::string name,
-    monte::SelectedEventDataFunctions const &functions,
-    monte::SelectedEventDataParams const &params) {
+    monte::SelectedEventFunctions const &functions,
+    monte::SelectedEventFunctionParams const &params) {
   if (!functions.discrete_vector_float_functions.count(name)) {
     return false;
   }
@@ -422,8 +459,8 @@ bool try_construct_vector_float_hist(
 
 bool try_construct_continuous_1d_hist(
     SelectedEventDataCollector &collector, std::string name,
-    monte::SelectedEventDataFunctions const &functions,
-    monte::SelectedEventDataParams const &params) {
+    monte::SelectedEventFunctions const &functions,
+    monte::SelectedEventFunctionParams const &params) {
   if (!functions.continuous_1d_functions.count(name)) {
     return false;
   }
@@ -466,8 +503,8 @@ bool try_construct_continuous_1d_hist(
 /// \param selected_event_data Where data will be stored. Will be reset. Must
 ///     not be null, else will throw a runtime_error.
 SelectedEventDataCollector::SelectedEventDataCollector(
-    monte::SelectedEventDataFunctions const &selected_event_data_functions,
-    monte::SelectedEventDataParams const &selected_event_data_params,
+    monte::SelectedEventFunctions const &selected_event_data_functions,
+    monte::SelectedEventFunctionParams const &selected_event_data_params,
     std::shared_ptr<monte::SelectedEventData> selected_event_data)
     : data(selected_event_data), requires_event_state(false) {
   auto const &functions = selected_event_data_functions;
@@ -481,8 +518,14 @@ SelectedEventDataCollector::SelectedEventDataCollector(
 
   data->reset();
 
+  // Use this to sort the generic functions by {order, name}
+  std::map<std::pair<Index, std::string>, GenericSelectedEventFunction>
+      ordered_generic_f;
   for (std::string const &name : selected_event_data_params.function_names) {
-    if (try_construct_vector_int_hist(*this, name, functions, params)) {
+    if (try_construct_generic_f(*this, name, functions, params,
+                                ordered_generic_f)) {
+      continue;
+    } else if (try_construct_vector_int_hist(*this, name, functions, params)) {
       continue;
     } else if (try_construct_vector_float_hist(*this, name, functions,
                                                params)) {
@@ -496,6 +539,11 @@ SelectedEventDataCollector::SelectedEventDataCollector(
           "selected_event_data_params: " +
           name);
     }
+  }
+
+  // Copy the sorted generic functions
+  for (auto const &pair : ordered_generic_f) {
+    generic_f.push_back(pair.second);
   }
 }
 
@@ -542,7 +590,17 @@ void SelectedEventDataCollector::collect_continuous_1d_data() {
   }
 }
 
-void SelectedEventDataCollector::collect(monte::MonteCounter const &counter) {
+void SelectedEventDataCollector::evaluate_generic_functions() {
+  auto f_it = generic_f.begin();
+  auto f_end = generic_f.end();
+  while (f_it != f_end) {
+    f_it->function();
+    ++f_it;
+  }
+}
+
+void SelectedEventDataCollector::collect() {
+  evaluate_generic_functions();
   collect_vector_int_data();
   collect_vector_float_data();
   collect_continuous_1d_data();
