@@ -6,9 +6,10 @@
 
 // -- Memory usage --
 // https://stackoverflow.com/a/372525
+// Changed getpagesize() to sysconf(_SC_PAGESIZE)
 
 #ifdef __linux__
-#include <sys/sysinfo.h>
+#include <unistd.h>
 #endif
 
 #ifdef __APPLE__
@@ -42,7 +43,8 @@ std::size_t memory_used(bool resident) {
     unsigned long vm = 0;
     fscanf(file, "%ul", &vm);  // Just need the first num: vm size
     fclose(file);
-    size = (std::size_t)vm * getpagesize();
+    long pagesize = sysconf(_SC_PAGESIZE);
+    size = (std::size_t)vm * pagesize;
   }
   return size;
 
