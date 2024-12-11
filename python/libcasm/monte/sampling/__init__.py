@@ -1,5 +1,6 @@
 """ CASM Monte Carlo sampling and convergence check methods """
 
+# keep seperate for now
 from ._monte_sampling import (
     SAMPLE_METHOD,
     SAMPLE_MODE,
@@ -10,19 +11,35 @@ from ._monte_sampling import (
     CompletionCheckResults,
     ConvergenceCheckResults,
     ConvergenceResultMap,
+    CorrelationsData,
+    CorrelationsDataParams,
     CutoffCheckParams,
+    DiscreteVectorFloatHistogram,
+    DiscreteVectorIntHistogram,
     EquilibrationCheckResults,
     EquilibrationResultMap,
+    GenericSelectedEventFunction,
+    Histogram1D,
     IndividualConvergenceResult,
     IndividualEquilibrationResult,
+    PartitionedHistogram1D,
+    PartitionedHistogramFunction,
+    PartitionedHistogramFunctionMap,
     RequestedPrecision,
     RequestedPrecisionMap,
     Sampler,
     SamplerComponent,
     SamplerMap,
     SamplingParams,
+    SelectedEventData,
+    SelectedEventFunctionParams,
+    SelectedEventFunctions,
     StateSamplingFunction,
     StateSamplingFunctionMap,
+    VectorFloatHistogramFunction,
+    VectorFloatHistogramFunctionMap,
+    VectorIntHistogramFunction,
+    VectorIntHistogramFunctionMap,
     all_minimums_met,
     any_maximum_met,
     colmajor_component_names,
@@ -41,24 +58,4 @@ from ._monte_sampling import (
 from ._requested_precision_constructor import (
     RequestedPrecisionConstructor,
     converge,
-)
-
-# keep seperate for now
-from ._monte_sampling import (
-    CorrelationsData,
-    CorrelationsDataParams,
-    DiscreteVectorIntHistogram,
-    DiscreteVectorFloatHistogram,
-    GenericSelectedEventFunction,
-    Histogram1D,
-    PartitionedHistogram1D,
-    PartitionedHistogramFunction,
-    PartitionedHistogramFunctionMap,
-    SelectedEventData,
-    SelectedEventFunctions,
-    SelectedEventFunctionParams,
-    VectorFloatHistogramFunction,
-    VectorFloatHistogramFunctionMap,
-    VectorIntHistogramFunction,
-    VectorIntHistogramFunctionMap,
 )
