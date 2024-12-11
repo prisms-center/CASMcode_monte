@@ -1,6 +1,8 @@
 #ifndef CASM_monte_HistogramFunction
 #define CASM_monte_HistogramFunction
 
+#include <optional>
+
 #include "casm/monte/definitions.hh"
 #include "casm/monte/misc/LexicographicalCompare.hh"
 #include "casm/monte/sampling/Sampler.hh"
