@@ -1,5 +1,6 @@
 #include "casm/monte/misc/memory_used.hh"
 
+#include <cmath>
 #include <iomanip>
 #include <sstream>
 #include <vector>
@@ -41,7 +42,7 @@ std::size_t memory_used(bool resident) {
   FILE *file = fopen("/proc/self/statm", "r");
   if (file) {
     unsigned long vm = 0;
-    fscanf(file, "%ul", &vm);  // Just need the first num: vm size
+    fscanf(file, "%lu", &vm);  // Just need the first num: vm size
     fclose(file);
     long pagesize = sysconf(_SC_PAGESIZE);
     size = (std::size_t)vm * pagesize;
