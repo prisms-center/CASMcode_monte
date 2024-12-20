@@ -254,8 +254,8 @@ void parse(InputParser<SelectedEventFunctionParams> &parser) {
   SelectedEventFunctionParams &params = *parser.value;
 
   auto subparser =
-      parser.subparse<CorrelationsDataParams>("correlations_data_params");
-  if (subparser->valid()) {
+      parser.subparse_if<CorrelationsDataParams>("correlations_data_params");
+  if (subparser->valid() && subparser->value != nullptr) {
     params.correlations_data_params = std::move(*subparser->value);
   }
 
