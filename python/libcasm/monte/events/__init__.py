@@ -1,4 +1,5 @@
 """Monte Carlo event application and occupant tracking"""
+
 from ._monte_events import (
     Atom,
     AtomLocation,

@@ -1,4 +1,5 @@
 """Monte Carlo simulation methods"""
+
 from ._metropolis import (
     metropolis_acceptance,
 )

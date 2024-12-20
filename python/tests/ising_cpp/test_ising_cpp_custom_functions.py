@@ -1,4 +1,5 @@
 """Test C++ implemented property ising_cpp with Python implemented Monte Carlo loop"""
+
 import json
 import math
 import pathlib
