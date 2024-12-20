@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed error parsing SelectedEventFunctionParams from JSON.
+- Fixed error merging log space Histogram1D which resulted in infinite loops.
 
 
 ## [2.0a3] - 2024-12-11

@@ -210,31 +210,41 @@ Histogram1D::Histogram1D(double _initial_begin, double _bin_width, bool _is_log,
       m_out_of_range_count(0.0) {}
 
 /// \brief Insert a value into the histogram, with an optional weight
+///
+/// Notes:
+/// - This function takes the "real value" being inserted into the histogram,
+///   whether the histogram is in linear or log space.
+///
+/// \param log_value The "real value" being inserted into the histogram. If the
+///     histogram is in log space, then the logarithm (std::log10) of `value` is
+///     evaluated and inserted.
+/// \param weight The weight to assign to the value
+
 void Histogram1D::insert(double value, double weight) {
   if (m_is_log) {
-    value = std::log10(value);
+    this->_insert(std::log10(value), weight);
+  } else {
+    this->_insert(value, weight);
   }
-  if (value < m_begin || m_count.empty()) {
-    _reset_bins(value);
-  }
-  if (value < m_begin && m_max_size_exceeded) {
-    m_out_of_range_count += weight;
-    return;
-  }
+}
 
-  double _tol = 1e-10;
-  int bin = std::floor((value - m_begin) / m_bin_width + _tol);
-
-  while (bin >= m_count.size()) {
-    if (m_count.size() == m_max_size) {
-      m_max_size_exceeded = true;
-      m_out_of_range_count += weight;
-      return;
-    }
-    m_count.push_back(0);
+/// \brief Insert the log of a value into a log space histogram directly,
+///     with an optional weight.
+///
+/// Notes:
+/// - This function is used to update the histogram when the logarithm
+///   (std::log10) of the "real value" has already been evaluated.
+/// - This function throws if the histogram is not in log space.
+///
+/// \param log_value The logarithm (std::log10) of the "real value"
+/// \param weight The weight to assign to the value
+void Histogram1D::insert_log_value(double log_value, double weight) {
+  if (!m_is_log) {
+    throw std::runtime_error(
+        "Error in Histogram1D::insert_log_value: histogram is not in log "
+        "space");
   }
-
-  m_count[bin] += weight;
+  this->_insert(log_value, weight);
 }
 
 /// \brief Return the coordinates of the beginning of each bin range
@@ -293,9 +303,42 @@ void Histogram1D::merge(Histogram1D const &other) {
   // Merge the counts
   std::vector<double> other_bin_coords = other.bin_coords();
   for (Index i = 0; i < other.m_count.size(); ++i) {
-    this->insert(other_bin_coords[i], other.m_count[i]);
+    if (m_is_log) {
+      this->insert_log_value(other_bin_coords[i], other.m_count[i]);
+    } else {
+      this->insert(other_bin_coords[i], other.m_count[i]);
+    }
   }
   this->m_out_of_range_count += other.m_out_of_range_count;
+}
+
+/// \brief Insert a value into the histogram, with an optional weight
+///
+/// \param value The value to add to the histogram. If `is_log` is true,
+///     the value should already be in log space.
+/// \param weight The weight to assign to the value
+void Histogram1D::_insert(double value, double weight) {
+  if (value < m_begin || m_count.empty()) {
+    _reset_bins(value);
+  }
+  if (value < m_begin && m_max_size_exceeded) {
+    m_out_of_range_count += weight;
+    return;
+  }
+
+  double _tol = 1e-10;
+  int bin = std::floor((value - m_begin) / m_bin_width + _tol);
+
+  while (bin >= m_count.size()) {
+    if (m_count.size() == m_max_size) {
+      m_max_size_exceeded = true;
+      m_out_of_range_count += weight;
+      return;
+    }
+    m_count.push_back(0);
+  }
+
+  m_count[bin] += weight;
 }
 
 /// \brief Reset histogram bins if this is the first value being added,
@@ -304,6 +347,12 @@ void Histogram1D::merge(Histogram1D const &other) {
 /// \param value The value to add to the histogram. If `is_log` is true,
 ///     the value should already be in log space.
 void Histogram1D::_reset_bins(double value) {
+  if (!std::isfinite(value)) {
+    std::stringstream msg;
+    msg << "Error in Histogram1D::_reset_bins: value (=" << value
+        << ") is not finite.";
+    throw std::runtime_error(msg.str());
+  }
   if (m_count.empty()) {
     while (value < m_begin) {
       m_begin -= m_bin_width;
@@ -355,6 +404,37 @@ Histogram1D combine(std::vector<Histogram1D> const &histograms) {
   }
   return combined;
 }
+
+// -- PartitionedHistogram1D --
+
+PartitionedHistogram1D::PartitionedHistogram1D(
+    std::vector<std::string> const &_partion_names, double _initial_begin,
+    double _bin_width, bool _is_log, Index _max_size)
+    : m_partition_names(_partion_names),
+      m_histograms(_partion_names.size(),
+                   Histogram1D(_initial_begin, _bin_width, _is_log, _max_size)),
+      m_up_to_date(false) {}
+
+/// \brief Make the combined histogram from the partitioned histograms
+void PartitionedHistogram1D::_make_combined_histogram() const {
+  m_combined_histogram = combine(m_histograms);
+  std::vector<double> bin_coords = m_combined_histogram->bin_coords();
+  if (!bin_coords.empty()) {
+    auto &hist = const_cast<std::vector<Histogram1D> &>(m_histograms);
+    for (Index i = 0; i < hist.size(); ++i) {
+      if (m_combined_histogram->is_log()) {
+        hist[i].insert_log_value(bin_coords.front(), 0.0);
+        hist[i].insert_log_value(bin_coords.back(), 0.0);
+      } else {
+        hist[i].insert(bin_coords.front(), 0.0);
+        hist[i].insert(bin_coords.back(), 0.0);
+      }
+    }
+  }
+  m_up_to_date = true;
+}
+
+// -- GenericSelectedEventFunction --
 
 /// \brief Constructor - default component names
 GenericSelectedEventFunction::GenericSelectedEventFunction(

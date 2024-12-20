@@ -316,6 +316,10 @@ class Histogram1D {
   /// \brief Insert a value into the histogram, with an optional weight
   void insert(double value, double weight = 1.0);
 
+  /// \brief Insert the log of a value into a log space histogram directly,
+  ///     with an optional weight.
+  void insert_log_value(double log_value, double weight = 1.0);
+
   /// \brief Return the coordinates of the beginning of each bin range
   std::vector<double> bin_coords() const;
 
@@ -330,6 +334,9 @@ class Histogram1D {
   void merge(Histogram1D const &other);
 
  private:
+  /// \brief Insert a value into the histogram, with an optional weight
+  void _insert(double value, double weight);
+
   /// \brief Reset histogram bins if this is the first value being added,
   /// or if `value` is less than `begin`
   void _reset_bins(double value);
@@ -385,12 +392,7 @@ class PartitionedHistogram1D {
   /// \brief Constructor
   PartitionedHistogram1D(std::vector<std::string> const &_partion_names,
                          double _initial_begin, double _bin_width, bool _is_log,
-                         Index _max_size = 10000)
-      : m_partition_names(_partion_names),
-        m_histograms(
-            _partion_names.size(),
-            Histogram1D(_initial_begin, _bin_width, _is_log, _max_size)),
-        m_up_to_date(false) {}
+                         Index _max_size = 10000);
 
   /// \brief Return the names of the partitions
   std::vector<std::string> const &partition_names() const {
@@ -433,19 +435,7 @@ class PartitionedHistogram1D {
 
  private:
   /// \brief Make the combined histogram from the partitioned histograms
-  void _make_combined_histogram() const {
-    m_combined_histogram = combine(m_histograms);
-    std::vector<double> bin_coords = m_combined_histogram->bin_coords();
-    if (!bin_coords.empty()) {
-      auto &hist = const_cast<std::vector<Histogram1D> &>(m_histograms);
-      for (Index i = 0; i < hist.size(); ++i) {
-        hist[i].insert(bin_coords.front(), 0.0);
-        hist[i].insert(bin_coords.back(), 0.0);
-      }
-    }
-
-    m_up_to_date = true;
-  }
+  void _make_combined_histogram() const;
 
   /// The names of the partitions
   std::vector<std::string> m_partition_names;
