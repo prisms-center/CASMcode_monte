@@ -2,7 +2,7 @@ from skbuild import setup
 
 setup(
     name="libcasm-monte",
-    version="2.0a3",
+    version="2.0a4",
     packages=[
         "libcasm",
         "libcasm.monte",
