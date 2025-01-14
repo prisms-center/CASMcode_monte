@@ -51,8 +51,8 @@ struct RunManager {
   /// Default null action before / after sampling
   struct NullAction {
     void operator()(sampling_fixture_type const &fixture,
-                    state_type const &state){
-        // do nothing
+                    state_type const &state) {
+      // do nothing
     };
   };
 
@@ -157,7 +157,7 @@ struct RunManager {
     }
   }
 
-  template <typename PreSampleActionType = NullAction,
+  template <bool DebugMode = false, typename PreSampleActionType = NullAction,
             typename PostSampleActionType = NullAction>
   void sample_data_by_count_if_due(
       state_type const &state,
@@ -169,7 +169,7 @@ struct RunManager {
           SAMPLE_MODE::BY_TIME) {
         if (fixture.counter().count == fixture.next_sample_count()) {
           pre_sample_f(fixture, state);
-          fixture.sample_data(state);
+          fixture.template sample_data<DebugMode>(state);
           post_sample_f(fixture, state);
           auto it = break_point_checks.find(fixture.label());
           if (it != break_point_checks.end()) {
@@ -180,7 +180,7 @@ struct RunManager {
     }
   }
 
-  template <typename PreSampleActionType = NullAction,
+  template <bool DebugMode = false, typename PreSampleActionType = NullAction,
             typename PostSampleActionType = NullAction>
   void sample_data_by_time_if_due(
       TimeType event_time, state_type const &state,
@@ -193,7 +193,7 @@ struct RunManager {
 
       pre_sample_f(fixture, state);
       fixture.set_time(this->next_sample_time);
-      fixture.sample_data(state);
+      fixture.template sample_data<DebugMode>(state);
       post_sample_f(fixture, state);
       auto it = break_point_checks.find(fixture.label());
       if (it != break_point_checks.end()) {
