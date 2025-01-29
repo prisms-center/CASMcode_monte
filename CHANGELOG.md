@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added `AtomInfo` and `AtomInfoMap` to `libcasm.monte.events`.
+- Added more informative error messages for continuous 1d histogram functions that give a bad partition or infinite value
 
 ### Fixed
 
