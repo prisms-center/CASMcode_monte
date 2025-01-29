@@ -469,7 +469,7 @@ PYBIND11_MODULE(_monte_events, m) {
           position_index: int
               Index of atom in Mol.component_id and Occupant.atoms.
           time: Optional[float] = None
-              Time of the event
+              Time when the atom was added or removed
           )pbdoc")
       .def_readwrite("atom", &monte::AtomInfo::atom,
                      R"pbdoc(
@@ -484,6 +484,10 @@ PYBIND11_MODULE(_monte_events, m) {
       .def_readwrite("position_index", &monte::AtomInfo::position_index,
                      R"pbdoc(
           int: Index of atom in Mol.component_id and Occupant.atoms.
+          )pbdoc")
+      .def_readwrite("time", &monte::AtomInfo::time,
+                     R"pbdoc(
+          float: Time when the atom was added or removed
           )pbdoc");
 
   py::bind_map<std::map<Index, monte::AtomInfo>>(m, "AtomInfoMap",
@@ -686,7 +690,7 @@ PYBIND11_MODULE(_monte_events, m) {
                      R"pbdoc(
           int: Asymmetric unit index
           )pbdoc")
-      .def_readwrite("species_index", &monte::OccCandidate::asym,
+      .def_readwrite("species_index", &monte::OccCandidate::species_index,
                      R"pbdoc(
           int: Species index, distinguishing each allowed site occupant, including\
           distinct molecular orientations if applicable.
@@ -736,7 +740,7 @@ PYBIND11_MODULE(_monte_events, m) {
              monte::Conversions const &convert) {
             jsonParser json;
             to_json(self, json, convert);
-            return json;
+            return static_cast<nlohmann::json>(json);
           },
           R"pbdoc(
          Represent the OccCandidate as a Python dict
@@ -750,7 +754,8 @@ PYBIND11_MODULE(_monte_events, m) {
          -------
          data : dict
               The OccCandidate as a Python dict
-         )pbdoc")
+         )pbdoc",
+          py::arg("convert"))
       .def_static(
           "from_dict",
           [](const nlohmann::json &data,
@@ -774,7 +779,8 @@ PYBIND11_MODULE(_monte_events, m) {
          -------
          candidate : :class:`~libcasm.monte.events.OccCandidate`
               The OccCandidate
-         )pbdoc");
+         )pbdoc",
+          py::arg("data"), py::arg("convert"));
 
   py::class_<monte::OccSwap>(m, "OccSwap", R"pbdoc(
     Represents a Monte Carlo event that swaps occupants
@@ -847,7 +853,7 @@ PYBIND11_MODULE(_monte_events, m) {
           [](monte::OccSwap const &self, monte::Conversions const &convert) {
             jsonParser json;
             to_json(self, json, convert);
-            return json;
+            return static_cast<nlohmann::json>(json);
           },
           R"pbdoc(
          Represent the OccSwap as a Python dict
@@ -861,7 +867,8 @@ PYBIND11_MODULE(_monte_events, m) {
          -------
          data : dict
               The OccSwap as a Python dict
-         )pbdoc")
+         )pbdoc",
+          py::arg("convert"))
       .def_static(
           "from_dict",
           [](const nlohmann::json &data,
@@ -884,7 +891,8 @@ PYBIND11_MODULE(_monte_events, m) {
          -------
          swap : :class:`~libcasm.monte.events.OccSwap`
               The OccSwap
-         )pbdoc");
+         )pbdoc",
+          py::arg("data"), py::arg("convert"));
 
   py::bind_map<std::map<monte::OccSwap, int>>(m, "OccSwapCountMap",
                                               R"pbdoc(
@@ -952,7 +960,7 @@ PYBIND11_MODULE(_monte_events, m) {
              monte::Conversions const &convert) {
             jsonParser json;
             to_json(self, json, convert);
-            return json;
+            return static_cast<nlohmann::json>(json);
           },
           R"pbdoc(
          Represent the MultiOccSwap as a Python dict
@@ -966,7 +974,8 @@ PYBIND11_MODULE(_monte_events, m) {
          -------
          data : dict
               The MultiOccSwap as a Python dict
-         )pbdoc")
+         )pbdoc",
+          py::arg("convert"))
       .def_static(
           "from_dict",
           [](const nlohmann::json &data,
@@ -990,7 +999,8 @@ PYBIND11_MODULE(_monte_events, m) {
          -------
          multiswap : :class:`~libcasm.monte.events.MultiOccSwap`
               The MultiOccSwap
-         )pbdoc");
+         )pbdoc",
+          py::arg("data"), py::arg("convert"));
 
   py::class_<monte::OccCandidateList>(m, "OccCandidateList", R"pbdoc(
     Stores a list of allowed OccCandidate
@@ -1049,7 +1059,7 @@ PYBIND11_MODULE(_monte_events, m) {
              monte::Conversions const &convert) {
             jsonParser json;
             to_json(self, json, convert);
-            return json;
+            return static_cast<nlohmann::json>(json);
           },
           R"pbdoc(
           Represent the OccCandidateList as a Python dict
@@ -1066,7 +1076,8 @@ PYBIND11_MODULE(_monte_events, m) {
           -------
           data : dict
               The OccCandidateList as a Python dict
-          )pbdoc")
+          )pbdoc",
+          py::arg("convert"))
       .def_static(
           "from_dict",
           [](const nlohmann::json &data,
@@ -1090,7 +1101,8 @@ PYBIND11_MODULE(_monte_events, m) {
           -------
           candidate_list : :class:`~libcasm.monte.events.OccCandidateList`
               The OccCandidateList
-          )pbdoc");
+          )pbdoc",
+          py::arg("data"), py::arg("convert"));
 
   m.def("is_allowed_canonical_swap", &monte::allowed_canonical_swap,
         R"pbdoc(
@@ -1312,19 +1324,21 @@ PYBIND11_MODULE(_monte_events, m) {
           },
           R"pbdoc(
           Access Mol by id (location of molecule in mol list).
-          )pbdoc")
+          )pbdoc",
+          py::arg("mol_id"))
       .def("atom_size", &monte::OccLocation::mol_size,
            R"pbdoc(
           Total number of atoms.
           )pbdoc")
       .def(
           "atom",
-          [](monte::OccLocation &self, Index mol_id) {
-            return self.mol(mol_id);
+          [](monte::OccLocation &self, Index atom_id) {
+            return self.atom(atom_id);
           },
           R"pbdoc(
           Access Atom by id (location of atom in atom list).
-          )pbdoc")
+          )pbdoc",
+          py::arg("atom_id"))
       .def("atom_positions_cart", &monte::OccLocation::atom_positions_cart,
            R"pbdoc(
           Return current atom positions in cartesian coordinates, shape=(3, atom_size).

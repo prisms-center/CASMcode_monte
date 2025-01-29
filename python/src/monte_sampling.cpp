@@ -2321,7 +2321,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
           stats : libcasm.monte.sampling.BasicStatistics
               Calculated statistics.
 
-          )pbdoc")
+          )pbdoc",
+          py::arg("observations"), py::arg("sample_weight"))
       .def(
           "__call__",
           [](monte::BasicStatisticsCalculator const &f,
@@ -2346,7 +2347,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
           stats : libcasm.monte.sampling.BasicStatistics
               Calculated statistics.
 
-          )pbdoc")
+          )pbdoc",
+          py::arg("observations"), py::arg("sample_weight"))
       .def(
           "to_dict",
           [](monte::BasicStatisticsCalculator const &f) {
