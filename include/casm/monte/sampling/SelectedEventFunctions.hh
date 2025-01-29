@@ -417,6 +417,13 @@ class PartitionedHistogram1D {
     if (partition < 0 || partition >= m_histograms.size()) {
       throw std::runtime_error("Partition index out of range");
     }
+    if (!std::isfinite(value)) {
+      std::stringstream msg;
+      msg << "Error in PartitionedHistogram1D::insert: "
+          << "for partition=\"" << m_partition_names[partition] << "\" "
+          << "value (=" << value << ") is not finite.";
+      throw std::runtime_error(msg.str());
+    }
     m_histograms[partition].insert(value, weight);
   }
 

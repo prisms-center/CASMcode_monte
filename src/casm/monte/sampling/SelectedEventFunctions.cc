@@ -615,7 +615,7 @@ SelectedEventDataCollector::SelectedEventDataCollector(
       continue;
     } else {
       throw std::runtime_error(
-          "Error in kinetic_monte_carlo_v2: unknown quantity in "
+          "Error in SelectedEventDataCollector: unknown quantity in "
           "selected_event_data_params: " +
           name);
     }
@@ -658,13 +658,37 @@ void SelectedEventDataCollector::collect_vector_float_data() {
 }
 
 void SelectedEventDataCollector::collect_continuous_1d_data() {
+  int partition;
+  double value;
   double weight = 1.0;
 
   auto hist_it = continuous_1d_hist.begin();
   auto f_it = continuous_1d_f.begin();
   auto f_end = continuous_1d_f.end();
   while (f_it != f_end) {
-    (*hist_it)->insert(f_it->partition(), f_it->function(), weight);
+    // Get partition and value to insert
+    partition = f_it->partition();
+    value = f_it->function();
+
+    // Validation so we can throw a more informative error message:
+    if (partition < 0 || partition >= f_it->partition_names.size()) {
+      std::stringstream msg;
+      msg << "Error in PartitionedHistogram1D::insert: "
+          << "function (name=\"" << f_it->name << "\") returned a "
+          << "partition index (=" << partition << ") that is out of range.";
+      throw std::runtime_error(msg.str());
+    }
+    if (!std::isfinite(value)) {
+      std::stringstream msg;
+      msg << "Error in PartitionedHistogram1D::insert: "
+          << "function (name=\"" << f_it->name << "\", "
+          << "partition=\"" << f_it->partition_names[partition] << "\") "
+          << " returned a value (=" << value << ") that is not finite.";
+      throw std::runtime_error(msg.str());
+    }
+
+    // Insert value
+    (*hist_it)->insert(partition, value, weight);
     ++f_it;
     ++hist_it;
   }
