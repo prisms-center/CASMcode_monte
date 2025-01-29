@@ -1,5 +1,8 @@
 #include "casm/monte/sampling/SelectedEventFunctions.hh"
 
+// debug
+#include <iostream>
+
 namespace CASM::monte {
 
 void CorrelationsData::initialize(Index _n_atoms,
@@ -660,6 +663,7 @@ void SelectedEventDataCollector::collect_vector_float_data() {
 void SelectedEventDataCollector::collect_continuous_1d_data() {
   int partition;
   double value;
+  double log_value;
   double weight = 1.0;
 
   auto hist_it = continuous_1d_hist.begin();
@@ -678,13 +682,28 @@ void SelectedEventDataCollector::collect_continuous_1d_data() {
           << "partition index (=" << partition << ") that is out of range.";
       throw std::runtime_error(msg.str());
     }
-    if (!std::isfinite(value)) {
-      std::stringstream msg;
-      msg << "Error in PartitionedHistogram1D::insert: "
-          << "function (name=\"" << f_it->name << "\", "
-          << "partition=\"" << f_it->partition_names[partition] << "\") "
-          << " returned a value (=" << value << ") that is not finite.";
-      throw std::runtime_error(msg.str());
+    if (f_it->is_log) {
+      log_value = std::log10(value);
+
+      if (!std::isfinite(log_value)) {
+        std::stringstream msg;
+        msg << "Error in PartitionedHistogram1D::insert: "
+            << "function (name=\"" << f_it->name << "\", "
+            << "partition=\"" << f_it->partition_names[partition] << "\") "
+            << "returned a value (=" << value << ") "
+            << "with log10(value) (=" << log_value << ") that is not finite.";
+        throw std::runtime_error(msg.str());
+      }
+
+    } else {
+      if (!std::isfinite(value)) {
+        std::stringstream msg;
+        msg << "Error in PartitionedHistogram1D::insert: "
+            << "function (name=\"" << f_it->name << "\", "
+            << "partition=\"" << f_it->partition_names[partition] << "\") "
+            << " returned a value (=" << value << ") that is not finite.";
+        throw std::runtime_error(msg.str());
+      }
     }
 
     // Insert value
