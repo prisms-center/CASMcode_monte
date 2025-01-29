@@ -2321,7 +2321,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
           stats : libcasm.monte.sampling.BasicStatistics
               Calculated statistics.
 
-          )pbdoc")
+          )pbdoc",
+          py::arg("observations"), py::arg("sample_weight"))
       .def(
           "__call__",
           [](monte::BasicStatisticsCalculator const &f,
@@ -2346,7 +2347,8 @@ PYBIND11_MODULE(_monte_sampling, m) {
           stats : libcasm.monte.sampling.BasicStatistics
               Calculated statistics.
 
-          )pbdoc")
+          )pbdoc",
+          py::arg("observations"), py::arg("sample_weight"))
       .def(
           "to_dict",
           [](monte::BasicStatisticsCalculator const &f) {
@@ -3829,7 +3831,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
           )pbdoc",
            py::arg("initial_begin") = 0.0, py::arg("bin_width") = 1.0,
            py::arg("is_log") = false, py::arg("max_size") = 10000)
-      .def("bin_width", &monte::Histogram1D::size, R"pbdoc(
+      .def("bin_width", &monte::Histogram1D::bin_width, R"pbdoc(
           The width of each bin in the histogram
           )pbdoc")
       .def("is_log", &monte::Histogram1D::is_log, R"pbdoc(
@@ -3917,7 +3919,7 @@ PYBIND11_MODULE(_monte_sampling, m) {
 
           Parameters
           ----------
-          partiion_names : list[str]
+          partition_names : list[str]
               Names of the partitions. A separate histogram is created for each
               partition (i.e. activation energies for A-Va hops in one partition
               and activation energies for B-Va hops in another partition).

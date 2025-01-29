@@ -281,6 +281,11 @@ class SamplingFixture {
     return m_is_complete;
   }
 
+  // Return completion check results
+  CompletionCheckResults<stats_type> const &completion_check_results() const {
+    return m_completion_check.results();
+  }
+
   void write_status(Index run_index) {
     if (m_params.method_log.logfile_path.empty()) {
       return;
@@ -337,7 +342,34 @@ class SamplingFixture {
     m_results.selected_event_data = std::move(selected_event_data);
   }
 
+  template <bool DebugMode = false>
   void sample_data(state_type const &state) {
+    // Debug log
+    if constexpr (DebugMode) {
+      Log &log = CASM::log();
+      log.custom("Sample data");
+      log.indent() << "- fixture: " << m_params.label << std::endl;
+
+      // - Set next sample count
+      if (m_params.sampling_params.sample_mode == SAMPLE_MODE::BY_TIME) {
+        log.indent() << "- sample_by: TIME" << std::endl;
+        log.indent() << "- next_sample_time: " << m_next_sample_time
+                     << std::endl;
+      } else {
+        log.indent() << "- sample_by: COUNT" << std::endl;
+        log.indent() << "- next_sample_count: " << m_next_sample_count
+                     << std::endl;
+      }
+
+      log.indent() << "- step: " << m_counter.step << std::endl;
+      log.indent() << "- pass: " << m_counter.pass << std::endl;
+      log.indent() << "- count: " << m_counter.count << std::endl;
+      log.indent() << "- time: " << m_counter.time << std::endl;
+      log << std::endl;
+      log.increase_indent();
+      log.end_section();
+    }
+
     // - Record count
     m_results.sample_count.push_back(m_counter.count);
 
@@ -355,6 +387,11 @@ class SamplingFixture {
     }
 
     // - Evaluate functions and record data
+    // Debug log
+    if constexpr (DebugMode) {
+      Log &log = CASM::log();
+      log.custom("Evaluate sampling functions");
+    }
     for (auto const &name : m_params.sampling_params.sampler_names) {
       if (this->sampling_functions.find(name) ==
           this->sampling_functions.end()) {
@@ -364,8 +401,51 @@ class SamplingFixture {
            << name << "'";
         throw std::runtime_error(ss.str());
       }
+
+      // Debug log - function name
+      if constexpr (DebugMode) {
+        Log &log = CASM::log();
+        log.indent() << "- function: " << name << std::endl;
+      }
+
+      // Sample data
       auto const &function = this->sampling_functions.at(name);
       m_results.samplers.at(name)->push_back(function());
+
+      // Debug log - function value
+      if constexpr (DebugMode) {
+        Log &log = CASM::log();
+        log.increase_indent();
+
+        auto const &sampler = *m_results.samplers.at(name);
+        int r = sampler.n_samples() - 1;
+        jsonParser tjson;
+        tjson["shape"] = sampler.shape();
+        tjson["component_names"] = sampler.component_names();
+        to_json(sampler.values().row(r), tjson["value"],
+                jsonParser::as_array());
+        log.indent() << "- shape: " << tjson["shape"] << std::endl;
+        log.indent() << "- component_names: " << tjson["component_names"]
+                     << std::endl;
+        log.indent() << "- value: " << tjson["value"] << std::endl;
+        log.decrease_indent();
+      }
+    }
+    if constexpr (DebugMode) {
+      if (m_params.sampling_params.sampler_names.size() == 0) {
+        Log &log = CASM::log();
+        log.indent() << "- no sampling functions" << std::endl;
+      }
+      Log &log = CASM::log();
+      log << std::endl;
+      log.end_section();
+    }
+
+    // Evaluate JSON sampling functions
+    // Debug log
+    if constexpr (DebugMode) {
+      Log &log = CASM::log();
+      log.custom("Evaluate JSON sampling functions");
     }
     for (auto const &name : m_params.sampling_params.json_sampler_names) {
       if (this->json_sampling_functions.find(name) ==
@@ -376,8 +456,61 @@ class SamplingFixture {
            << name << "'";
         throw std::runtime_error(ss.str());
       }
+
+      // Debug log - function name
+      if constexpr (DebugMode) {
+        Log &log = CASM::log();
+        log.indent() << "- JSON function: " << name << std::endl;
+      }
+
+      // Sample JSON data
       auto const &function = this->json_sampling_functions.at(name);
       m_results.json_samplers.at(name)->values.push_back(function());
+
+      // Debug log - function name
+      if constexpr (DebugMode) {
+        Log &log = CASM::log();
+        log.increase_indent();
+
+        auto const &sampler = *m_results.json_samplers.at(name);
+        log.indent() << "- value: " << sampler.values.back() << std::endl;
+        log.decrease_indent();
+      }
+    }
+    if constexpr (DebugMode) {
+      if (m_params.sampling_params.json_sampler_names.size() == 0) {
+        Log &log = CASM::log();
+        log.indent() << "- no JSON sampling functions" << std::endl;
+      }
+      Log &log = CASM::log();
+      log << std::endl << std::endl;
+      log.end_section();
+    }
+
+    if constexpr (DebugMode) {
+      Log &log = CASM::log();
+      log.custom("JSON Summary");
+
+      jsonParser json;
+      json["sampling_functions"] = jsonParser::object();
+      for (auto const &name : m_params.sampling_params.sampler_names) {
+        auto const &sampler = *m_results.samplers.at(name);
+        int r = sampler.n_samples() - 1;
+        jsonParser &tjson = json["sampling_functions"][name];
+        tjson["shape"] = sampler.shape();
+        tjson["component_names"] = sampler.component_names();
+        to_json(sampler.values().row(r), tjson["value"],
+                jsonParser::as_array());
+      }
+
+      json["json_sampling_functions"] = jsonParser::object();
+      for (auto const &name : m_params.sampling_params.json_sampler_names) {
+        auto const &sampler = *m_results.json_samplers.at(name);
+        json["json_sampling_functions"][name] = sampler.values.back();
+      }
+
+      log.indent() << json << std::endl << std::endl;
+      log.end_section();
     }
 
     // - Set next sample count
@@ -388,6 +521,14 @@ class SamplingFixture {
             "Error: state sampling period parameter error, next_sample_time <= "
             "current time");
       }
+      if constexpr (DebugMode) {
+        Log &log = CASM::log();
+        log.custom("Set next sample time");
+        log.indent() << "- next_sample_time: " << m_next_sample_time
+                     << std::endl
+                     << std::endl;
+        log.end_section();
+      }
     } else {
       m_next_sample_count = static_cast<CountType>(
           std::round(this->sample_at(m_results.sample_count.size())));
@@ -396,20 +537,35 @@ class SamplingFixture {
             "Error: state sampling period parameter error, next_sample_count "
             "<= current count");
       }
+      if constexpr (DebugMode) {
+        Log &log = CASM::log();
+        log.custom("Set next sample count");
+        log.indent() << "- next_sample_count: " << m_next_sample_count
+                     << std::endl
+                     << std::endl;
+        log.end_section();
+      }
+    }
+
+    if constexpr (DebugMode) {
+      Log &log = CASM::log();
+      log.decrease_indent();
     }
   }
 
+  template <bool DebugMode = false>
   void sample_data_by_count_if_due(state_type const &state) {
     if (m_params.sampling_params.sample_mode != SAMPLE_MODE::BY_TIME &&
         m_counter.count == m_next_sample_count) {
-      sample_data(state);
+      sample_data<DebugMode>(state);
     }
   }
 
+  template <bool DebugMode = false>
   void sample_data_by_time_if_due(state_type const &state, double event_time) {
     if (m_params.sampling_params.sample_mode != SAMPLE_MODE::BY_TIME &&
         event_time >= m_next_sample_time) {
-      sample_data(state);
+      sample_data<DebugMode>(state);
     }
   }
 

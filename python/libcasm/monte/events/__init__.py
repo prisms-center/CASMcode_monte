@@ -2,6 +2,8 @@
 
 from ._monte_events import (
     Atom,
+    AtomInfo,
+    AtomInfoMap,
     AtomLocation,
     AtomTraj,
     AtomTrajVector,
