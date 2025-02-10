@@ -31,7 +31,7 @@ struct RunManager {
   /// A `run_index` used for status messages and results output
   Index run_index;
 
-  /// Random number generator engine
+  /// Random number generator engine (not null)
   std::shared_ptr<engine_type> engine;
 
   /// Sampling fixtures
@@ -51,8 +51,8 @@ struct RunManager {
   /// Default null action before / after sampling
   struct NullAction {
     void operator()(sampling_fixture_type const &fixture,
-                    state_type const &state) {
-      // do nothing
+                    state_type const &state){
+        // do nothing
     };
   };
 
@@ -67,7 +67,7 @@ struct RunManager {
 
   /// \brief Constructor
   ///
-  /// \param _engine Random number generation engine
+  /// \param _engine Random number generation engine (throw if null)
   /// \param _sampling_fixture_params Sampling fixture parameters
   /// \param _global_cutoff If true, the run is complete if any sampling fixture
   ///     is complete. Otherwise, all sampling fixtures must be
@@ -82,6 +82,11 @@ struct RunManager {
         next_sampling_fixture(nullptr),
         next_sample_time(0.0),
         break_point_set(false) {
+    if (!engine) {
+      throw std::runtime_error(
+          "Error constructing RunManager: engine==nullptr");
+    }
+
     for (auto const &params : _sampling_fixture_params) {
       sampling_fixtures.emplace_back(
           std::make_shared<sampling_fixture_type>(params, engine));

@@ -99,21 +99,21 @@ double sample_at(CountType sample_index, SamplingParams const &sampling_params);
 template <typename EngineType>
 CountType stochastic_count_step(
     double sample_rate,
-    monte::RandomNumberGenerator<EngineType> random_number_generator);
+    monte::RandomNumberGenerator<EngineType> &random_number_generator);
 
 /// \brief Stochastically determine much time
 ///     until the next sample
 template <typename EngineType>
 TimeType stochastic_time_step(
     TimeType sample_rate,
-    monte::RandomNumberGenerator<EngineType> random_number_generator);
+    monte::RandomNumberGenerator<EngineType> &random_number_generator);
 
 /// \brief Return the count / time when the sample_index-th sample should be
 ///     taken
 template <typename EngineType>
 double stochastic_sample_at(
     CountType sample_index, SamplingParams const &sampling_params,
-    monte::RandomNumberGenerator<EngineType> random_number_generator,
+    monte::RandomNumberGenerator<EngineType> &random_number_generator,
     std::vector<CountType> const &sample_count,
     std::vector<TimeType> const &sample_time);
 
@@ -192,7 +192,7 @@ inline double sample_at(CountType sample_index,
 template <typename EngineType>
 CountType stochastic_count_step(
     double sample_rate,
-    monte::RandomNumberGenerator<EngineType> random_number_generator) {
+    monte::RandomNumberGenerator<EngineType> &random_number_generator) {
   CountType dn = 1;
   double max = 1.0;
   while (true) {
@@ -213,7 +213,7 @@ CountType stochastic_count_step(
 template <typename EngineType>
 TimeType stochastic_time_step(
     TimeType sample_rate,
-    monte::RandomNumberGenerator<EngineType> random_number_generator) {
+    monte::RandomNumberGenerator<EngineType> &random_number_generator) {
   TimeType max = 1.0;
   return -std::log(random_number_generator.random_real(max)) / sample_rate;
 }
@@ -241,7 +241,7 @@ TimeType stochastic_time_step(
 template <typename EngineType>
 double stochastic_sample_at(
     CountType sample_index, SamplingParams const &sampling_params,
-    monte::RandomNumberGenerator<EngineType> random_number_generator,
+    monte::RandomNumberGenerator<EngineType> &random_number_generator,
     std::vector<CountType> const &sample_count,
     std::vector<TimeType> const &sample_time) {
   SamplingParams const &s = sampling_params;
