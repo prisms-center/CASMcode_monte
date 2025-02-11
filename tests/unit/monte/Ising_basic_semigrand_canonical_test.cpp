@@ -11,7 +11,7 @@ using namespace CASM::monte::ising_cpp::basic_semigrand_canonical;
 
 typedef SemiGrandCanonicalConditions conditions_type;
 typedef IsingState state_type;
-typedef std::mt19937_64 engine_type;
+typedef monte::default_engine_type engine_type;
 typedef SemiGrandCanonicalEventGenerator<engine_type> event_generator_type;
 typedef event_generator_type::random_number_generator_type
     random_number_generator_type;

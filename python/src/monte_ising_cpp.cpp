@@ -27,7 +27,7 @@ using namespace CASM::monte;
 using namespace CASM::monte::ising_cpp;
 
 // used for libcasm.monte:
-typedef std::mt19937_64 engine_type;
+typedef monte::default_engine_type engine_type;
 typedef RandomNumberGenerator<engine_type> generator_type;
 typedef BasicStatistics statistics_type;
 typedef IsingConfiguration configuration_type;

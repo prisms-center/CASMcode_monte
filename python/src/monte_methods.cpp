@@ -29,7 +29,7 @@ namespace CASMpy {
 using namespace CASM;
 
 // used for libcasm.monte:
-typedef std::mt19937_64 engine_type;
+typedef monte::default_engine_type engine_type;
 typedef monte::RandomNumberGenerator<engine_type> generator_type;
 typedef monte::BasicStatistics statistics_type;
 

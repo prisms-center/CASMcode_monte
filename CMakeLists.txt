@@ -81,6 +81,7 @@ set(
   libcasm_monte_HEADERS
   ${PROJECT_SOURCE_DIR}/include/casm/monte/BasicStatistics.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/Conversions.hh
+  ${PROJECT_SOURCE_DIR}/include/casm/monte/MTRandEngine.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/MethodLog.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/RandomNumberGenerator.hh
   ${PROJECT_SOURCE_DIR}/include/casm/monte/ValueMap.hh

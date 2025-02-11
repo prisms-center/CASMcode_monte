@@ -3,14 +3,18 @@
 
 #include <map>
 #include <memory>
+#include <random>
 #include <string>
 
 #include "casm/casm_io/json/jsonParser.hh"
 #include "casm/global/definitions.hh"
 #include "casm/global/eigen.hh"
+#include "casm/monte/MTRandEngine.hh"
 
 namespace CASM {
 namespace monte {
+
+typedef std::mt19937_64 default_engine_type;
 
 /// How often to sample runs
 enum class SAMPLE_MODE { BY_STEP, BY_PASS, BY_TIME };

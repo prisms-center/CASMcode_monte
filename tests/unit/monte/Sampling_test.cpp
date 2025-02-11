@@ -19,7 +19,8 @@ struct CalculationTest {
   std::shared_ptr<xtal::BasicStructure const> shared_prim;
 
   /// Random number generator
-  monte::RandomNumberGenerator<std::mt19937_64> random_number_generator;
+  monte::RandomNumberGenerator<monte::default_engine_type>
+      random_number_generator;
 
   /// Current state
   monte::State<test::Configuration> const *state;
@@ -27,9 +28,10 @@ struct CalculationTest {
   /// Current supercell
   Eigen::Matrix3l transformation_matrix_to_super;
 
-  CalculationTest(std::shared_ptr<xtal::BasicStructure const> _shared_prim,
-                  std::shared_ptr<std::mt19937_64> _random_number_engine =
-                      std::shared_ptr<std::mt19937_64>())
+  CalculationTest(
+      std::shared_ptr<xtal::BasicStructure const> _shared_prim,
+      std::shared_ptr<monte::default_engine_type> _random_number_engine =
+          std::shared_ptr<monte::default_engine_type>())
       : shared_prim(_shared_prim),
         random_number_generator(_random_number_engine),
         state(nullptr) {}

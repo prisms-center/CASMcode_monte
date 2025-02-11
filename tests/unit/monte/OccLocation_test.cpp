@@ -105,7 +105,7 @@ void run_case(std::shared_ptr<xtal::BasicStructure const> shared_prim,
 
 class OccLocationTest : public testing::Test {
  protected:
-  typedef std::mt19937_64 engine_type;
+  typedef monte::default_engine_type engine_type;
   typedef monte::RandomNumberGenerator<engine_type> generator_type;
   generator_type random_number_generator;
 };
