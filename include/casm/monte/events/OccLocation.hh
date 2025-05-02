@@ -73,7 +73,8 @@ class OccLocation {
 
   OccLocation(const Conversions &_convert,
               const OccCandidateList &_candidate_list,
-              bool _update_atoms = false, bool _save_atom_info = false);
+              bool _update_atoms = false, bool _track_unique_atoms = false,
+              bool _save_atom_info = false);
 
   /// Fill tables with occupation info
   void initialize(Eigen::VectorXi const &occupation,
@@ -191,6 +192,10 @@ class OccLocation {
   /// Get Conversions objects
   Conversions const &convert() const;
 
+  /// \brief Replace the Mol at a specified site
+  void replace_mol(Index l, int occ, std::vector<Index> const &atom_id,
+                   std::vector<Atom> const &atom);
+
  private:
   Conversions const &m_convert;
 
@@ -218,18 +223,20 @@ class OccLocation {
   /// If true, update Atom location during apply
   bool m_update_atoms;
 
-  /// Data structure used to implement adding "reservoir" molecules during apply
-  std::vector<Mol> m_reservoir_mol;
+  // -- Track atoms moving to/from the reservoir --
+
+  /// The `atom_id` (positions in `m_atoms`) that have been emptied due to
+  /// an atom being removed from the supercell (and not yet filled).
+  std::set<Index> m_available_atom_id;
+
+  /// If true, track unique atom ids
+  const bool m_track_unique_atoms;
 
   /// The next unique atom id to assign
   Index m_next_unique_atom_id;
 
   /// m_unique_atom_id[atom_id] -> unique atom id for current Atom in `m_atoms`
   std::vector<Index> m_unique_atom_id;
-
-  /// The `atom_id` (positions in `m_atoms`) that have been emptied due to
-  /// an atom being removed from the supercell (and not yet filled).
-  std::set<Index> m_available_atom_id;
 
   /// If true, save the initial and final atom info
   bool m_save_atom_info;

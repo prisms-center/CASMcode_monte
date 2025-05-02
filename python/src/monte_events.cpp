@@ -1241,7 +1241,7 @@ PYBIND11_MODULE(_monte_events, m) {
 
     )pbdoc")
       .def(py::init<const monte::Conversions &, const monte::OccCandidateList &,
-                    bool>(),
+                    bool, bool, bool>(),
            R"pbdoc(
           .. rubric:: Constructor
 
@@ -1256,13 +1256,21 @@ PYBIND11_MODULE(_monte_events, m) {
               If True, update atom location information when updating occupation.
               This can be used by kinetic Monte Carlo methods for measuring
               diffusion.
+          track_unique_atoms: bool = False
+              If True, track unique atom id for each atom in the supercell.
+              This can be used by kinetic Monte Carlo methods which allow
+              adding / removing atoms to track individual atoms. This requires
+              `update_atoms` to be True.
           save_atom_info: bool = False
               If True, save initial and final atom position, type, and time
               information. This can be used by kinetic Monte Carlo
-              methods to record the exact deposition / dissolution events.
+              methods to record the exact deposition / dissolution events. This
+              requires `update_atoms` and `track_unique_atoms` to be True.
           )pbdoc",
            py::arg("convert"), py::arg("occ_candidate_list"),
-           py::arg("update_species") = false)
+           py::arg("update_atoms") = false,
+           py::arg("track_unique_atoms") = false,
+           py::arg("save_atom_info") = false)
       .def("initialize", &monte::OccLocation::initialize,
            R"pbdoc(
           Fill tables with current occupation info
@@ -1272,7 +1280,7 @@ PYBIND11_MODULE(_monte_events, m) {
           occupation: np.ndarray[np.int[n_sites,]]
               The occupation vector to initialize with
           time: Optional[float] = None
-              If time has a value, and `save_atom_info` is true, then the
+              If time has a value, and `save_atom_info` is True, then the
               initial atom info will be stored with the given time.
           )pbdoc",
            py::arg("occupation"), py::arg("time") = std::nullopt)
@@ -1288,7 +1296,7 @@ PYBIND11_MODULE(_monte_events, m) {
               The occupation vector to update
           time: Optional[float] = None
               The time the event occurred (for kinetic Monte Carlo). If time
-              has a value, and `save_atom_info` is true, then the
+              has a value, and `save_atom_info` is True, then the
               initial/final atom info will be stored with the given time.
           )pbdoc",
            py::arg("event"), py::arg("occupation"),
