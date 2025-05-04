@@ -65,9 +65,9 @@ class IsingConfiguration:
 
     def set_occ(self, linear_site_index: int, new_occ: int) -> None:
         """Set the current occupation of one site"""
-        self._occupation[
-            np.unravel_index(linear_site_index, self.shape, order="F")
-        ] = new_occ
+        self._occupation[np.unravel_index(linear_site_index, self.shape, order="F")] = (
+            new_occ
+        )
 
     @staticmethod
     def from_dict(data: dict) -> IsingConfiguration:

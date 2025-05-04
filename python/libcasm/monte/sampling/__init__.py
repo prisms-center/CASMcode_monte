@@ -1,4 +1,4 @@
-""" CASM Monte Carlo sampling and convergence check methods """
+"""CASM Monte Carlo sampling and convergence check methods"""
 
 # keep seperate for now
 from ._monte_sampling import (
