@@ -32,7 +32,7 @@ if os.path.exists(processed_dir):
 
 os.mkdir(processed_dir)
 for file in os.listdir(raw_dir):
-    processed_file = file.replace("linux", "manylinux2014")
+    processed_file = file.replace("linux", "manylinux_2_28")
     shutil.copyfile(
         os.path.join(raw_dir, file), os.path.join(processed_dir, processed_file)
     )
