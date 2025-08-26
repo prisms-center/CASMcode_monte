@@ -23,7 +23,7 @@ jobs:
 
       ### libcasm-global ###
       - name: checkout libcasm-global tests
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: prisms-center/CASMcode_global
           path: CASMcode_global
@@ -39,7 +39,7 @@ jobs:
 
       ### libcasm-composition ###
       - name: checkout libcasm-composition tests
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: prisms-center/CASMcode_composition
           path: CASMcode_composition
@@ -56,7 +56,7 @@ jobs:
 
       ### libcasm-xtal ###
       - name: checkout libcasm-xtal tests
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: prisms-center/CASMcode_crystallography
           path: CASMcode_crystallography
