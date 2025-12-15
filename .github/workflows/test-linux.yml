@@ -85,7 +85,7 @@ jobs:
 
       - name: upload docs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: libcasm-monte-docs
           path: python/doc/_build/html
