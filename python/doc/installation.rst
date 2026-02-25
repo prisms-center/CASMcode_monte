@@ -7,7 +7,7 @@ Install from PyPI
 
 .. note::
 
-    CASM is built for macOS x86_64 (Intel), macOS arm64 (Apple Silicon), Linux x86_64, and Linux aarch64.
+    CASM is built for macOS arm64 (Apple Silicon), Linux x86_64, and Linux aarch64.
 
 The latest release of libcasm-monte can be installed with:
 
