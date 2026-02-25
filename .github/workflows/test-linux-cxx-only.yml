@@ -18,8 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
 
@@ -33,7 +33,7 @@ jobs:
       ### libcasm-global ###
       - name: restore libcasm-global cache
         id: cache-libcasm-global-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: CASMcode_global/dist
           key: ${{ runner.os }}-libcasm-global-v2-2-0
@@ -41,7 +41,7 @@ jobs:
       ### libcasm-composition ###
       - name: restore libcasm-composition cache
         id: cache-libcasm-composition-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: CASMcode_composition/dist
           key: ${{ runner.os }}-libcasm-composition-v2-2-0
@@ -49,7 +49,7 @@ jobs:
       ### libcasm-xtal ###
       - name: restore libcasm-xtal cache
         id: cache-libcasm-xtal-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: CASMcode_crystallography/dist
           key: ${{ runner.os }}-libcasm-xtal-v2-2-0
@@ -102,7 +102,7 @@ jobs:
 
       - name: upload test log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: libcasm-monte-cxx-test-log
           path: build_cxx_test/Testing/Temporary/LastTest.log
