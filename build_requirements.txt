@@ -6,5 +6,5 @@ ninja
 pybind11~=3.0
 numpy
 libcasm-global>=2.2.0
-libcasm-xtal>=2.2.0
+libcasm-xtal>=2.2.0,<3
 libcasm-composition>=2.2.0

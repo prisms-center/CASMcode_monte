@@ -7,7 +7,7 @@ requires = [
     "ninja",
     "pybind11~=3.0",
     "libcasm-global>=2.2.0",
-    "libcasm-xtal>=2.2.0",
+    "libcasm-xtal>=2.2.0,<3",
     "libcasm-composition>=2.2.0",
 ]
 build-backend = "setuptools.build_meta"
@@ -30,7 +30,7 @@ classifiers = [
 ]
 dependencies = [
     "libcasm-global>=2.4.0",
-    "libcasm-xtal>=2.3.0",
+    "libcasm-xtal>=2.3.0,<3",
     "libcasm-composition>=2.3.0",
     "numpy",
 ]
