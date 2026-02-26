@@ -63,7 +63,7 @@ test-command = "pytest -rsap {project}/python/tests"
 
 [tool.cibuildwheel.macos]
 # C++17
-environment = { MACOSX_DEPLOYMENT_TARGET="10.15" }
+environment = { MACOSX_DEPLOYMENT_TARGET="11.0" }
 
 repair-wheel-command = ""
 
