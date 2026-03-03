@@ -52,7 +52,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: CASMcode_crystallography/dist
-          key: ${{ runner.os }}-libcasm-xtal-v2-3-0
+          key: ${{ runner.os }}-libcasm-xtal-v3-0a1
 
       - name: Install CASM dependencies
         run: |

@@ -2,20 +2,19 @@ import os
 
 # -- package specific configuration --
 project = "libcasm-monte"
-version = "2.3"  # The short X.Y version.
-release = "2.3.0"  # The full version, including alpha/beta/rc tags.
+version = "3.0"  # The short X.Y version.
+release = "3.0a1"  # The full version, including alpha/beta/rc tags.
 project_desc = "CASM building blocks for Monte Carlo simulations"
 logo_text = "libcasm-monte"
 github_url = "https://github.com/prisms-center/CASMcode_monte/"
 pypi_url = "https://pypi.org/project/libcasm-monte/"
 intersphinx_libcasm_packages = [
     ("global", "2.0"),
-    ("xtal", "2.0"),
+    ("xtal", "3"),
     ("composition", "2.0"),
-    ("clexulator", "2.0"),
-    ("configuration", "2.0"),
+    ("clexulator", "3"),
+    ("configuration", "3"),
 ]
-
 
 # -- CASM common configuration ---
 
@@ -67,7 +66,6 @@ for package, vers in intersphinx_libcasm_packages:
     intersphinx_mapping[package] = (url, inventory)
 
 print(intersphinx_mapping)
-
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom

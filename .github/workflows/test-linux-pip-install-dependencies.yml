@@ -60,12 +60,12 @@ jobs:
         with:
           repository: prisms-center/CASMcode_crystallography
           path: CASMcode_crystallography
-          ref: v2.3.0
+          ref: v3.0a1
 
       - name: test libcasm-xtal
         shell: bash
         run: |
           cd CASMcode_crystallography
-          pip install libcasm-xtal==2.3.0
+          pip install libcasm-xtal==3.0a1
           pip install -r test_requirements.txt
           python -m pytest -rsap python/tests

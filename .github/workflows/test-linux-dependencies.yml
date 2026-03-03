@@ -91,7 +91,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: CASMcode_crystallography/dist
-          key: ${{ runner.os }}-libcasm-xtal-v2-3-0
+          key: ${{ runner.os }}-libcasm-xtal-v3-0a1
 
       - name: checkout libcasm-xtal
         if: steps.cache-libcasm-xtal-restore.outputs.cache-hit != 'true'
@@ -99,7 +99,7 @@ jobs:
         with:
           repository: prisms-center/CASMcode_crystallography
           path: CASMcode_crystallography
-          ref: v2.3.0
+          ref: v3.0a1
 
       - name: make xtal
         if: steps.cache-libcasm-xtal-restore.outputs.cache-hit != 'true'
